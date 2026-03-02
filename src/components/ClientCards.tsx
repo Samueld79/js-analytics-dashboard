@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import type { ClientMonthlyData } from "../data/months";
 import type { AccountStatus, ClientMetrics } from "../utils/calculations";
 import { formatCop, formatPercent, formatRoas, getDelta } from "../utils/calculations";
-import { downloadTextFile, generateClientCSV, sanitizeFilename } from "../utils/export";
 import { ClientCharts } from "./ClientCharts";
 import { StatusPill } from "./StatusPill";
 
@@ -140,21 +139,10 @@ export function ClientCards({ clients, data, monthLabel, activeMonth, previousMo
         {visibleClients.map((client) => {
           const copy = getClientCopy(client);
           const isChartsOpen = openCharts[client.name] ?? false;
-          const fullClientData = data.find((item) => item.clientName === client.name) ?? null;
 
           const salesDelta = getDelta(client.sales, client.previousSales);
           const messagesDelta = getDelta(client.messages, client.previousMessages);
           const cprDelta = getDelta(client.cpr, client.previousCpr);
-
-          const onDownloadReport = () => {
-            if (!fullClientData) return;
-            const months = Object.keys(fullClientData.months).sort((a, b) => a.localeCompare(b));
-            const fileBase = `reporte-${sanitizeFilename(fullClientData.clientName)}`;
-            const filename =
-              months.length > 1 ? `${fileBase}.csv` : `${fileBase}-${months[0] ?? "sin-mes"}.csv`;
-            const csv = generateClientCSV(fullClientData);
-            downloadTextFile(filename, csv);
-          };
 
           const onDownloadPdf = () => {
             const url = `/report?client=${encodeURIComponent(client.name)}&month=${encodeURIComponent(activeMonth)}`;
@@ -217,9 +205,6 @@ export function ClientCards({ clients, data, monthLabel, activeMonth, previousMo
                 </span>
               </div>
               <div className="client-actions no-print">
-                <button type="button" className="client-report-btn" onClick={onDownloadReport}>
-                  Descargar reporte
-                </button>
                 <button type="button" className="client-pdf-btn" onClick={onDownloadPdf}>
                   Descargar PDF
                 </button>
