@@ -481,6 +481,44 @@ tbody tr:hover td {
   font-size: 0.83rem;
 }
 
+.toggle-charts-btn {
+  border: 1px solid rgba(148, 167, 199, 0.35);
+  background: rgba(22, 33, 58, 0.72);
+  color: #d9e6ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.toggle-charts-btn:hover {
+  background: rgba(41, 121, 255, 0.2);
+  border-color: rgba(122, 177, 255, 0.52);
+}
+
+.client-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.client-charts-grid .chart-card {
+  min-height: 100%;
+  padding: 14px;
+  gap: 8px;
+}
+
+.client-charts-grid .chart-card:last-child {
+  grid-column: 1 / -1;
+}
+
+.client-charts-grid .bar-chart {
+  min-height: 160px;
+}
+
 .client-copy h4 {
   margin: 0 0 6px;
   font-size: 0.88rem;
@@ -561,5 +599,13 @@ tbody tr:hover td {
   .mini-kpis,
   .mini-kpis-extended {
     grid-template-columns: 1fr;
+  }
+
+  .client-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-charts-grid .chart-card:last-child {
+    grid-column: auto;
   }
 }

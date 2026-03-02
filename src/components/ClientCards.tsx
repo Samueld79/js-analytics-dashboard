@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
+import type { ClientMonthlyData } from "../data/months";
 import type { AccountStatus, ClientMetrics } from "../utils/calculations";
 import { formatCop, formatInteger, formatPercent, formatRoas } from "../utils/calculations";
+import { ClientCharts } from "./ClientCharts";
 import { StatusPill } from "./StatusPill";
 
 type ClientCardsProps = {
   clients: ClientMetrics[];
+  data: ClientMonthlyData[];
   monthLabel: string;
   previousMonthExists: boolean;
 };
@@ -85,8 +88,9 @@ function getClientCopy(client: ClientMetrics): { diagnosis: string; direction: s
   return namedCopy[client.name] ?? copyByStatus[client.status];
 }
 
-export function ClientCards({ clients, monthLabel, previousMonthExists }: ClientCardsProps) {
+export function ClientCards({ clients, data, monthLabel, previousMonthExists }: ClientCardsProps) {
   const [search, setSearch] = useState("");
+  const [openCharts, setOpenCharts] = useState<Record<string, boolean>>({});
   const normalizedSearch = search.trim().toLowerCase();
   const visibleClients = useMemo(
     () => clients.filter((client) => client.name.toLowerCase().includes(normalizedSearch)),
@@ -114,6 +118,7 @@ export function ClientCards({ clients, monthLabel, previousMonthExists }: Client
       <div className="clients-grid">
         {visibleClients.map((client) => {
           const copy = getClientCopy(client);
+          const isChartsOpen = openCharts[client.name] ?? false;
           return (
             <article key={client.name} className="card client-card">
               <div className="client-head">
@@ -159,6 +164,16 @@ export function ClientCards({ clients, monthLabel, previousMonthExists }: Client
                 vs mes anterior: ROAS {previousMonthExists ? formatPercent(client.deltaRoas) : "—"} · CPR{" "}
                 {previousMonthExists ? formatPercent(client.deltaCpr) : "—"}
               </p>
+              <button
+                type="button"
+                className="toggle-charts-btn"
+                onClick={() =>
+                  setOpenCharts((prev) => ({ ...prev, [client.name]: !isChartsOpen }))
+                }
+              >
+                {isChartsOpen ? "Ocultar gráficas" : "Ver gráficas"}
+              </button>
+              {isChartsOpen ? <ClientCharts clientName={client.name} data={data} /> : null}
               <div className="client-copy">
                 <h4>Diagnóstico ejecutivo</h4>
                 <p>{copy.diagnosis}</p>

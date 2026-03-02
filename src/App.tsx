@@ -143,7 +143,12 @@ function App() {
         </section>
 
         <RankingTable clients={rankedClients} />
-        <ClientCards clients={rankedClients} monthLabel={monthLabel} previousMonthExists={Boolean(previousMonth)} />
+        <ClientCards
+          clients={rankedClients}
+          data={data}
+          monthLabel={monthLabel}
+          previousMonthExists={Boolean(previousMonth)}
+        />
       </main>
     </div>
   );
