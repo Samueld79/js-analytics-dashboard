@@ -504,9 +504,16 @@ tbody tr:hover td {
   gap: 10px;
 }
 
+.client-charts-header h4 {
+  margin: 0;
+  color: #cfe0ff;
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
 .client-charts-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -518,6 +525,37 @@ tbody tr:hover td {
 
 .client-charts-grid .bar-chart {
   min-height: 160px;
+}
+
+.client-cpr-chart .chart-card {
+  padding: 14px;
+}
+
+.client-charts-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.client-charts-summary div {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(148, 167, 199, 0.18);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.client-charts-summary span {
+  display: block;
+  color: #9fb2d8;
+  font-size: 0.76rem;
+}
+
+.client-charts-summary strong {
+  display: block;
+  margin-top: 4px;
+  color: #edf2ff;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .client-copy h4 {
@@ -560,6 +598,10 @@ tbody tr:hover td {
   }
 
   .client-charts-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .client-charts-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -607,6 +649,10 @@ tbody tr:hover td {
   }
 
   .client-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-charts-summary {
     grid-template-columns: 1fr;
   }
 }
