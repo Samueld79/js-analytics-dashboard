@@ -1,0 +1,86 @@
+[
+  {
+    "clientName": "Dulce María Collection",
+    "months": {
+      "2026-02": {
+        "investment": 600000,
+        "sales": null,
+        "messages": 465,
+        "reach": 41848,
+        "impressions": 65946
+      }
+    }
+  },
+  {
+    "clientName": "Ángeles Creando",
+    "months": {
+      "2026-02": {
+        "investment": 1306222,
+        "sales": null,
+        "messages": 1060,
+        "reach": 238233,
+        "impressions": 411096
+      }
+    }
+  },
+  {
+    "clientName": "Empaques y Suministros",
+    "months": {
+      "2026-02": {
+        "investment": 871653,
+        "sales": null,
+        "messages": 1092,
+        "reach": 65130,
+        "impressions": 174892
+      }
+    }
+  },
+  {
+    "clientName": "Platería Rossy 2",
+    "months": {
+      "2026-02": {
+        "investment": 603443,
+        "sales": null,
+        "messages": 501,
+        "reach": 80430,
+        "impressions": 131999
+      }
+    }
+  },
+  {
+    "clientName": "Tienda de la Platería",
+    "months": {
+      "2026-02": {
+        "investment": 931714,
+        "sales": null,
+        "messages": 486,
+        "reach": 168561,
+        "impressions": 258530
+      }
+    }
+  },
+  {
+    "clientName": "Libell Joyería",
+    "months": {
+      "2026-02": {
+        "investment": 3716870,
+        "sales": null,
+        "messages": 2502,
+        "reach": 490391,
+        "impressions": 925672
+      }
+    }
+  },
+  {
+    "clientName": "Ivalent",
+    "months": {
+      "2026-02": {
+        "investment": 1062755,
+        "sales": null,
+        "messages": 689,
+        "reach": 55624,
+        "impressions": 131498
+      }
+    }
+  }
+]

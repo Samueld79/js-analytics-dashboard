@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import type { AccountStatus, ClientMetrics } from "../utils/calculations";
-import { formatCop, formatRoas } from "../utils/calculations";
+import { formatCop, formatInteger, formatPercent, formatRoas } from "../utils/calculations";
 import { StatusPill } from "./StatusPill";
 
 type ClientCardsProps = {
   clients: ClientMetrics[];
+  monthLabel: string;
+  previousMonthExists: boolean;
 };
 
 const copyByStatus: Record<AccountStatus, { diagnosis: string; direction: string }> = {
@@ -16,66 +18,66 @@ const copyByStatus: Record<AccountStatus, { diagnosis: string; direction: string
   },
   "Alto Rendimiento": {
     diagnosis:
-      "Cuenta altamente rentable, con señal clara de tracción comercial y una base real para escalar con menor riesgo.",
+      "Cuenta altamente rentable, con señal clara de tracción comercial y una base real para escalar con bajo riesgo.",
     direction:
-      "Escalar progresivo, refresh creativos y reforzar remarketing para capturar demanda caliente sin deteriorar eficiencia.",
+      "Escalar de forma controlada, refrescar creativos y proteger la eficiencia en campañas con mejor retorno.",
   },
   "Rentable - Optimizable": {
     diagnosis:
-      "Rentable y estable, con desempeño sólido y margen claro para mejorar eficiencia y elevar retorno.",
+      "Rentable y estable, con margen para mejorar eficiencia comercial y capturar más valor con la misma inversión.",
     direction:
-      "Redistribuir presupuesto, probar hooks de mayor intención y fortalecer remarketing con oferta y urgencia.",
+      "Redistribuir presupuesto hacia activos ganadores y ajustar mensajes para elevar conversión en audiencias clave.",
   },
   "Margen Bajo": {
     diagnosis:
-      "Retorno bajo para el esfuerzo invertido; hay señales de desalineación entre objetivo, público y mensaje.",
+      "Retorno bajo para el capital invertido; se observan señales de desalineación entre oferta, mensaje y público.",
     direction:
-      "Reestructurar por temperatura de audiencia (frío/tibio/caliente), ajustar intención y ejecutar pruebas A/B enfocadas.",
+      "Reorganizar estructura por nivel de intención, simplificar propuesta y ejecutar pruebas de validación rápida.",
   },
   "No Rentable": {
     diagnosis:
-      "No está siendo rentable en el estado actual y requiere corrección inmediata para evitar más pérdida de eficiencia.",
+      "No está siendo rentable en el estado actual y requiere corrección inmediata para contener pérdida de eficiencia.",
     direction:
-      "Pausar escalamiento, revisar objetivo/audiencias/mensaje, aplicar estructura simple 1+1 y validar resultados en 72h.",
+      "Pausar escalamiento, reenfocar objetivo comercial y reconstruir una estructura simple antes de reinvertir.",
   },
 };
 
 const namedCopy: Partial<Record<string, { diagnosis: string; direction: string }>> = {
   "Tienda de la Platería": {
     diagnosis:
-      "Tienda de la Platería mantiene un retorno sobresaliente y consistente; hay espacio para crecer con disciplina sin deteriorar resultados.",
+      "Tienda de la Platería mantiene retorno sólido y consistente, con capacidad de crecimiento sin sacrificar desempeño.",
     direction:
-      "Aplicar escalamiento controlado por tramos y mantener eficiencia con seguimiento semanal de costo por resultado y calidad de tráfico.",
+      "Escalamiento controlado por tramos y disciplina de eficiencia para sostener calidad de resultados.",
   },
   "Libell Joyería": {
     diagnosis:
-      "Libell Joyería lidera en volumen y rentabilidad, con señales claras para sostener crecimiento de forma ordenada.",
+      "Libell Joyería conserva una base robusta de rentabilidad con volumen suficiente para crecer de forma ordenada.",
     direction:
-      "Priorizar escalamiento controlado en campañas ganadoras y mantener eficiencia con refresh creativo y remarketing de alta intención.",
+      "Aplicar escalamiento controlado en campañas líderes y mantener eficiencia con optimización continua.",
   },
   "Empaques y Suministros": {
     diagnosis:
-      "Empaques y Suministros es rentable, pero aún por debajo de su potencial por fricción en estructura y mensaje comercial.",
+      "Empaques y Suministros mantiene rentabilidad, pero aún con espacio claro para capturar mejor desempeño comercial.",
     direction:
-      "Ejecutar optimización de estructura y mensaje para mejorar conversión, concentrando presupuesto en los conjuntos con mejor respuesta.",
+      "Priorizar optimización de estructura y mensaje para mejorar conversión y aprovechar mejor la inversión mensual.",
   },
   "Platería Rossy 2": {
     diagnosis:
-      "Platería Rossy 2 requiere corrección inmediata: el retorno actual no sostiene escalamiento sin afectar rentabilidad.",
+      "Platería Rossy 2 requiere corrección inmediata: el retorno actual no justifica incremento de presupuesto.",
     direction:
-      "No escalar hasta estabilizar. Reordenar campaña con propuesta clara, audiencias de mayor intención y validación en ciclos cortos.",
+      "No escalar hasta estabilizar. Corregir enfoque comercial y validar una estructura más eficiente antes de crecer.",
   },
   Ivalent: {
     diagnosis:
-      "Ivalent muestra un desempeño fuerte, impulsado por un contexto de evento comercial favorable para capturar demanda activa.",
+      "Ivalent muestra una respuesta comercial fuerte, apalancada por dinámica de evento y alta intención de compra.",
     direction:
-      "Diseñar continuidad post-evento con remarketing con incentivo para recuperar interesados y sostener ventas en marzo.",
+      "Planificar continuidad con remarketing con incentivo para sostener tracción después del pico del evento.",
   },
   "Dulce María Collection": {
     diagnosis:
-      "Dulce María Collection no cuenta con reporte de ventas y, sin ese dato, no es posible evaluar retorno real ni tomar decisiones sólidas.",
+      "Dulce María Collection no tiene reporte de ventas; sin esa visibilidad no existe lectura real de rendimiento.",
     direction:
-      "Prioridad absoluta: implementar reporte de ventas diario/semanal. Sin reporte de ventas no hay base para optimización ni escalamiento.",
+      "Prioridad total en reporte de ventas diario/semanal para habilitar análisis serio y decisiones con fundamento.",
   },
 };
 
@@ -83,19 +85,18 @@ function getClientCopy(client: ClientMetrics): { diagnosis: string; direction: s
   return namedCopy[client.name] ?? copyByStatus[client.status];
 }
 
-export function ClientCards({ clients }: ClientCardsProps) {
+export function ClientCards({ clients, monthLabel, previousMonthExists }: ClientCardsProps) {
   const [search, setSearch] = useState("");
   const normalizedSearch = search.trim().toLowerCase();
   const visibleClients = useMemo(
-    () =>
-      clients.filter((client) => client.name.toLowerCase().includes(normalizedSearch)),
+    () => clients.filter((client) => client.name.toLowerCase().includes(normalizedSearch)),
     [clients, normalizedSearch],
   );
 
   return (
     <section className="section-block">
       <div className="section-heading section-row">
-        <h2>Vista por cliente</h2>
+        <h2>Vista Ejecutiva por Cliente</h2>
         <span className="visible-chip">{visibleClients.length} visibles</span>
       </div>
       <div className="client-toolbar card">
@@ -117,10 +118,10 @@ export function ClientCards({ clients }: ClientCardsProps) {
             <article key={client.name} className="card client-card">
               <div className="client-head">
                 <h3>{client.name}</h3>
-                <p>Febrero 2026</p>
+                <p>{monthLabel}</p>
               </div>
               <StatusPill status={client.status} />
-              <div className="mini-kpis">
+              <div className="mini-kpis mini-kpis-extended">
                 <div>
                   <span>Inversión</span>
                   <strong>{formatCop(client.investment)}</strong>
@@ -137,11 +138,31 @@ export function ClientCards({ clients }: ClientCardsProps) {
                   <span>Utilidad</span>
                   <strong>{formatCop(client.estimatedProfit)}</strong>
                 </div>
+                <div>
+                  <span>Mensajes</span>
+                  <strong>{formatInteger(client.messages)}</strong>
+                </div>
+                <div>
+                  <span>CPR</span>
+                  <strong>{formatCop(client.cpr)}</strong>
+                </div>
+                <div>
+                  <span>Alcance</span>
+                  <strong>{formatInteger(client.reach)}</strong>
+                </div>
+                <div>
+                  <span>Impresiones</span>
+                  <strong>{formatInteger(client.impressions)}</strong>
+                </div>
               </div>
+              <p className="delta-line">
+                vs mes anterior: ROAS {previousMonthExists ? formatPercent(client.deltaRoas) : "—"} · CPR{" "}
+                {previousMonthExists ? formatPercent(client.deltaCpr) : "—"}
+              </p>
               <div className="client-copy">
                 <h4>Diagnóstico ejecutivo</h4>
                 <p>{copy.diagnosis}</p>
-                <h4>Dirección para marzo</h4>
+                <h4>Dirección para el próximo mes</h4>
                 <p>{copy.direction}</p>
               </div>
             </article>

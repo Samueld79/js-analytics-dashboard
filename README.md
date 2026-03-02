@@ -16,6 +16,52 @@ npm run build
 npm run preview
 ```
 
+## Data remota con fallback local
+
+El dashboard intenta leer datos desde `VITE_DATA_URL`. Si la carga falla (timeout, error HTTP o JSON inválido), usa automáticamente el dataset local de `src/data/months.ts`.
+
+1. Definir variable en entorno local:
+
+```bash
+VITE_DATA_URL=https://tu-dominio.com/data/monthly.json
+```
+
+2. En Vercel:
+- Ir a `Project Settings` -> `Environment Variables`.
+- Crear `VITE_DATA_URL` con la URL pública del JSON.
+- Hacer redeploy.
+
+Formato esperado del JSON:
+
+```json
+[
+  {
+    "clientName": "Tienda de la Platería",
+    "months": {
+      "2026-02": {
+        "investment": 931713,
+        "sales": 30158300,
+        "messages": 148,
+        "reach": 44000,
+        "impressions": 120000
+      },
+      "2026-03": {
+        "investment": 1000000,
+        "sales": 32000000,
+        "messages": 160,
+        "reach": 47000,
+        "impressions": 130000
+      }
+    }
+  }
+]
+```
+
+Notas:
+- `investment` faltante se normaliza a `0`.
+- `sales`, `messages`, `reach`, `impressions` faltantes se normalizan a `null`.
+- Si `VITE_DATA_URL` no está definida, se usa local automáticamente.
+
 ## Deploy en Vercel (GitHub)
 
 1. Crear un repositorio en GitHub.
