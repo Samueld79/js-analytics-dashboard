@@ -10,6 +10,7 @@ type ClientCardsProps = {
   clients: ClientMetrics[];
   data: ClientMonthlyData[];
   monthLabel: string;
+  activeMonth: string;
   previousMonthExists: boolean;
 };
 
@@ -108,7 +109,7 @@ function formatDeltaText(direction: "up" | "down" | "flat" | "none", deltaPercen
   return `${arrow} ${Math.abs(deltaPercent).toFixed(1)}%`;
 }
 
-export function ClientCards({ clients, data, monthLabel, previousMonthExists }: ClientCardsProps) {
+export function ClientCards({ clients, data, monthLabel, activeMonth, previousMonthExists }: ClientCardsProps) {
   const [search, setSearch] = useState("");
   const [openCharts, setOpenCharts] = useState<Record<string, boolean>>({});
   const normalizedSearch = search.trim().toLowerCase();
@@ -153,6 +154,11 @@ export function ClientCards({ clients, data, monthLabel, previousMonthExists }: 
               months.length > 1 ? `${fileBase}.csv` : `${fileBase}-${months[0] ?? "sin-mes"}.csv`;
             const csv = generateClientCSV(fullClientData);
             downloadTextFile(filename, csv);
+          };
+
+          const onDownloadPdf = () => {
+            const url = `/report?client=${encodeURIComponent(client.name)}&month=${encodeURIComponent(activeMonth)}`;
+            window.open(url, "_blank", "noopener,noreferrer");
           };
 
           return (
@@ -210,12 +216,17 @@ export function ClientCards({ clients, data, monthLabel, previousMonthExists }: 
                   ROAS {previousMonthExists ? formatPercent(client.deltaRoas) : "—"}
                 </span>
               </div>
-              <button type="button" className="client-report-btn" onClick={onDownloadReport}>
-                Descargar reporte
-              </button>
+              <div className="client-actions no-print">
+                <button type="button" className="client-report-btn" onClick={onDownloadReport}>
+                  Descargar reporte
+                </button>
+                <button type="button" className="client-pdf-btn" onClick={onDownloadPdf}>
+                  Descargar PDF
+                </button>
+              </div>
               <button
                 type="button"
-                className="client-charts-toggle"
+                className="client-charts-toggle no-print"
                 onClick={() =>
                   setOpenCharts((prev) => ({ ...prev, [client.name]: !isChartsOpen }))
                 }

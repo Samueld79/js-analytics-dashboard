@@ -6,6 +6,7 @@ import { BarChart } from "./components/charts/BarChart";
 import { LineChart } from "./components/charts/LineChart";
 import { clientsMonthlyData, type ClientMonthlyData } from "./data/months";
 import { fetchMonthlyData } from "./data/remote";
+import { ReportPage } from "./pages/ReportPage";
 import {
   buildClientMetricsForMonth,
   buildMonthlyOverviewSeries,
@@ -20,13 +21,16 @@ import {
 } from "./utils/calculations";
 
 function App() {
+  const isReportRoute = typeof window !== "undefined" && window.location.pathname === "/report";
+  if (isReportRoute) {
+    return <ReportPage />;
+  }
+
   const [data, setData] = useState<ClientMonthlyData[]>(clientsMonthlyData);
   const [dataSource, setDataSource] = useState<"remote" | "local">("local");
   const monthOptions = useMemo(() => getAvailableMonths(data), [data]);
   const defaultMonth = monthOptions.includes("2026-02") ? "2026-02" : (monthOptions[0] ?? "2026-02");
-  const [selectedMonth, setSelectedMonth] = useState(
-    defaultMonth,
-  );
+  const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
   const activeMonth = selectedMonth ?? defaultMonth;
 
   useEffect(() => {
@@ -147,6 +151,7 @@ function App() {
           clients={rankedClients}
           data={data}
           monthLabel={monthLabel}
+          activeMonth={activeMonth}
           previousMonthExists={Boolean(previousMonth)}
         />
       </main>

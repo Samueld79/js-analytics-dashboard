@@ -687,3 +687,130 @@ tbody tr:hover td {
     grid-template-columns: 1fr;
   }
 }
+
+.client-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.client-pdf-btn {
+  border: 1px solid rgba(148, 167, 199, 0.35);
+  background: rgba(14, 24, 42, 0.86);
+  color: #dce8ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.client-pdf-btn:hover {
+  background: rgba(0, 230, 118, 0.14);
+  border-color: rgba(0, 230, 118, 0.4);
+}
+
+.report-layout {
+  width: min(1120px, calc(100% - 36px));
+}
+
+.report-wrap {
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+}
+
+.report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.report-header h1 {
+  margin: 8px 0 0;
+  font-size: clamp(1.24rem, 2.7vw, 1.8rem);
+}
+
+.report-print-btn {
+  border: 1px solid rgba(148, 167, 199, 0.35);
+  background: rgba(16, 26, 45, 0.8);
+  color: #e0ebff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.report-print-btn:hover {
+  background: rgba(41, 121, 255, 0.18);
+  border-color: rgba(122, 177, 255, 0.5);
+}
+
+.report-kpi-grid .kpi-card {
+  padding: 18px;
+}
+
+.report-insight {
+  padding: 20px;
+  margin: 0;
+}
+
+.report-next-step-title {
+  margin-top: 8px;
+}
+
+@media (max-width: 680px) {
+  .client-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .report-layout {
+    width: min(1120px, calc(100% - 18px));
+  }
+
+  .report-wrap {
+    padding: 16px;
+  }
+
+  .report-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media print {
+  body {
+    background: #0b1220;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page-bg {
+    display: none;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .layout,
+  .report-layout {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    gap: 12px;
+  }
+
+  .report-wrap {
+    box-shadow: none;
+    border: none;
+    background: #0f1729;
+    padding: 12mm;
+    border-radius: 0;
+  }
+}
