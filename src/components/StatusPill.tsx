@@ -6,6 +6,7 @@ type StatusPillProps = {
 
 const statusClass: Record<AccountStatus, string> = {
   "Sin Data": "status-gray",
+  "Sin Ventas Reportadas": "status-gray",
   "Alto Rendimiento": "status-green",
   "Rentable - Optimizable": "status-blue",
   "Margen Bajo": "status-amber",

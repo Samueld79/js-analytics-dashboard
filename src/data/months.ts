@@ -67,7 +67,7 @@ export const clientsMonthlyData: ClientMonthlyData[] = [
     months: {
       "2026-02": {
         investment: 3716870,
-        sales: 47453394,
+        sales: 56590594,
         messages: null,
         reach: null,
         impressions: null,

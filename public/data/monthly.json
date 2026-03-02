@@ -2,20 +2,6 @@
   {
     "clientName": "Dulce María Collection",
     "months": {
-      "2025-12": {
-        "investment": 520000,
-        "sales": null,
-        "messages": 392,
-        "reach": 36840,
-        "impressions": 58210
-      },
-      "2026-01": {
-        "investment": 560000,
-        "sales": null,
-        "messages": 431,
-        "reach": 39720,
-        "impressions": 62170
-      },
       "2026-02": {
         "investment": 600000,
         "sales": null,
@@ -28,20 +14,6 @@
   {
     "clientName": "Ángeles Creando",
     "months": {
-      "2025-12": {
-        "investment": 1149000,
-        "sales": 16840000,
-        "messages": 852,
-        "reach": 191420,
-        "impressions": 338510
-      },
-      "2026-01": {
-        "investment": 1235000,
-        "sales": 18960000,
-        "messages": 944,
-        "reach": 214805,
-        "impressions": 372640
-      },
       "2026-02": {
         "investment": 1306222,
         "sales": 21007000,
@@ -54,20 +26,6 @@
   {
     "clientName": "Empaques y Suministros",
     "months": {
-      "2025-12": {
-        "investment": 742000,
-        "sales": 2945000,
-        "messages": 903,
-        "reach": 53310,
-        "impressions": 143220
-      },
-      "2026-01": {
-        "investment": 805000,
-        "sales": 3278000,
-        "messages": 987,
-        "reach": 59240,
-        "impressions": 159860
-      },
       "2026-02": {
         "investment": 871653,
         "sales": 3596900,
@@ -80,20 +38,6 @@
   {
     "clientName": "Platería Rossy 2",
     "months": {
-      "2025-12": {
-        "investment": 510000,
-        "sales": 420000,
-        "messages": 418,
-        "reach": 69200,
-        "impressions": 113420
-      },
-      "2026-01": {
-        "investment": 558000,
-        "sales": 460000,
-        "messages": 462,
-        "reach": 74210,
-        "impressions": 122860
-      },
       "2026-02": {
         "investment": 603443,
         "sales": 500000,
@@ -106,20 +50,6 @@
   {
     "clientName": "Tienda de la Platería",
     "months": {
-      "2025-12": {
-        "investment": 812000,
-        "sales": 25870000,
-        "messages": 392,
-        "reach": 144230,
-        "impressions": 224180
-      },
-      "2026-01": {
-        "investment": 875000,
-        "sales": 28190000,
-        "messages": 441,
-        "reach": 156410,
-        "impressions": 241560
-      },
       "2026-02": {
         "investment": 931714,
         "sales": 30158300,
@@ -132,23 +62,9 @@
   {
     "clientName": "Libell Joyería",
     "months": {
-      "2025-12": {
-        "investment": 3254000,
-        "sales": 39820000,
-        "messages": 2190,
-        "reach": 428900,
-        "impressions": 816340
-      },
-      "2026-01": {
-        "investment": 3498000,
-        "sales": 43670000,
-        "messages": 2336,
-        "reach": 459210,
-        "impressions": 872110
-      },
       "2026-02": {
         "investment": 3716870,
-        "sales": 47453394,
+        "sales": 56590594,
         "messages": 2502,
         "reach": 490391,
         "impressions": 925672
@@ -158,20 +74,6 @@
   {
     "clientName": "Ivalent",
     "months": {
-      "2025-12": {
-        "investment": 905000,
-        "sales": 18650000,
-        "messages": 544,
-        "reach": 46210,
-        "impressions": 111840
-      },
-      "2026-01": {
-        "investment": 986000,
-        "sales": 20840000,
-        "messages": 618,
-        "reach": 50790,
-        "impressions": 121930
-      },
       "2026-02": {
         "investment": 1062755,
         "sales": 23235000,

@@ -2,6 +2,7 @@ import type { ClientMonthlyData, MonthKey, MonthlyMetrics } from "../data/months
 
 export type AccountStatus =
   | "Sin Data"
+  | "Sin Ventas Reportadas"
   | "Alto Rendimiento"
   | "Rentable - Optimizable"
   | "Margen Bajo"
@@ -18,6 +19,9 @@ export type ClientMetrics = {
   cpr: number | null;
   estimatedProfit: number | null;
   status: AccountStatus;
+  previousSales: number | null;
+  previousMessages: number | null;
+  previousCpr: number | null;
   deltaInvestment: number | null;
   deltaSales: number | null;
   deltaRoas: number | null;
@@ -62,6 +66,11 @@ export type ClientChartSeries = {
   salesPoints: MonthValuePoint[];
   messagesPoints: MonthValuePoint[];
   cprPoints: MonthValuePoint[];
+};
+
+export type DeltaInfo = {
+  direction: "up" | "down" | "flat" | "none";
+  deltaPercent: number | null;
 };
 
 const currencyFormatter = new Intl.NumberFormat("es-CO", {
@@ -116,8 +125,8 @@ export function getMonthLabel(monthKey: MonthKey): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-export function getStatusByRoas(roas: number | null): AccountStatus {
-  if (roas === null) return "Sin Data";
+export function getStatusByRoas(roas: number | null, messages: number | null = null): AccountStatus {
+  if (roas === null) return messages !== null ? "Sin Ventas Reportadas" : "Sin Data";
   if (roas >= 10) return "Alto Rendimiento";
   if (roas >= 4) return "Rentable - Optimizable";
   if (roas > 1) return "Margen Bajo";
@@ -161,6 +170,16 @@ function toDeltaPercent(current: number | null, previous: number | null): number
   return ((current - previous) / previous) * 100;
 }
 
+export function getDelta(current: number | null, previous: number | null): DeltaInfo {
+  if (current === null || previous === null || previous === 0) {
+    return { direction: "none", deltaPercent: null };
+  }
+  const deltaPercent = ((current - previous) / previous) * 100;
+  if (deltaPercent > 0) return { direction: "up", deltaPercent };
+  if (deltaPercent < 0) return { direction: "down", deltaPercent };
+  return { direction: "flat", deltaPercent: 0 };
+}
+
 function sumNullable(values: Array<number | null>): number | null {
   const valid = values.filter((value): value is number => value !== null);
   if (valid.length === 0) return null;
@@ -192,7 +211,10 @@ export function buildClientMetricsForMonth(
       roas,
       cpr,
       estimatedProfit: current.sales === null ? null : current.sales - current.investment,
-      status: getStatusByRoas(roas),
+      status: getStatusByRoas(roas, current.messages),
+      previousSales: previous?.sales ?? null,
+      previousMessages: previous?.messages ?? null,
+      previousCpr,
       deltaInvestment: previous ? toDeltaPercent(current.investment, previous.investment) : null,
       deltaSales: previous ? toDeltaPercent(current.sales, previous.sales) : null,
       deltaRoas: toDeltaPercent(roas, previousRoas),

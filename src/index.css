@@ -475,10 +475,41 @@ tbody tr:hover td {
   font-variant-numeric: tabular-nums;
 }
 
-.delta-line {
-  margin: 0;
-  color: #9eb5df;
+.delta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   font-size: 0.83rem;
+}
+
+.delta-up {
+  color: #00e676;
+}
+
+.delta-down {
+  color: #ff5252;
+}
+
+.delta-neutral {
+  color: #9eb5df;
+}
+
+.client-report-btn {
+  border: 1px solid rgba(148, 167, 199, 0.35);
+  background: rgba(16, 26, 45, 0.78);
+  color: #dce8ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.client-report-btn:hover {
+  background: rgba(41, 121, 255, 0.16);
+  border-color: rgba(122, 177, 255, 0.5);
 }
 
 .client-charts-toggle {

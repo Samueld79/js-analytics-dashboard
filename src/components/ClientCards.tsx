@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import type { ClientMonthlyData } from "../data/months";
 import type { AccountStatus, ClientMetrics } from "../utils/calculations";
-import { formatCop, formatInteger, formatPercent, formatRoas } from "../utils/calculations";
+import { formatCop, formatPercent, formatRoas, getDelta } from "../utils/calculations";
+import { downloadTextFile, generateClientCSV, sanitizeFilename } from "../utils/export";
 import { ClientCharts } from "./ClientCharts";
 import { StatusPill } from "./StatusPill";
 
@@ -18,6 +19,12 @@ const copyByStatus: Record<AccountStatus, { diagnosis: string; direction: string
       "No hay reporte de ventas este mes, así que no podemos medir retorno real. Con datos incompletos, cualquier decisión es una apuesta, no estrategia.",
     direction:
       "Implementar reporte diario/semana de ventas (aunque sea simple). Sin ventas reportadas no hay ROAS, y sin ROAS no se puede optimizar con precisión.",
+  },
+  "Sin Ventas Reportadas": {
+    diagnosis:
+      "Hay actividad publicitaria reportada, pero no hay ventas registradas para medir retorno económico real.",
+    direction:
+      "Prioridad inmediata: conectar reporte comercial con pauta para validar ventas y habilitar optimización basada en resultados.",
   },
   "Alto Rendimiento": {
     diagnosis:
@@ -88,6 +95,19 @@ function getClientCopy(client: ClientMetrics): { diagnosis: string; direction: s
   return namedCopy[client.name] ?? copyByStatus[client.status];
 }
 
+function getDeltaClass(direction: "up" | "down" | "flat" | "none"): string {
+  if (direction === "up") return "delta-up";
+  if (direction === "down") return "delta-down";
+  return "delta-neutral";
+}
+
+function formatDeltaText(direction: "up" | "down" | "flat" | "none", deltaPercent: number | null): string {
+  if (direction === "none" || deltaPercent === null) return "—";
+  if (direction === "flat") return "→ 0.0%";
+  const arrow = direction === "up" ? "↑" : "↓";
+  return `${arrow} ${Math.abs(deltaPercent).toFixed(1)}%`;
+}
+
 export function ClientCards({ clients, data, monthLabel, previousMonthExists }: ClientCardsProps) {
   const [search, setSearch] = useState("");
   const [openCharts, setOpenCharts] = useState<Record<string, boolean>>({});
@@ -119,6 +139,22 @@ export function ClientCards({ clients, data, monthLabel, previousMonthExists }: 
         {visibleClients.map((client) => {
           const copy = getClientCopy(client);
           const isChartsOpen = openCharts[client.name] ?? false;
+          const fullClientData = data.find((item) => item.clientName === client.name) ?? null;
+
+          const salesDelta = getDelta(client.sales, client.previousSales);
+          const messagesDelta = getDelta(client.messages, client.previousMessages);
+          const cprDelta = getDelta(client.cpr, client.previousCpr);
+
+          const onDownloadReport = () => {
+            if (!fullClientData) return;
+            const months = Object.keys(fullClientData.months).sort((a, b) => a.localeCompare(b));
+            const fileBase = `reporte-${sanitizeFilename(fullClientData.clientName)}`;
+            const filename =
+              months.length > 1 ? `${fileBase}.csv` : `${fileBase}-${months[0] ?? "sin-mes"}.csv`;
+            const csv = generateClientCSV(fullClientData);
+            downloadTextFile(filename, csv);
+          };
+
           return (
             <article key={client.name} className="card client-card">
               <div className="client-head">
@@ -145,7 +181,7 @@ export function ClientCards({ clients, data, monthLabel, previousMonthExists }: 
                 </div>
                 <div>
                   <span>Mensajes</span>
-                  <strong>{formatInteger(client.messages)}</strong>
+                  <strong>{client.messages === null ? "—" : client.messages.toLocaleString("es-CO")}</strong>
                 </div>
                 <div>
                   <span>CPR</span>
@@ -153,17 +189,30 @@ export function ClientCards({ clients, data, monthLabel, previousMonthExists }: 
                 </div>
                 <div>
                   <span>Alcance</span>
-                  <strong>{formatInteger(client.reach)}</strong>
+                  <strong>{client.reach === null ? "—" : client.reach.toLocaleString("es-CO")}</strong>
                 </div>
                 <div>
                   <span>Impresiones</span>
-                  <strong>{formatInteger(client.impressions)}</strong>
+                  <strong>{client.impressions === null ? "—" : client.impressions.toLocaleString("es-CO")}</strong>
                 </div>
               </div>
-              <p className="delta-line">
-                vs mes anterior: ROAS {previousMonthExists ? formatPercent(client.deltaRoas) : "—"} · CPR{" "}
-                {previousMonthExists ? formatPercent(client.deltaCpr) : "—"}
-              </p>
+              <div className="delta-row">
+                <span className={getDeltaClass(salesDelta.direction)}>
+                  Ventas {previousMonthExists ? formatDeltaText(salesDelta.direction, salesDelta.deltaPercent) : "—"}
+                </span>
+                <span className={getDeltaClass(messagesDelta.direction)}>
+                  Mensajes {previousMonthExists ? formatDeltaText(messagesDelta.direction, messagesDelta.deltaPercent) : "—"}
+                </span>
+                <span className={getDeltaClass(cprDelta.direction)}>
+                  CPR {previousMonthExists ? formatDeltaText(cprDelta.direction, cprDelta.deltaPercent) : "—"}
+                </span>
+                <span className="delta-neutral">
+                  ROAS {previousMonthExists ? formatPercent(client.deltaRoas) : "—"}
+                </span>
+              </div>
+              <button type="button" className="client-report-btn" onClick={onDownloadReport}>
+                Descargar reporte
+              </button>
               <button
                 type="button"
                 className="client-charts-toggle"
