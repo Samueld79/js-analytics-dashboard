@@ -36,12 +36,7 @@ function App() {
   }, [defaultMonth, monthOptions, selectedMonth]);
 
   useEffect(() => {
-    const REMOTE_URL = import.meta.env.VITE_DATA_URL;
-    if (!REMOTE_URL) {
-      setData(clientsMonthlyData);
-      setDataSource("local");
-      return;
-    }
+    const REMOTE_URL = import.meta.env.VITE_DATA_URL ?? "/data/monthly.json";
 
     let mounted = true;
 

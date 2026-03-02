@@ -11,16 +11,7 @@ type BarChartProps = {
   emptyMessage: string;
 };
 
-export function BarChart({ title, points, emptyMessage }: BarChartProps) {
-  if (points.length < 2) {
-    return (
-      <article className="card chart-card">
-        <h3>{title}</h3>
-        <p className="chart-empty">{emptyMessage}</p>
-      </article>
-    );
-  }
-
+export function BarChart({ title, points }: BarChartProps) {
   const validValues = points
     .map((point) => point.value)
     .filter((value): value is number => value !== null && value >= 0);
@@ -29,7 +20,7 @@ export function BarChart({ title, points, emptyMessage }: BarChartProps) {
     return (
       <article className="card chart-card">
         <h3>{title}</h3>
-        <p className="chart-empty">No hay mensajes reportados para graficar.</p>
+        <p className="chart-empty">No hay datos reportados para este gráfico.</p>
       </article>
     );
   }

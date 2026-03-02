@@ -11,25 +11,16 @@ type LineChartProps = {
   emptyMessage: string;
 };
 
-export function LineChart({ title, points, emptyMessage }: LineChartProps) {
-  if (points.length < 2) {
-    return (
-      <article className="card chart-card">
-        <h3>{title}</h3>
-        <p className="chart-empty">{emptyMessage}</p>
-      </article>
-    );
-  }
-
+export function LineChart({ title, points }: LineChartProps) {
   const validPoints = points
     .map((point, index) => ({ ...point, index }))
     .filter((point) => point.value !== null) as Array<LineChartPoint & { index: number; value: number }>;
 
-  if (validPoints.length < 2) {
+  if (validPoints.length === 0) {
     return (
       <article className="card chart-card">
         <h3>{title}</h3>
-        <p className="chart-empty">No hay suficientes datos reportados para este gráfico.</p>
+        <p className="chart-empty">No hay datos reportados para este gráfico.</p>
       </article>
     );
   }
@@ -49,16 +40,25 @@ export function LineChart({ title, points, emptyMessage }: LineChartProps) {
     paddingX + (index / Math.max(points.length - 1, 1)) * usableWidth;
   const toY = (value: number) => paddingY + usableHeight - ((value - minValue) / span) * usableHeight;
 
-  const pathData = validPoints
-    .map((point, idx) => `${idx === 0 ? "M" : "L"}${toX(point.index)} ${toY(point.value)}`)
-    .join(" ");
+  const pathData =
+    validPoints.length >= 2
+      ? validPoints
+          .map((point, idx) => `${idx === 0 ? "M" : "L"}${toX(point.index)} ${toY(point.value)}`)
+          .join(" ")
+      : "";
 
   return (
     <article className="card chart-card">
       <h3>{title}</h3>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
-        <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} className="chart-axis" />
-        <path d={pathData} className="line-path" />
+        <line
+          x1={paddingX}
+          y1={height - paddingY}
+          x2={width - paddingX}
+          y2={height - paddingY}
+          className="chart-axis"
+        />
+        {pathData ? <path d={pathData} className="line-path" /> : null}
         {validPoints.map((point) => (
           <circle
             key={`${point.month}-${point.index}`}

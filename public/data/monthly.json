@@ -16,7 +16,7 @@
     "months": {
       "2026-02": {
         "investment": 1306222,
-        "sales": null,
+        "sales": 21007000,
         "messages": 1060,
         "reach": 238233,
         "impressions": 411096
@@ -28,7 +28,7 @@
     "months": {
       "2026-02": {
         "investment": 871653,
-        "sales": null,
+        "sales": 3596900,
         "messages": 1092,
         "reach": 65130,
         "impressions": 174892
@@ -40,7 +40,7 @@
     "months": {
       "2026-02": {
         "investment": 603443,
-        "sales": null,
+        "sales": 500000,
         "messages": 501,
         "reach": 80430,
         "impressions": 131999
@@ -52,7 +52,7 @@
     "months": {
       "2026-02": {
         "investment": 931714,
-        "sales": null,
+        "sales": 30158300,
         "messages": 486,
         "reach": 168561,
         "impressions": 258530
@@ -64,7 +64,7 @@
     "months": {
       "2026-02": {
         "investment": 3716870,
-        "sales": null,
+        "sales": 47453394,
         "messages": 2502,
         "reach": 490391,
         "impressions": 925672
@@ -76,7 +76,7 @@
     "months": {
       "2026-02": {
         "investment": 1062755,
-        "sales": null,
+        "sales": 23235000,
         "messages": 689,
         "reach": 55624,
         "impressions": 131498
