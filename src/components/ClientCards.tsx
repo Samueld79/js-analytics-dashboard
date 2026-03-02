@@ -166,7 +166,7 @@ export function ClientCards({ clients, data, monthLabel, previousMonthExists }: 
               </p>
               <button
                 type="button"
-                className="toggle-charts-btn"
+                className="client-charts-toggle"
                 onClick={() =>
                   setOpenCharts((prev) => ({ ...prev, [client.name]: !isChartsOpen }))
                 }

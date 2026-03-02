@@ -58,6 +58,12 @@ export type ClientSeries = {
   cpr: MonthValuePoint[];
 };
 
+export type ClientChartSeries = {
+  salesPoints: MonthValuePoint[];
+  messagesPoints: MonthValuePoint[];
+  cprPoints: MonthValuePoint[];
+};
+
 const currencyFormatter = new Intl.NumberFormat("es-CO", {
   style: "currency",
   currency: "COP",
@@ -236,8 +242,34 @@ export function buildMonthlyOverviewSeries(data: ClientMonthlyData[]): MonthlyOv
   });
 }
 
+export function getClientByName(
+  data: ClientMonthlyData[],
+  clientName: string,
+): ClientMonthlyData | null {
+  return data.find((item) => item.clientName === clientName) ?? null;
+}
+
+export function getSortedMonthsForClient(client: ClientMonthlyData): MonthKey[] {
+  return Object.keys(client.months).sort((a, b) => a.localeCompare(b));
+}
+
+export function buildClientChartSeries(client: ClientMonthlyData): ClientChartSeries {
+  const months = getSortedMonthsForClient(client);
+  return {
+    salesPoints: months.map((month) => ({ month, value: client.months[month]?.sales ?? null })),
+    messagesPoints: months.map((month) => ({ month, value: client.months[month]?.messages ?? null })),
+    cprPoints: months.map((month) => {
+      const entry = client.months[month];
+      if (!entry || entry.messages === null || entry.messages === 0) {
+        return { month, value: null };
+      }
+      return { month, value: entry.investment / entry.messages };
+    }),
+  };
+}
+
 export function buildClientSeries(data: ClientMonthlyData[], clientName: string): ClientSeries {
-  const client = data.find((item) => item.clientName === clientName);
+  const client = getClientByName(data, clientName);
   if (!client) {
     return {
       months: [],
@@ -249,20 +281,15 @@ export function buildClientSeries(data: ClientMonthlyData[], clientName: string)
     };
   }
 
-  const months = Object.keys(client.months).sort((a, b) => a.localeCompare(b));
+  const months = getSortedMonthsForClient(client);
+  const chartSeries = buildClientChartSeries(client);
 
   return {
     months,
-    sales: months.map((month) => ({ month, value: client.months[month]?.sales ?? null })),
-    messages: months.map((month) => ({ month, value: client.months[month]?.messages ?? null })),
+    sales: chartSeries.salesPoints,
+    messages: chartSeries.messagesPoints,
     reach: months.map((month) => ({ month, value: client.months[month]?.reach ?? null })),
     impressions: months.map((month) => ({ month, value: client.months[month]?.impressions ?? null })),
-    cpr: months.map((month) => {
-      const entry = client.months[month];
-      if (!entry || entry.messages === null || entry.messages === 0) {
-        return { month, value: null };
-      }
-      return { month, value: entry.investment / entry.messages };
-    }),
+    cpr: chartSeries.cprPoints,
   };
 }
