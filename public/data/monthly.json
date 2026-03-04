@@ -50,6 +50,13 @@
   {
     "clientName": "Tienda de la Platería",
     "months": {
+      "2026-01": {
+        "investment": 1063764,
+        "sales": 49258100,
+        "messages": 520,
+        "reach": 184781,
+        "impressions": 308837
+      },
       "2026-02": {
         "investment": 931714,
         "sales": 30158300,
@@ -80,6 +87,18 @@
         "messages": 689,
         "reach": 55624,
         "impressions": 131498
+      }
+    }
+  },
+  {
+    "clientName": "Papelería El Río",
+    "months": {
+      "2026-02": {
+        "investment": 1439332,
+        "sales": 67137636,
+        "messages": 1196,
+        "reach": 176390,
+        "impressions": 291529
       }
     }
   }

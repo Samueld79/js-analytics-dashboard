@@ -491,7 +491,7 @@ tbody tr:hover td {
 }
 
 .delta-neutral {
-  color: #9eb5df;
+  color: rgba(220, 232, 255, 0.75);
 }
 
 .client-report-btn {

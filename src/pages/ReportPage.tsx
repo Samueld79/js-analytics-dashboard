@@ -123,6 +123,7 @@ export function ReportPage() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const requestedClient = params.get("client") ?? "";
   const requestedMonth = params.get("month") ?? "2026-02";
+  const shouldAutoPrint = params.get("print") === "1";
 
   const monthOptions = useMemo(() => getAvailableMonths(data), [data]);
   const activeMonth = monthOptions.includes(requestedMonth)
@@ -142,6 +143,14 @@ export function ReportPage() {
     const metrics = buildClientMetricsForMonth(data, activeMonth, previousMonth);
     return metrics.find((metric) => metric.name === resolvedClientName) ?? null;
   }, [activeMonth, data, previousMonth, resolvedClientName]);
+
+  useEffect(() => {
+    if (!shouldAutoPrint || !clientMetric) return;
+    const timeoutId = window.setTimeout(() => {
+      window.print();
+    }, 750);
+    return () => window.clearTimeout(timeoutId);
+  }, [clientMetric, shouldAutoPrint]);
 
   if (!clientMetric) {
     return (

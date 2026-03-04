@@ -145,7 +145,7 @@ export function ClientCards({ clients, data, monthLabel, activeMonth, previousMo
           const cprDelta = getDelta(client.cpr, client.previousCpr);
 
           const onDownloadPdf = () => {
-            const url = `/report?client=${encodeURIComponent(client.name)}&month=${encodeURIComponent(activeMonth)}`;
+            const url = `/report?client=${encodeURIComponent(client.name)}&month=${encodeURIComponent(activeMonth)}&print=1`;
             window.open(url, "_blank", "noopener,noreferrer");
           };
 
