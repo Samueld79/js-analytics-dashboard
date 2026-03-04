@@ -557,24 +557,42 @@ tbody tr:hover td {
   letter-spacing: 0.01em;
 }
 
-.client-charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+.client-charts-primary {
+  grid-column: 1 / -1;
 }
 
-.client-charts-grid .chart-card {
+.client-charts-primary .chart-card {
   min-height: 100%;
   padding: 14px;
   gap: 8px;
 }
 
-.client-charts-grid .bar-chart {
+.client-charts-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.client-charts-mini-grid .chart-card {
+  min-height: 100%;
+  padding: 14px;
+  gap: 8px;
+}
+
+.client-charts-mini-grid .bar-chart {
   min-height: 160px;
 }
 
-.client-cpr-chart .chart-card {
-  padding: 14px;
+.client-chart-with-note {
+  display: grid;
+  gap: 6px;
+}
+
+.chart-note {
+  margin: 0;
+  color: rgba(196, 212, 240, 0.86);
+  font-size: 0.74rem;
+  line-height: 1.35;
 }
 
 .client-charts-summary {
@@ -643,10 +661,6 @@ tbody tr:hover td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .client-charts-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .client-charts-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -665,6 +679,10 @@ tbody tr:hover td {
 
   .month-selector-wrap {
     min-width: 0;
+  }
+
+  .client-charts-mini-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -694,7 +712,7 @@ tbody tr:hover td {
     grid-template-columns: 1fr;
   }
 
-  .client-charts-grid {
+  .client-charts-mini-grid {
     grid-template-columns: 1fr;
   }
 

@@ -16,7 +16,7 @@ export function sanitizeFilename(value: string): string {
 
 export function generateClientCSV(client: ClientMonthlyData): string {
   const months = Object.keys(client.months).sort((a, b) => a.localeCompare(b));
-  const header = "Mes,Inversión,Ventas,ROAS,Mensajes,CPR,Alcance,Impresiones";
+  const header = "Mes,Inversión,Ventas,ROAS,Mensajes,Costo promedio por conversación,Alcance,Impresiones";
   const rows = months.map((month) => {
     const metrics = client.months[month];
     const roas = toNullableRatio(metrics.sales, metrics.investment);

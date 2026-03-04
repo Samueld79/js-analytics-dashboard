@@ -197,7 +197,7 @@ export function ReportPage() {
               <KpiCard label="ROAS" value={formatRoas(clientMetric.roas)} />
               <KpiCard label="Utilidad estimada" value={formatCop(clientMetric.estimatedProfit)} />
               <KpiCard label="Mensajes" value={formatInteger(clientMetric.messages)} />
-              <KpiCard label="CPR" value={formatCop(clientMetric.cpr)} />
+              <KpiCard label="Costo promedio por conversación" value={formatCop(clientMetric.cpr)} />
               <KpiCard label="Alcance" value={formatInteger(clientMetric.reach)} />
               <KpiCard label="Impresiones" value={formatInteger(clientMetric.impressions)} />
             </div>

@@ -65,7 +65,8 @@ export type ClientSeries = {
 export type ClientChartSeries = {
   salesPoints: MonthValuePoint[];
   messagesPoints: MonthValuePoint[];
-  cprPoints: MonthValuePoint[];
+  roasPoints: MonthValuePoint[];
+  avgConversationCostPoints: MonthValuePoint[];
 };
 
 export type DeltaInfo = {
@@ -280,7 +281,14 @@ export function buildClientChartSeries(client: ClientMonthlyData): ClientChartSe
   return {
     salesPoints: months.map((month) => ({ month, value: client.months[month]?.sales ?? null })),
     messagesPoints: months.map((month) => ({ month, value: client.months[month]?.messages ?? null })),
-    cprPoints: months.map((month) => {
+    roasPoints: months.map((month) => {
+      const entry = client.months[month];
+      if (!entry || entry.investment <= 0 || entry.sales === null) {
+        return { month, value: null };
+      }
+      return { month, value: entry.sales / entry.investment };
+    }),
+    avgConversationCostPoints: months.map((month) => {
       const entry = client.months[month];
       if (!entry || entry.messages === null || entry.messages === 0) {
         return { month, value: null };
@@ -312,6 +320,6 @@ export function buildClientSeries(data: ClientMonthlyData[], clientName: string)
     messages: chartSeries.messagesPoints,
     reach: months.map((month) => ({ month, value: client.months[month]?.reach ?? null })),
     impressions: months.map((month) => ({ month, value: client.months[month]?.impressions ?? null })),
-    cpr: chartSeries.cprPoints,
+    cpr: chartSeries.avgConversationCostPoints,
   };
 }

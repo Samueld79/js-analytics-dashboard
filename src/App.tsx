@@ -111,7 +111,7 @@ function App() {
             <KpiCard label="Ventas totales reportadas" value={formatCop(overview.totalReportedSales)} />
             <KpiCard label="ROAS general" value={formatRoas(overview.globalRoas)} />
             <KpiCard label="Mensajes totales" value={formatInteger(overview.totalMessages)} />
-            <KpiCard label="CPR promedio ponderado" value={formatCop(overview.weightedCpr)} />
+            <KpiCard label="Costo promedio por conversación (ponderado)" value={formatCop(overview.weightedCpr)} />
             <KpiCard label="Alcance total" value={formatInteger(overview.totalReach)} />
             <KpiCard label="Impresiones totales" value={formatInteger(overview.totalImpressions)} />
             <KpiCard

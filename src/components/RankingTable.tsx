@@ -22,7 +22,7 @@ export function RankingTable({ clients }: RankingTableProps) {
               <th className="num-col">ROAS</th>
               <th className="num-col">Utilidad</th>
               <th className="num-col">Mensajes</th>
-              <th className="num-col">CPR</th>
+              <th className="num-col">Costo promedio por conversación</th>
               <th className="num-col">Alcance</th>
               <th className="num-col">Impresiones</th>
               <th>Estado</th>

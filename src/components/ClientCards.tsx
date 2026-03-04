@@ -178,7 +178,7 @@ export function ClientCards({ clients, data, monthLabel, activeMonth, previousMo
                   <strong>{client.messages === null ? "—" : client.messages.toLocaleString("es-CO")}</strong>
                 </div>
                 <div>
-                  <span>CPR</span>
+                  <span>Costo promedio por conversación</span>
                   <strong>{formatCop(client.cpr)}</strong>
                 </div>
                 <div>
@@ -198,7 +198,7 @@ export function ClientCards({ clients, data, monthLabel, activeMonth, previousMo
                   Mensajes {previousMonthExists ? formatDeltaText(messagesDelta.direction, messagesDelta.deltaPercent) : "—"}
                 </span>
                 <span className={getDeltaClass(cprDelta.direction)}>
-                  CPR {previousMonthExists ? formatDeltaText(cprDelta.direction, cprDelta.deltaPercent) : "—"}
+                  Costo promedio por conversación {previousMonthExists ? formatDeltaText(cprDelta.direction, cprDelta.deltaPercent) : "—"}
                 </span>
                 <span className="delta-neutral">
                   ROAS {previousMonthExists ? formatPercent(client.deltaRoas) : "—"}

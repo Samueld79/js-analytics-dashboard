@@ -10,17 +10,20 @@ type ClientChartsProps = {
 };
 
 export function ClientCharts({ clientName, data }: ClientChartsProps) {
+  const formatRoasPoint = (value: number) => `${value.toFixed(2)}x`;
+
   const chartData = useMemo(() => {
     const client = getClientByName(data, clientName);
     if (!client) {
       return {
         salesPoints: [],
         messagesPoints: [],
-        cprPoints: [],
+        roasPoints: [],
+        avgConversationCostPoints: [],
         latestSummary: {
           sales: null as number | null,
           messages: null as number | null,
-          cpr: null as number | null,
+          avgConversationCost: null as number | null,
           roas: null as number | null,
         },
       };
@@ -30,7 +33,7 @@ export function ClientCharts({ clientName, data }: ClientChartsProps) {
     const chartSeries = buildClientChartSeries(client);
     const latestMonth = months[months.length - 1];
     const latest = latestMonth ? client.months[latestMonth] : null;
-    const cpr =
+    const avgConversationCost =
       !latest || latest.messages === null || latest.messages === 0
         ? null
         : latest.investment / latest.messages;
@@ -44,7 +47,7 @@ export function ClientCharts({ clientName, data }: ClientChartsProps) {
       latestSummary: {
         sales: latest?.sales ?? null,
         messages: latest?.messages ?? null,
-        cpr,
+        avgConversationCost,
         roas,
       },
     };
@@ -53,20 +56,39 @@ export function ClientCharts({ clientName, data }: ClientChartsProps) {
   return (
     <section className="client-charts-wrap">
       <div className="client-charts-header">
-        <h4>Comparativo Ventas vs Mensajes</h4>
+        <h4>Comparativo mensual por cliente</h4>
       </div>
-      <div className="client-charts-grid">
+      <div className="client-charts-primary">
         <LineChart
           title="Ventas por mes"
           points={chartData.salesPoints}
           emptyMessage="No hay datos reportados para este gráfico."
           valueFormatter={formatCop}
         />
+      </div>
+      <div className="client-charts-mini-grid">
         <BarChart
           title="Mensajes por mes"
           points={chartData.messagesPoints}
           emptyMessage="No hay datos reportados para este gráfico."
         />
+        <LineChart
+          title="ROAS por mes"
+          points={chartData.roasPoints}
+          emptyMessage="No hay datos reportados para este gráfico."
+          valueFormatter={formatRoasPoint}
+        />
+        <div className="client-chart-with-note">
+          <LineChart
+            title="Costo promedio por conversación por mes"
+            points={chartData.avgConversationCostPoints}
+            emptyMessage="No hay datos reportados para este gráfico."
+            valueFormatter={formatCop}
+          />
+          <p className="chart-note">
+            Calculado como inversión total / mensajes. No atribuye inversión exclusiva a campañas de mensajes.
+          </p>
+        </div>
       </div>
       <div className="client-charts-summary">
         <div>
@@ -78,21 +100,13 @@ export function ClientCharts({ clientName, data }: ClientChartsProps) {
           <strong>{formatInteger(chartData.latestSummary.messages)}</strong>
         </div>
         <div>
-          <span>CPR (último mes)</span>
-          <strong>{formatCop(chartData.latestSummary.cpr)}</strong>
+          <span>Costo promedio por conversación (último mes)</span>
+          <strong>{formatCop(chartData.latestSummary.avgConversationCost)}</strong>
         </div>
         <div>
           <span>ROAS (último mes)</span>
           <strong>{formatRoas(chartData.latestSummary.roas)}</strong>
         </div>
-      </div>
-      <div className="client-cpr-chart">
-        <LineChart
-          title="CPR por mes"
-          points={chartData.cprPoints}
-          emptyMessage="No hay datos reportados para este gráfico."
-          valueFormatter={formatCop}
-        />
       </div>
     </section>
   );
