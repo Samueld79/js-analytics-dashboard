@@ -60,6 +60,7 @@ export function ClientCharts({ clientName, data }: ClientChartsProps) {
           title="Ventas por mes"
           points={chartData.salesPoints}
           emptyMessage="No hay datos reportados para este gráfico."
+          valueFormatter={formatCop}
         />
         <BarChart
           title="Mensajes por mes"
@@ -90,6 +91,7 @@ export function ClientCharts({ clientName, data }: ClientChartsProps) {
           title="CPR por mes"
           points={chartData.cprPoints}
           emptyMessage="No hay datos reportados para este gráfico."
+          valueFormatter={formatCop}
         />
       </div>
     </section>

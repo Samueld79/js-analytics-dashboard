@@ -9,9 +9,10 @@ type LineChartProps = {
   title: string;
   points: LineChartPoint[];
   emptyMessage: string;
+  valueFormatter?: (value: number) => string;
 };
 
-export function LineChart({ title, points }: LineChartProps) {
+export function LineChart({ title, points, emptyMessage, valueFormatter }: LineChartProps) {
   const validPoints = points
     .map((point, index) => ({ ...point, index }))
     .filter((point) => point.value !== null) as Array<LineChartPoint & { index: number; value: number }>;
@@ -20,7 +21,7 @@ export function LineChart({ title, points }: LineChartProps) {
     return (
       <article className="card chart-card">
         <h3>{title}</h3>
-        <p className="chart-empty">No hay datos reportados para este gráfico.</p>
+        <p className="chart-empty">{emptyMessage}</p>
       </article>
     );
   }
@@ -39,6 +40,7 @@ export function LineChart({ title, points }: LineChartProps) {
   const toX = (index: number) =>
     paddingX + (index / Math.max(points.length - 1, 1)) * usableWidth;
   const toY = (value: number) => paddingY + usableHeight - ((value - minValue) / span) * usableHeight;
+  const formatValue = valueFormatter ?? ((value: number) => value.toLocaleString("es-CO"));
 
   const pathData =
     validPoints.length >= 2
@@ -59,15 +61,23 @@ export function LineChart({ title, points }: LineChartProps) {
           className="chart-axis"
         />
         {pathData ? <path d={pathData} className="line-path" /> : null}
-        {validPoints.map((point) => (
-          <circle
-            key={`${point.month}-${point.index}`}
-            cx={toX(point.index)}
-            cy={toY(point.value)}
-            r="4"
-            className="line-point"
-          />
-        ))}
+        {validPoints.map((point) => {
+          const x = toX(point.index);
+          const y = toY(point.value);
+          const labelOffset = y <= paddingY + 14 ? 14 : -10;
+          const labelY = y + labelOffset;
+          const textAnchor = x <= paddingX + 26 ? "start" : x >= width - paddingX - 26 ? "end" : "middle";
+          const labelX = textAnchor === "start" ? x + 4 : textAnchor === "end" ? x - 4 : x;
+
+          return (
+            <g key={`${point.month}-${point.index}`}>
+              <circle cx={x} cy={y} r="4" className="line-point" />
+              <text x={labelX} y={labelY} textAnchor={textAnchor} className="chart-value-label">
+                {formatValue(point.value)}
+              </text>
+            </g>
+          );
+        })}
       </svg>
       <div className="chart-labels">
         {points.map((point) => (
