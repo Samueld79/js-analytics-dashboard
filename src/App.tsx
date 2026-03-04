@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClientCards } from "./components/ClientCards";
+import { HeroHeader } from "./components/HeroHeader";
 import { KpiCard } from "./components/KpiCard";
 import { RankingTable } from "./components/RankingTable";
 import { BarChart } from "./components/charts/BarChart";
@@ -77,30 +78,14 @@ function App() {
     <div className="page-shell">
       <div className="page-bg" />
       <main className="layout">
-        <header className="topbar card">
-          <div>
-            <p className="brand">J&S Analytics</p>
-            <h1>Panel Ejecutivo de Performance y Rentabilidad</h1>
-            <p className="subtitle">Corte mensual: {monthLabel}</p>
-            <p className="subtitle source-note">
-              Fuente: {dataSource === "remote" ? "Remota" : "Local (fallback)"}
-            </p>
-          </div>
-          <div className="month-selector-wrap">
-            <label htmlFor="monthSelector">Mes de análisis</label>
-            <select
-              id="monthSelector"
-              value={selectedMonth}
-              onChange={(event) => setSelectedMonth(event.target.value)}
-            >
-              {monthOptions.map((month) => (
-                <option key={month} value={month}>
-                  {getMonthLabel(month)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </header>
+        <HeroHeader
+          monthLabel={monthLabel}
+          dataSource={dataSource}
+          selectedMonth={selectedMonth}
+          monthOptions={monthOptions}
+          getMonthLabel={getMonthLabel}
+          onMonthChange={setSelectedMonth}
+        />
 
         <section className="card section-block overview-section">
           <div className="section-heading">
