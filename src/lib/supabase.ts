@@ -111,6 +111,15 @@ export type Client = {
   updated_at: string;
 };
 
+export type ClientInput = Omit<
+  Client,
+  'id' | 'created_at' | 'updated_at' | 'last_optimization_at' | 'last_sales_entry_at' | 'slug'
+> & {
+  slug?: string | null;
+  target_cities?: string[] | null;
+  created_by?: string | null;
+};
+
 export type AdMetric = {
   id: string;
   client_id: string;

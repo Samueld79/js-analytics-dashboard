@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getClientByIdOrSlug, listClients } from '../services/clients';
-import { isSupabaseConfigured, type Client } from '../lib/supabase';
+import { createClient, getClientByIdOrSlug, listClients } from '../services/clients';
+import {
+  isSupabaseConfigured,
+  type Client,
+  type ClientInput,
+  type ServiceMutationResult,
+} from '../lib/supabase';
 
 export function useClients() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -26,11 +32,29 @@ export function useClients() {
     void load();
   }, [load]);
 
+  const create = useCallback(
+    async (input: ClientInput): Promise<ServiceMutationResult<Client>> => {
+      setSaving(true);
+      const result = await createClient(input);
+      if (result.data) {
+        await load();
+        setError(null);
+      } else if (result.error) {
+        setError(result.error);
+      }
+      setSaving(false);
+      return result;
+    },
+    [load],
+  );
+
   return {
     clients,
     loading,
+    saving,
     error,
     reload: load,
+    createClient: create,
     isConfigured: isSupabaseConfigured,
   };
 }

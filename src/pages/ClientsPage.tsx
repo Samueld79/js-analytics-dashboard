@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
 import { Plus, Search, Users, Building2, MapPin } from 'lucide-react';
 import { statusLabel } from '../lib/utils';
 
 export function ClientsPage() {
-  const { clients, loading } = useClients();
+  const { clients, loading, saving, error, createClient } = useClients();
   const [search, setSearch] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const filtered = clients.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -20,10 +22,16 @@ export function ClientsPage() {
           <h1 className="page-title">Clientes</h1>
           <p className="page-subtitle">{clients.length} clientes registrados</p>
         </div>
-        <button className="btn-primary">
+        <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
           <Plus size={16} /> Nuevo Cliente
         </button>
       </div>
+
+      {error && (
+        <div className="card section-block" style={{ padding: 16 }}>
+          <p className="empty-note">{error}</p>
+        </div>
+      )}
 
       <div className="search-bar-wrap">
         <Search size={16} className="search-icon" />
@@ -75,6 +83,20 @@ export function ClientsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {showCreateModal && (
+        <ClientCreateModal
+          saving={saving}
+          onClose={() => setShowCreateModal(false)}
+          onSave={async (input) => {
+            const result = await createClient(input);
+            if (!result.error) {
+              setShowCreateModal(false);
+            }
+            return result;
+          }}
+        />
       )}
     </div>
   );
