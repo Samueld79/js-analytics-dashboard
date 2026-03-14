@@ -60,6 +60,7 @@ export function AIAgentPage() {
   const [structureLoading, setStructureLoading] = useState(false);
   const [queryLoading, setQueryLoading] = useState(false);
   const [savingMemory, setSavingMemory] = useState(false);
+  const [savingWithTasks, setSavingWithTasks] = useState(false);
   const [structuredResult, setStructuredResult] = useState<StructuredStrategyResponse | null>(null);
   const [previousSummary, setPreviousSummary] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -68,6 +69,7 @@ export function AIAgentPage() {
   const {
     strategies,
     createStrategy,
+    generateTasks,
     saving: savingStrategy,
   } = useStrategies(selectedClient || undefined);
 
@@ -156,8 +158,12 @@ export function AIAgentPage() {
     }
   }
 
-  async function handleSaveStrategy() {
+  async function handleSaveStrategy(options: { generateTasksAfterSave?: boolean } = {}) {
     if (!structuredResult) return;
+
+    if (options.generateTasksAfterSave) {
+      setSavingWithTasks(true);
+    }
 
     const result = await createStrategy(structuredResult.strategy, {
       changeSummary: 'Creada desde Agente IA',
@@ -165,9 +171,29 @@ export function AIAgentPage() {
 
     if (result.error) {
       setMessage(result.error);
+      setSavingWithTasks(false);
       return;
     }
 
+    if (result.data && options.generateTasksAfterSave) {
+      const taskResult = await generateTasks(result.data.id, result.data.ai_checklist);
+      setSavingWithTasks(false);
+
+      if (taskResult.error) {
+        setMessage(`Estrategia guardada, pero no se pudieron generar tareas: ${taskResult.error}`);
+        return;
+      }
+
+      const createdCount = taskResult.data?.length ?? 0;
+      setMessage(
+        createdCount > 0
+          ? `Estrategia guardada y ${createdCount} tarea${createdCount !== 1 ? 's' : ''} creada${createdCount !== 1 ? 's' : ''}.`
+          : 'Estrategia guardada. No se crearon tareas nuevas porque ya existían abiertas.',
+      );
+      return;
+    }
+
+    setSavingWithTasks(false);
     setMessage('Estrategia guardada correctamente.');
   }
 
@@ -483,6 +509,19 @@ export function AIAgentPage() {
                     <>
                       <Save size={16} /> Guardar como estrategia
                     </>
+                  )}
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => void handleSaveStrategy({ generateTasksAfterSave: true })}
+                  disabled={savingStrategy || savingWithTasks}
+                >
+                  {savingWithTasks ? (
+                    <>
+                      <Loader2 size={16} className="spin" /> Guardando y creando tareas...
+                    </>
+                  ) : (
+                    'Guardar y generar tareas'
                   )}
                 </button>
                 <button className="btn-secondary" onClick={() => setShowEditModal(true)}>

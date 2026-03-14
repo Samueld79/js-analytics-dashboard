@@ -14,6 +14,7 @@ import {
   type StrategyInput,
   type StrategyStatus,
 } from '../lib/supabase';
+import { logActivitySafe } from './activityLog';
 import {
   getCurrentUserId,
   isMissingRpcFunction,
@@ -431,7 +432,7 @@ async function manualUpdateStrategy(
 
 export async function createStrategy(
   input: StrategyInput,
-  options: { changeSummary?: string | null } = {},
+  options: { changeSummary?: string | null; skipActivityLog?: boolean } = {},
 ): Promise<ServiceMutationResult<Strategy>> {
   if (!isSupabaseConfigured || !supabase) {
     return { data: null, error: SUPABASE_MISSING_MESSAGE };
@@ -452,13 +453,27 @@ export async function createStrategy(
   if (result.data?.status === 'approved') {
     await syncApprovedStrategyMemory(result.data);
   }
+  if (result.data && !options.skipActivityLog) {
+    await logActivitySafe({
+      client_id: result.data.client_id,
+      entity_type: 'strategy',
+      entity_id: result.data.id,
+      action: 'strategy_created',
+      description: `${result.data.title} · v${result.data.latest_version ?? result.data.version ?? 1}.`,
+      metadata: {
+        status: result.data.status,
+        month: result.data.month,
+        monthly_budget: result.data.monthly_budget,
+      },
+    });
+  }
   return result;
 }
 
 export async function updateStrategy(
   strategyId: string,
   input: StrategyInput,
-  options: { changeSummary?: string | null } = {},
+  options: { changeSummary?: string | null; skipActivityLog?: boolean } = {},
 ): Promise<ServiceMutationResult<Strategy>> {
   if (!isSupabaseConfigured || !supabase) {
     return { data: null, error: SUPABASE_MISSING_MESSAGE };
@@ -484,6 +499,21 @@ export async function updateStrategy(
   if (result.data?.status === 'approved') {
     await syncApprovedStrategyMemory(result.data);
   }
+  if (result.data && !options.skipActivityLog) {
+    await logActivitySafe({
+      client_id: result.data.client_id,
+      entity_type: 'strategy',
+      entity_id: result.data.id,
+      action: 'strategy_updated',
+      description: `${result.data.title} · v${result.data.latest_version ?? result.data.version ?? 1}.`,
+      metadata: {
+        status: result.data.status,
+        month: result.data.month,
+        monthly_budget: result.data.monthly_budget,
+        change_summary: options.changeSummary ?? null,
+      },
+    });
+  }
   return result;
 }
 
@@ -497,7 +527,7 @@ export async function updateStrategyStatus(
     return { data: null, error: 'La estrategia no existe o no esta disponible.' };
   }
 
-  return updateStrategy(
+  const result = await updateStrategy(
     id,
     {
       ...toStrategyInput(strategy),
@@ -505,6 +535,24 @@ export async function updateStrategyStatus(
     },
     {
       changeSummary: changeSummary ?? `Cambio de estado a ${status}`,
+      skipActivityLog: true,
     },
   );
+
+  if (result.data && strategy.status !== status) {
+    await logActivitySafe({
+      client_id: result.data.client_id,
+      entity_type: 'strategy',
+      entity_id: result.data.id,
+      action: 'strategy_status_changed',
+      description: `${result.data.title} · ${strategy.status} -> ${status}.`,
+      metadata: {
+        from_status: strategy.status,
+        to_status: status,
+        version: result.data.latest_version ?? result.data.version ?? 1,
+      },
+    });
+  }
+
+  return result;
 }

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from './useAuth';
 import type {
+  ActivityLog,
   Alert,
   Client,
   ClientHealthScore,
@@ -15,6 +17,7 @@ import type {
 } from '../lib/supabase';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { listAdMetrics } from '../services/adMetrics';
+import { listActivityLog } from '../services/activityLog';
 import { listAlerts } from '../services/alerts';
 import { getClientByIdOrSlug } from '../services/clients';
 import { listDailyOperatingKpis, listMonthlyOperatingKpis } from '../services/dashboard';
@@ -34,6 +37,7 @@ type WorkspaceState = {
   tasks: Task[];
   alerts: Alert[];
   files: ClientFile[];
+  activityLog: ActivityLog[];
   health: ClientHealthScore | null;
   issues: OperationalIssue[];
 };
@@ -48,11 +52,13 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   tasks: [],
   alerts: [],
   files: [],
+  activityLog: [],
   health: null,
   issues: [],
 };
 
 export function useClientWorkspace(clientId?: string, days = 30) {
+  const { isInternal } = useAuth();
   const [data, setData] = useState<WorkspaceState>(EMPTY_WORKSPACE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,16 +72,28 @@ export function useClientWorkspace(clientId?: string, days = 30) {
 
     setLoading(true);
     try {
-      const [client, metrics, dailyKpis, monthlyKpis, sales, strategies, tasks, alerts, files] = await Promise.all([
+      const [
+        client,
+        metrics,
+        dailyKpis,
+        monthlyKpis,
+        sales,
+        strategies,
+        tasks,
+        alerts,
+        files,
+        activityLog,
+      ] = await Promise.all([
         getClientByIdOrSlug(clientId),
         listAdMetrics({ clientId, days }),
         listDailyOperatingKpis({ clientId, days }),
         listMonthlyOperatingKpis({ clientId, monthsBack: 2 }),
         listDailySales({ clientId, days }),
-        listStrategies(clientId),
-        listTasks({ clientId }),
-        listAlerts({ clientId }),
+        isInternal ? listStrategies(clientId) : Promise.resolve([]),
+        isInternal ? listTasks({ clientId }) : Promise.resolve([]),
+        isInternal ? listAlerts({ clientId }) : Promise.resolve([]),
         listClientFiles({ clientId }),
+        isInternal ? listActivityLog({ clientId, limit: 14 }) : Promise.resolve([]),
       ]);
 
       const operationalSnapshot = buildOperationalSnapshot({
@@ -98,6 +116,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         tasks,
         alerts,
         files,
+        activityLog,
         health,
         issues,
       });
@@ -109,7 +128,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
     } finally {
       setLoading(false);
     }
-  }, [clientId, days]);
+  }, [clientId, days, isInternal]);
 
   useEffect(() => {
     void load();
@@ -144,14 +163,11 @@ export function useClientWorkspace(clientId?: string, days = 30) {
     async (file: ClientFileInput): Promise<ServiceMutationResult<ClientFile>> => {
       const result = await createClientFile(file);
       if (result.data) {
-        setData((current) => ({
-          ...current,
-          files: [result.data as ClientFile, ...current.files],
-        }));
+        await load();
       }
       return result;
     },
-    [],
+    [load],
   );
 
   return {

@@ -7,6 +7,7 @@ import {
   type DailySaleInput,
   type ServiceMutationResult,
 } from '../lib/supabase';
+import { logActivitySafe } from './activityLog';
 
 type ListDailySalesParams = {
   clientId?: string;
@@ -101,6 +102,24 @@ export async function upsertDailySale(
 
   if (clientUpdateError) {
     console.error('[dailySales] update client last_sales_entry_at', clientUpdateError);
+  }
+
+  if (data) {
+    await logActivitySafe({
+      client_id: sale.client_id,
+      entity_type: 'daily_sale',
+      entity_id: (data as DailySale).id,
+      action: 'sales_upserted',
+      description: `Ventas registradas para ${sale.date} por ${normalizeMoney(sale.total_sales).toLocaleString('es-CO')}.`,
+      metadata: {
+        date: sale.date,
+        total_sales: normalizeMoney(sale.total_sales),
+        new_client_sales: normalizeMoney(sale.new_client_sales),
+        repeat_sales: normalizeMoney(sale.repeat_sales),
+        physical_store_sales: normalizeMoney(sale.physical_store_sales),
+        online_sales: normalizeMoney(sale.online_sales),
+      },
+    });
   }
 
   return { data: (data ?? null) as DailySale | null, error: null };

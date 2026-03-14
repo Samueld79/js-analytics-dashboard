@@ -1,12 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BarChart2, TrendingUp, ClipboardList,
-  Bot, Bell, Settings, ChevronRight, Zap
+  Bot, Bell, Settings, ChevronRight, Zap, LockKeyhole, LogOut
 } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
+import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
+import { roleLabel } from '../lib/utils';
 
-const NAV = [
+const INTERNAL_NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Clientes' },
   { to: '/metrics', icon: BarChart2, label: 'Métricas Ads' },
@@ -20,6 +22,16 @@ export function Sidebar() {
   const loc = useLocation();
   const { unreadCount } = useAlerts();
   const { clients } = useClients();
+  const { authEnabled, profile, role, isInternal, defaultClientId, signOut } = useAuth();
+
+  const nav = isInternal
+    ? INTERNAL_NAV
+    : defaultClientId
+      ? [{ to: '/mi-espacio', icon: LockKeyhole, label: 'Mi espacio' }]
+      : [];
+  const visibleClients = isInternal
+    ? clients.slice(0, 6)
+    : clients.filter((client) => client.id === defaultClientId).slice(0, 1);
 
   return (
     <aside className="sidebar">
@@ -29,14 +41,19 @@ export function Sidebar() {
         </div>
         <div>
           <span className="sidebar-brand-name">Agency OS</span>
-          <span className="sidebar-brand-sub">Panel Interno</span>
+          <span className="sidebar-brand-sub">{isInternal ? 'Panel Interno' : 'Workspace Cliente'}</span>
         </div>
       </div>
 
       <nav className="sidebar-nav">
         <div className="sidebar-section-label">Navegación</div>
-        {NAV.map(({ to, icon: Icon, label, badge }) => {
-          const active = to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(to);
+        {nav.map(({ to, icon: Icon, label, badge }) => {
+          const active =
+            to === '/'
+              ? loc.pathname === '/'
+              : to === '/mi-espacio'
+                ? loc.pathname === '/mi-espacio' || (defaultClientId ? loc.pathname === `/clients/${defaultClientId}` : false)
+                : loc.pathname.startsWith(to);
           return (
             <Link key={to} to={to} className={`sidebar-link ${active ? 'active' : ''}`}>
               <Icon size={16} />
@@ -52,8 +69,8 @@ export function Sidebar() {
 
       {clients.length > 0 && (
         <div className="sidebar-clients">
-          <div className="sidebar-section-label">Clientes</div>
-          {clients.slice(0, 6).map(c => (
+          <div className="sidebar-section-label">{isInternal ? 'Clientes' : 'Tu empresa'}</div>
+          {visibleClients.map(c => (
             <Link key={c.id} to={`/clients/${c.id}`} className={`sidebar-client-link ${loc.pathname === `/clients/${c.id}` ? 'active' : ''}`}>
               <span className="sidebar-client-dot" style={{ background: clientColor(c.id) }} />
               <span>{c.name}</span>
@@ -63,10 +80,23 @@ export function Sidebar() {
       )}
 
       <div className="sidebar-footer">
-        <Link to="/settings" className="sidebar-link small">
-          <Settings size={14} />
-          <span>Configuración</span>
-        </Link>
+        {authEnabled && (
+          <div className="sidebar-user-card">
+            <div>
+              <div className="sidebar-user-name">{profile?.full_name ?? profile?.email ?? 'Sesion activa'}</div>
+              <div className="sidebar-user-role">{roleLabel(role)}</div>
+            </div>
+            <button className="sidebar-signout" onClick={() => void signOut()} title="Cerrar sesion">
+              <LogOut size={14} />
+            </button>
+          </div>
+        )}
+        {isInternal && (
+          <Link to="/settings" className="sidebar-link small">
+            <Settings size={14} />
+            <span>Configuración</span>
+          </Link>
+        )}
       </div>
     </aside>
   );

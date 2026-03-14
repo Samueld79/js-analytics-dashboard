@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from './useAuth';
 import {
   isSupabaseConfigured,
   type Alert,
@@ -8,11 +9,19 @@ import {
 import { listAlerts, updateAlertStatus } from '../services/alerts';
 
 export function useAlerts() {
+  const { isInternal } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!isInternal) {
+      setAlerts([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await listAlerts();
@@ -25,7 +34,7 @@ export function useAlerts() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isInternal]);
 
   useEffect(() => {
     void load();

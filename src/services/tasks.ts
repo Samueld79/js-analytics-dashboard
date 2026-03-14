@@ -11,6 +11,7 @@ import {
   type TaskUpdateInput,
   type ServiceMutationResult,
 } from '../lib/supabase';
+import { logActivitySafe } from './activityLog';
 import { getCurrentUserId, normalizeOptionalText } from './serviceHelpers';
 
 type ListTasksParams = {
@@ -75,6 +76,30 @@ export async function updateTask(
     return { data: null, error: getErrorMessage(error, 'No se pudo actualizar la tarea.') };
   }
 
+  if (data) {
+    const nextTask = data as Task;
+    const action =
+      updates.status === 'done'
+        ? 'task_completed'
+        : updates.status === 'pending' && nextTask.completed_at == null
+          ? 'task_reopened'
+          : 'task_updated';
+
+    await logActivitySafe({
+      client_id: nextTask.client_id,
+      entity_type: 'task',
+      entity_id: nextTask.id,
+      action,
+      description: `${nextTask.title} · estado ${nextTask.status}.`,
+      metadata: {
+        status: nextTask.status,
+        priority: nextTask.priority,
+        strategy_id: nextTask.strategy_id,
+        alert_id: nextTask.alert_id,
+      },
+    });
+  }
+
   return { data: (data ?? null) as Task | null, error: null };
 }
 
@@ -108,6 +133,23 @@ export async function createTasks(
   if (error) {
     console.error('[tasks] createTasks', error);
     return { data: null, error: getErrorMessage(error, 'No se pudieron crear las tareas.') };
+  }
+
+  for (const task of (data ?? []) as Task[]) {
+    await logActivitySafe({
+      client_id: task.client_id,
+      entity_type: 'task',
+      entity_id: task.id,
+      action: 'task_created',
+      description: `Tarea creada: ${task.title}.`,
+      metadata: {
+        type: task.type,
+        priority: task.priority,
+        status: task.status,
+        strategy_id: task.strategy_id,
+        alert_id: task.alert_id,
+      },
+    });
   }
 
   return { data: (data ?? []) as Task[], error: null };
@@ -181,7 +223,22 @@ export async function createTasksFromChecklist(params: {
     return { data: [], error: null };
   }
 
-  return createTasks(tasksToCreate);
+  const result = await createTasks(tasksToCreate);
+  if (!result.error && params.strategyId && (result.data?.length ?? 0) > 0) {
+    await logActivitySafe({
+      client_id: params.clientId,
+      entity_type: 'strategy',
+      entity_id: params.strategyId,
+      action: 'strategy_tasks_generated',
+      description: `${result.data?.length ?? 0} tarea${(result.data?.length ?? 0) !== 1 ? 's' : ''} generada${(result.data?.length ?? 0) !== 1 ? 's' : ''} desde checklist.`,
+      metadata: {
+        strategy_id: params.strategyId,
+        created_tasks: result.data?.length ?? 0,
+      },
+    });
+  }
+
+  return result;
 }
 
 export async function createTasksFromOperationalIssues(

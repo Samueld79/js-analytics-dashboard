@@ -32,6 +32,15 @@ export type StrategyStatus =
   | 'reviewed'
   | 'approved'
   | 'archived';
+export type UserRole =
+  | 'admin'
+  | 'team'
+  | 'strategist'
+  | 'operator'
+  | 'partner'
+  | 'client'
+  | 'anonymous';
+export type ClientAccessLevel = 'manager' | 'operator' | 'viewer' | 'client';
 export type TaskType =
   | 'optimization'
   | 'review'
@@ -60,6 +69,27 @@ export type OperationalIssueType =
   | 'low_real_roas'
   | 'overdue_tasks';
 export type HealthStatus = 'healthy' | 'warning' | 'critical';
+
+export type UserProfile = {
+  id: string;
+  email?: string | null;
+  full_name?: string | null;
+  role: UserRole;
+  avatar_url?: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClientMembership = {
+  id: string;
+  client_id: string;
+  user_id: string;
+  access_level: ClientAccessLevel;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+};
 
 export type Client = {
   id: string;
@@ -394,6 +424,22 @@ export type AdImportRun = {
   started_at: string;
   finished_at?: string | null;
   created_at: string;
+};
+
+export type ActivityLog = {
+  id: string;
+  client_id?: string | null;
+  user_id?: string | null;
+  entity_type: string;
+  entity_id?: string | null;
+  action: string;
+  description?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+};
+
+export type ActivityLogInput = Omit<ActivityLog, 'id' | 'user_id' | 'created_at'> & {
+  user_id?: string | null;
 };
 
 export type ServiceMutationResult<T> = {

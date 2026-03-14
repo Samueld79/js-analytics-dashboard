@@ -9,6 +9,7 @@ import {
   type AlertStatus,
   type ServiceMutationResult,
 } from '../lib/supabase';
+import { logActivitySafe } from './activityLog';
 import { isMissingRpcFunction, normalizeOptionalText } from './serviceHelpers';
 
 type ListAlertsParams = {
@@ -226,6 +227,21 @@ export async function updateAlertStatus(
   if (error) {
     console.error('[alerts] updateAlertStatus', error);
     return { data: null, error: getErrorMessage(error, 'No se pudo actualizar la alerta.') };
+  }
+
+  if (data && (status === 'resolved' || status === 'dismissed')) {
+    await logActivitySafe({
+      client_id: (data as Alert).client_id ?? null,
+      entity_type: 'alert',
+      entity_id: (data as Alert).id,
+      action: status === 'resolved' ? 'alert_resolved' : 'alert_dismissed',
+      description: `${(data as Alert).title}.`,
+      metadata: {
+        rule_key: (data as Alert).rule_key,
+        severity: (data as Alert).severity,
+        status,
+      },
+    });
   }
 
   return { data: (data ?? null) as Alert | null, error: null };

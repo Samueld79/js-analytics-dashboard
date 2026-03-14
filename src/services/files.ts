@@ -7,6 +7,7 @@ import {
   type ClientFileInput,
   type ServiceMutationResult,
 } from '../lib/supabase';
+import { logActivitySafe } from './activityLog';
 import { getCurrentUserId, normalizeOptionalText } from './serviceHelpers';
 
 type ListClientFilesParams = {
@@ -71,6 +72,21 @@ export async function createClientFile(
       data: null,
       error: getErrorMessage(error, 'No se pudo registrar el archivo.'),
     };
+  }
+
+  if (data) {
+    await logActivitySafe({
+      client_id: input.client_id,
+      entity_type: 'client_file',
+      entity_id: (data as ClientFile).id,
+      action: 'file_registered',
+      description: `Archivo registrado: ${payload.name}.`,
+      metadata: {
+        file_type: payload.file_type,
+        strategy_id: payload.strategy_id,
+        drive_url: payload.drive_url,
+      },
+    });
   }
 
   return { data: (data ?? null) as ClientFile | null, error: null };

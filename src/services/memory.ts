@@ -10,6 +10,7 @@ import {
   type Strategy,
   type StrategyInput,
 } from '../lib/supabase';
+import { logActivitySafe } from './activityLog';
 import { getClientByIdOrSlug } from './clients';
 import { getCurrentUserId, normalizeOptionalText } from './serviceHelpers';
 
@@ -436,7 +437,20 @@ export async function syncApprovedStrategyMemory(strategy: Strategy): Promise<vo
   const result = await saveMemoryEntries(buildStrategyMemoryEntries(strategy, createdBy));
   if (result.error) {
     console.error('[memory] syncApprovedStrategyMemory entries', result.error);
+    return;
   }
+
+  await logActivitySafe({
+    client_id: strategy.client_id,
+    entity_type: 'client_memory',
+    entity_id: null,
+    action: 'strategy_memory_synced',
+    description: `Memoria sincronizada desde estrategia aprobada ${strategy.title}.`,
+    metadata: {
+      strategy_id: strategy.id,
+      entries_saved: result.data?.length ?? 0,
+    },
+  });
 }
 
 export async function saveStructuredDraftToMemory(params: {
@@ -458,5 +472,20 @@ export async function saveStructuredDraftToMemory(params: {
     createdBy,
   });
 
-  return saveMemoryEntries(entries);
+  const result = await saveMemoryEntries(entries);
+  if (!result.error) {
+    await logActivitySafe({
+      client_id: params.clientId,
+      entity_type: 'client_memory',
+      entity_id: null,
+      action: 'draft_memory_saved',
+      description: `Draft IA guardado en memoria con ${result.data?.length ?? 0} entrada${(result.data?.length ?? 0) !== 1 ? 's' : ''}.`,
+      metadata: {
+        entries_saved: result.data?.length ?? 0,
+        month: params.strategy.month ?? null,
+      },
+    });
+  }
+
+  return result;
 }

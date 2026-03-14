@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   BarChart2,
@@ -12,10 +12,13 @@ import {
 } from 'lucide-react';
 import { ClientFileModal } from '../components/ClientFileModal';
 import { SalesModal } from '../components/SalesModal';
+import { useAuth } from '../hooks/useAuth';
 import { useClientWorkspace } from '../hooks/useClientWorkspace';
 import {
+  activityActionLabel,
   formatCop,
   formatDate,
+  formatDateTime,
   formatNumber,
   formatRoas,
   healthStatusLabel,
@@ -24,6 +27,7 @@ import {
 } from '../lib/utils';
 import type {
   AdMetric,
+  ActivityLog,
   Alert,
   Client,
   ClientHealthScore,
@@ -49,6 +53,7 @@ export function ClientDetailPage() {
     tasks,
     alerts,
     files,
+    activityLog,
     health,
     issues,
     loading,
@@ -56,6 +61,7 @@ export function ClientDetailPage() {
     addFile,
     updateTask,
   } = useClientWorkspace(id, 30);
+  const { isInternal, canWriteSales } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
@@ -64,6 +70,8 @@ export function ClientDetailPage() {
     () => [...dailyKpis].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 7),
     [dailyKpis],
   );
+
+  const canRegisterSales = client ? canWriteSales(client.id) : false;
 
   if (loading) {
     return (
@@ -92,7 +100,7 @@ export function ClientDetailPage() {
     (alert) => alert.severity === 'critical' && ['unread', 'read'].includes(alert.status),
   );
 
-  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+  const allTabs: { key: Tab; label: string; icon: ReactNode }[] = [
     { key: 'overview', label: 'Resumen', icon: <BarChart2 size={14} /> },
     { key: 'metrics', label: 'Ads', icon: <TrendingUp size={14} /> },
     { key: 'sales', label: 'Ventas', icon: <TrendingUp size={14} /> },
@@ -100,12 +108,25 @@ export function ClientDetailPage() {
     { key: 'tasks', label: 'Tareas', icon: <CheckSquare size={14} /> },
     { key: 'files', label: 'Archivos', icon: <FolderOpen size={14} /> },
   ];
+  const tabs = allTabs.filter((entry) =>
+    isInternal || ['overview', 'metrics', 'sales', 'files'].includes(entry.key),
+  );
+
+  useEffect(() => {
+    if (!tabs.some((entry) => entry.key === tab)) {
+      setTab(tabs[0]?.key ?? 'overview');
+    }
+  }, [tab, tabs]);
 
   return (
     <div className="page-content">
       <div className="page-header">
         <div className="page-header-left">
-          <Link to="/clients" className="back-link"><ArrowLeft size={14} /> Clientes</Link>
+          {isInternal ? (
+            <Link to="/clients" className="back-link"><ArrowLeft size={14} /> Clientes</Link>
+          ) : (
+            <span className="meta-chip">Mi espacio</span>
+          )}
           <div className="client-page-title">
             <h1 className="page-title">{client.name}</h1>
             <span className="client-niche-tag">{client.niche}</span>
@@ -117,22 +138,26 @@ export function ClientDetailPage() {
             </a>
           )}
         </div>
-        <button className="btn-primary" onClick={() => setShowSalesModal(true)}>
-          + Registrar Ventas
-        </button>
+        {canRegisterSales && (
+          <button className="btn-primary" onClick={() => setShowSalesModal(true)}>
+            + Registrar Ventas
+          </button>
+        )}
       </div>
 
-      {(health || criticalAlerts.length > 0) && (
+      {isInternal && (health || criticalAlerts.length > 0) && (
         <ClientOperationalBanner health={health} issues={issues} criticalAlerts={criticalAlerts} />
       )}
 
       <div className="kpi-strip">
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">Salud</span>
-          <span className={`kpi-strip-value health-${health?.status ?? 'healthy'}`}>
-            {health ? `${health.score} · ${healthStatusLabel(health.status)}` : '—'}
-          </span>
-        </div>
+        {isInternal && (
+          <div className="kpi-strip-item">
+            <span className="kpi-strip-label">Salud</span>
+            <span className={`kpi-strip-value health-${health?.status ?? 'healthy'}`}>
+              {health ? `${health.score} · ${healthStatusLabel(health.status)}` : '—'}
+            </span>
+          </div>
+        )}
         <div className="kpi-strip-item">
           <span className="kpi-strip-label">Inversión 30d</span>
           <span className="kpi-strip-value">{formatCop(operatingTotals.spend)}</span>
@@ -157,10 +182,12 @@ export function ClientDetailPage() {
           <span className="kpi-strip-label">Ventas 30d</span>
           <span className="kpi-strip-value">{formatCop(operatingTotals.total_sales)}</span>
         </div>
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">Tareas</span>
-          <span className="kpi-strip-value">{pendingTasks.length} pendientes</span>
-        </div>
+        {isInternal && (
+          <div className="kpi-strip-item">
+            <span className="kpi-strip-label">Tareas</span>
+            <span className="kpi-strip-value">{pendingTasks.length} pendientes</span>
+          </div>
+        )}
       </div>
 
       <div className="tab-bar">
@@ -182,6 +209,8 @@ export function ClientDetailPage() {
           issues={issues}
           operatingTotals={operatingTotals}
           operatingRows={recentOperatingKpis}
+          activityLog={activityLog}
+          showOperational={isInternal}
         />
       )}
       {tab === 'metrics' && <ClientMetricsTab metrics={metrics} />}
@@ -192,7 +221,7 @@ export function ClientDetailPage() {
         <ClientFilesTab
           files={files}
           strategies={strategies}
-          onAddFile={() => setShowFileModal(true)}
+          onAddFile={isInternal ? () => setShowFileModal(true) : undefined}
         />
       )}
 
@@ -209,7 +238,7 @@ export function ClientDetailPage() {
         />
       )}
 
-      {showFileModal && (
+      {isInternal && showFileModal && (
         <ClientFileModal
           clientId={client.id}
           strategies={strategies}
@@ -231,16 +260,20 @@ function ClientOverview({
   client,
   health,
   issues,
+  activityLog,
+  showOperational,
 }: {
   operatingTotals: ReturnType<typeof sumOperatingKpis>;
   operatingRows: ClientDailyOperatingKpi[];
   client: Client;
   health: ClientHealthScore | null;
   issues: OperationalIssue[];
+  activityLog: ActivityLog[];
+  showOperational: boolean;
 }) {
   return (
     <div className="tab-content overview-grid">
-      {health && (
+      {showOperational && health && (
         <div className="card section-block">
           <div className="section-heading"><h2>Salud operativa</h2></div>
           <div className="metric-grid-4">
@@ -351,6 +384,27 @@ function ClientOverview({
         <div className="card section-block">
           <div className="section-heading"><h2>Notas del cliente</h2></div>
           <p className="notes-text">{client.notes}</p>
+        </div>
+      )}
+
+      {showOperational && (
+        <div className="card section-block">
+          <div className="section-heading"><h2>Actividad reciente</h2></div>
+          {activityLog.length === 0 ? (
+            <p className="empty-note">Todavía no hay movimientos auditados para este cliente.</p>
+          ) : (
+            <div className="activity-feed">
+              {activityLog.map((entry) => (
+                <div key={entry.id} className="activity-row">
+                  <div className="activity-row-main">
+                    <strong>{activityActionLabel(entry.action)}</strong>
+                    {entry.description && <span>{entry.description}</span>}
+                  </div>
+                  <span className="activity-row-time">{formatDateTime(entry.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -628,23 +682,28 @@ function ClientFilesTab({
 }: {
   files: ClientFile[];
   strategies: Strategy[];
-  onAddFile: () => void;
+  onAddFile?: (() => void) | undefined;
 }) {
   const strategyMap = new Map(strategies.map((strategy) => [strategy.id, strategy.title]));
 
   return (
     <div className="tab-content">
-      <div className="strategy-tab-header">
-        <button className="btn-primary" onClick={onAddFile}>
-          + Registrar archivo
-        </button>
-      </div>
+      {onAddFile && (
+        <div className="strategy-tab-header">
+          <button className="btn-primary" onClick={onAddFile}>
+            + Registrar archivo
+          </button>
+        </div>
+      )}
       <div className="card section-block">
         <div className="section-heading">
           <h2>Archivos del cliente</h2>
         </div>
         {files.length === 0 ? (
-          <p className="empty-note">No hay archivos registrados. Agrega links de Drive para ordenar creativos y documentos.</p>
+          <p className="empty-note">
+            No hay archivos registrados todavía.
+            {onAddFile ? ' Agrega links de Drive para ordenar creativos y documentos.' : ''}
+          </p>
         ) : (
           <div className="table-wrap">
             <table>

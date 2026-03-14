@@ -111,6 +111,16 @@ export function formatDate(dateStr: string): string {
   return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
 }
 
+export function formatDateTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('es-CO', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function statusLabel(status: string): string {
   const map: Record<string, string> = {
     draft: 'Borrador',
@@ -154,4 +164,37 @@ export function healthStatusLabel(status: string): string {
     critical: 'Crítico',
   };
   return map[status] ?? status;
+}
+
+export function roleLabel(role: string): string {
+  const map: Record<string, string> = {
+    admin: 'Admin',
+    team: 'Equipo',
+    strategist: 'Estratega',
+    operator: 'Operador',
+    partner: 'Socio',
+    client: 'Cliente',
+    anonymous: 'Anonimo',
+  };
+  return map[role] ?? role;
+}
+
+export function activityActionLabel(action: string): string {
+  const map: Record<string, string> = {
+    sales_upserted: 'Ventas registradas',
+    strategy_created: 'Estrategia creada',
+    strategy_updated: 'Estrategia actualizada',
+    strategy_status_changed: 'Estado de estrategia actualizado',
+    strategy_tasks_generated: 'Tareas generadas desde estrategia',
+    strategy_memory_synced: 'Memoria del cliente actualizada',
+    task_created: 'Tarea creada',
+    task_updated: 'Tarea actualizada',
+    task_completed: 'Tarea completada',
+    task_reopened: 'Tarea reabierta',
+    file_registered: 'Archivo registrado',
+    draft_memory_saved: 'Memoria guardada desde IA',
+    alert_resolved: 'Alerta resuelta',
+    alert_dismissed: 'Alerta descartada',
+  };
+  return map[action] ?? action.replace(/_/g, ' ');
 }
