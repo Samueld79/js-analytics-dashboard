@@ -5,7 +5,6 @@
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.save_strategy_with_history(
-  p_strategy_id UUID DEFAULT NULL,
   p_client_id UUID,
   p_title TEXT,
   p_month DATE,
@@ -24,7 +23,8 @@ CREATE OR REPLACE FUNCTION public.save_strategy_with_history(
   p_ai_summary TEXT DEFAULT NULL,
   p_ai_checklist JSONB DEFAULT '[]'::jsonb,
   p_ai_diff TEXT DEFAULT NULL,
-  p_change_summary TEXT DEFAULT NULL
+  p_change_summary TEXT DEFAULT NULL,
+  p_strategy_id UUID DEFAULT NULL
 )
 RETURNS public.strategies
 LANGUAGE plpgsql
@@ -156,7 +156,6 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.save_strategy_with_history(
   UUID,
-  UUID,
   TEXT,
   DATE,
   TEXT,
@@ -174,7 +173,8 @@ GRANT EXECUTE ON FUNCTION public.save_strategy_with_history(
   TEXT,
   JSONB,
   TEXT,
-  TEXT
+  TEXT,
+  UUID
 ) TO anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.touch_operational_alert(
