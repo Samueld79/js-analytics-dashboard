@@ -120,6 +120,37 @@ export type ClientInput = Omit<
   created_by?: string | null;
 };
 
+export type AdAccountStatus = 'active' | 'paused' | 'archived';
+export type MetaSyncStatus = 'ok' | 'stale' | 'no_data';
+
+export type AdAccountSyncRow = {
+  id: string;
+  client_id: string;
+  name: string;
+  meta_account_id: string;
+  status: AdAccountStatus;
+  is_primary: boolean;
+  last_sync_at?: string | null;
+};
+
+export type ClientMetaOverview = {
+  client_id: string;
+  sync_status: MetaSyncStatus;
+  last_sync_at?: string | null;
+  active_accounts: number;
+  synced_accounts: number;
+  stale_accounts: number;
+  missing_sync_accounts: number;
+  has_mtd_data: boolean;
+  mtd_spend: number;
+  mtd_messages: number;
+  mtd_leads: number;
+  mtd_purchases: number;
+  mtd_purchase_value: number;
+  mtd_ad_roas: number;
+  mtd_real_roas: number;
+};
+
 export type AdMetric = {
   id: string;
   client_id: string;

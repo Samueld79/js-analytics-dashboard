@@ -1,10 +1,29 @@
 import { useDashboard } from '../hooks/useDashboard';
-import { formatCop, formatNumber, formatRoas, healthStatusLabel, sumOperatingKpis } from '../lib/utils';
+import {
+  formatCop,
+  formatDateTime,
+  formatNumber,
+  formatRoas,
+  healthStatusLabel,
+  metaSyncStatusClass,
+  metaSyncStatusLabel,
+  sumOperatingKpis,
+} from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { TrendingUp, MessageSquare, DollarSign, BarChart3, AlertTriangle, ArrowRight } from 'lucide-react';
 
 export function DashboardPage() {
-  const { clients, alerts, dailyKpis, monthlyKpis, tasks, healthByClient, issuesByClient, unreadCount } = useDashboardWithCounts();
+  const {
+    clients,
+    alerts,
+    dailyKpis,
+    monthlyKpis,
+    tasks,
+    healthByClient,
+    issuesByClient,
+    metaByClient,
+    unreadCount,
+  } = useDashboardWithCounts();
   const overall = sumOperatingKpis(dailyKpis);
   const pendingTasks = tasks.filter(t => t.status === 'pending').length;
   const criticalAlerts = alerts.filter(a => a.severity === 'critical' && a.status === 'unread');
@@ -17,6 +36,21 @@ export function DashboardPage() {
   const clientsAtRisk = healthEntries
     .filter((entry) => (entry.health?.status ?? 'healthy') !== 'healthy')
     .sort((a, b) => (a.health?.score ?? 100) - (b.health?.score ?? 100));
+  const metaEntries = clients
+    .map((client) => ({
+      client,
+      meta: metaByClient[client.id] ?? null,
+    }))
+    .sort((a, b) => {
+      const statusWeight = getMetaStatusWeight(a.meta?.sync_status) - getMetaStatusWeight(b.meta?.sync_status);
+      if (statusWeight !== 0) return statusWeight;
+      return a.client.name.localeCompare(b.client.name);
+    });
+  const metaOkCount = metaEntries.filter((entry) => entry.meta?.sync_status === 'ok').length;
+  const metaStaleCount = metaEntries.filter((entry) => entry.meta?.sync_status === 'stale').length;
+  const metaNoDataCount = metaEntries.filter(
+    (entry) => !entry.meta || entry.meta.sync_status === 'no_data',
+  ).length;
 
   const clientSummaries = clients.map(c => {
     const clientDaily = dailyKpis.filter(kpi => kpi.client_id === c.id);
@@ -118,6 +152,40 @@ export function DashboardPage() {
           </div>
         </div>
 
+        <div className="card section-block">
+          <div className="section-heading">
+            <h2>Estado Meta</h2>
+            <span className="badge-count">{metaStaleCount}</span>
+          </div>
+          <div className="task-list-compact">
+            {metaEntries.length === 0 ? (
+              <p className="empty-note">No hay clientes activos para revisar sincronización Meta.</p>
+            ) : (
+              metaEntries.map(({ client, meta }) => (
+                <Link key={client.id} to={`/clients/${client.id}`} className="client-risk-row">
+                  <div className="task-info-compact">
+                    <span className="task-title-compact">{client.name}</span>
+                    <span className="task-due">
+                      {meta?.last_sync_at
+                        ? `Última sync ${formatDateTime(meta.last_sync_at)}`
+                        : 'Sin sincronización registrada'}
+                    </span>
+                  </div>
+                  <span className={`status-pill ${metaSyncStatusClass(meta?.sync_status ?? 'no_data')}`}>
+                    {metaSyncStatusLabel(meta?.sync_status ?? 'no_data')}
+                  </span>
+                  <span className="type-chip">
+                    {meta?.has_mtd_data ? formatCop(meta.mtd_spend) : 'MTD vacío'}
+                  </span>
+                  <span className="type-chip">
+                    {meta?.has_mtd_data ? formatRoas(meta.mtd_ad_roas) : 'ROAS —'}
+                  </span>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+
         {/* Pending tasks */}
         <div className="card section-block">
           <div className="section-heading">
@@ -178,6 +246,18 @@ export function DashboardPage() {
               <span className="insight-num">{healthyClients}</span>
               <span className="insight-label">clientes al día</span>
             </div>
+            <div className="insight-stat">
+              <span className="insight-num">{metaOkCount}</span>
+              <span className="insight-label">sync Meta OK</span>
+            </div>
+            <div className="insight-stat">
+              <span className="insight-num">{metaStaleCount}</span>
+              <span className="insight-label">sync Meta stale</span>
+            </div>
+            <div className="insight-stat">
+              <span className="insight-num">{metaNoDataCount}</span>
+              <span className="insight-label">sin datos Meta</span>
+            </div>
           </div>
           <p className="insight-text">
             La operación muestra {formatRoas(overall.ad_roas)} de ROAS Ads con {formatCop(overall.spend)} de inversión.
@@ -195,6 +275,19 @@ function useDashboardWithCounts() {
     ...dashboard,
     unreadCount: dashboard.alerts.filter((alert) => alert.status === 'unread').length,
   };
+}
+
+function getMetaStatusWeight(status?: 'ok' | 'stale' | 'no_data' | null): number {
+  switch (status) {
+    case 'stale':
+      return 0;
+    case 'no_data':
+      return 1;
+    case 'ok':
+      return 2;
+    default:
+      return 1;
+  }
 }
 
 function KpiBox({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {

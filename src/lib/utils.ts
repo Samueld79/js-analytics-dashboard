@@ -4,6 +4,7 @@ import type {
   ClientMonthlyOperatingKpi,
   DailySale,
   DailySaleValidation,
+  MetaSyncStatus,
 } from '../lib/supabase';
 
 export const formatCop = (value: number): string => {
@@ -119,6 +120,55 @@ export function formatDateTime(dateStr: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+export function getCurrentMonthFloor(date = new Date()): string {
+  const current = new Date(date);
+  current.setDate(1);
+  current.setHours(12, 0, 0, 0);
+  return current.toISOString().split('T')[0];
+}
+
+export function isMetaSyncStale(
+  lastSyncAt?: string | null,
+  staleAfterHours = 30,
+): boolean {
+  if (!lastSyncAt) return true;
+
+  const timestamp = new Date(lastSyncAt).getTime();
+  if (!Number.isFinite(timestamp)) return true;
+
+  return Date.now() - timestamp > staleAfterHours * 60 * 60 * 1000;
+}
+
+export function getMetaSyncStatus(params: {
+  activeAccounts: number;
+  lastSyncAt?: string | null;
+  staleAccounts: number;
+}): MetaSyncStatus {
+  if (params.activeAccounts === 0 || !params.lastSyncAt) return 'no_data';
+  if (params.staleAccounts > 0 || isMetaSyncStale(params.lastSyncAt)) return 'stale';
+  return 'ok';
+}
+
+export function metaSyncStatusLabel(status: MetaSyncStatus): string {
+  const map: Record<MetaSyncStatus, string> = {
+    ok: 'OK',
+    stale: 'Desactualizado',
+    no_data: 'Sin datos',
+  };
+
+  return map[status];
+}
+
+export function metaSyncStatusClass(status: MetaSyncStatus): string {
+  const map: Record<MetaSyncStatus, string> = {
+    ok: 'status-green',
+    stale: 'status-amber',
+    no_data: 'status-gray',
+  };
+
+  return map[status];
 }
 
 export function statusLabel(status: string): string {

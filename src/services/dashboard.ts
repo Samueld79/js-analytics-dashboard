@@ -4,8 +4,10 @@ import {
   type Client,
   type ClientHealthScore,
   type ClientDailyOperatingKpi,
+  type ClientMetaOverview,
   type ClientMonthlyOperatingKpi,
 } from '../lib/supabase';
+import { buildClientMetaOverviewByClient, listMetaAccountSyncRows } from './meta';
 import { runOperationalChecks } from './operationalChecks';
 
 function getSinceDate(days: number): string {
@@ -85,12 +87,14 @@ export type DashboardSnapshot = {
   tasks: import('../lib/supabase').Task[];
   healthByClient: Record<string, ClientHealthScore>;
   issuesByClient: Record<string, import('../lib/supabase').OperationalIssue[]>;
+  metaByClient: Record<string, ClientMetaOverview>;
 };
 
 export async function getDashboardSnapshot(days = 30): Promise<DashboardSnapshot> {
-  const [operationalSnapshot, monthlyKpis] = await Promise.all([
+  const [operationalSnapshot, monthlyKpis, syncRows] = await Promise.all([
     runOperationalChecks({ days, syncAlertsAndTasks: true }),
     listMonthlyOperatingKpis(),
+    listMetaAccountSyncRows(),
   ]);
 
   return {
@@ -101,5 +105,10 @@ export async function getDashboardSnapshot(days = 30): Promise<DashboardSnapshot
     tasks: operationalSnapshot.tasks,
     healthByClient: operationalSnapshot.healthByClient,
     issuesByClient: operationalSnapshot.issuesByClient,
+    metaByClient: buildClientMetaOverviewByClient({
+      clientIds: operationalSnapshot.clients.map((client) => client.id),
+      monthlyKpis,
+      syncRows,
+    }),
   };
 }

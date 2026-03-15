@@ -10,6 +10,7 @@ const EMPTY_DASHBOARD: DashboardSnapshot = {
   tasks: [],
   healthByClient: {},
   issuesByClient: {},
+  metaByClient: {},
 };
 
 export function useDashboard(days = 30) {

@@ -5,6 +5,7 @@ import type {
   Alert,
   Client,
   ClientHealthScore,
+  ClientMetaOverview,
   ClientFile,
   ClientFileInput,
   ClientDailyOperatingKpi,
@@ -23,6 +24,7 @@ import { getClientByIdOrSlug } from '../services/clients';
 import { listDailyOperatingKpis, listMonthlyOperatingKpis } from '../services/dashboard';
 import { listDailySales, upsertDailySale } from '../services/dailySales';
 import { createClientFile, listClientFiles } from '../services/files';
+import { buildClientMetaOverviewByClient, listMetaAccountSyncRows } from '../services/meta';
 import { buildOperationalSnapshot } from '../services/operationalChecks';
 import { listStrategies } from '../services/strategies';
 import { listTasks, updateTask } from '../services/tasks';
@@ -40,6 +42,7 @@ type WorkspaceState = {
   activityLog: ActivityLog[];
   health: ClientHealthScore | null;
   issues: OperationalIssue[];
+  meta: ClientMetaOverview | null;
 };
 
 const EMPTY_WORKSPACE: WorkspaceState = {
@@ -55,6 +58,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   activityLog: [],
   health: null,
   issues: [],
+  meta: null,
 };
 
 export function useClientWorkspace(clientId?: string, days = 30) {
@@ -83,6 +87,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         alerts,
         files,
         activityLog,
+        syncRows,
       ] = await Promise.all([
         getClientByIdOrSlug(clientId),
         listAdMetrics({ clientId, days }),
@@ -94,6 +99,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         isInternal ? listAlerts({ clientId }) : Promise.resolve([]),
         listClientFiles({ clientId }),
         isInternal ? listActivityLog({ clientId, limit: 14 }) : Promise.resolve([]),
+        listMetaAccountSyncRows({ clientId }),
       ]);
 
       const operationalSnapshot = buildOperationalSnapshot({
@@ -105,6 +111,12 @@ export function useClientWorkspace(clientId?: string, days = 30) {
       });
       const health = client ? operationalSnapshot.healthByClient[client.id] ?? null : null;
       const issues = client ? operationalSnapshot.issuesByClient[client.id] ?? [] : [];
+      const metaByClient = buildClientMetaOverviewByClient({
+        clientIds: client ? [client.id] : clientId ? [clientId] : [],
+        monthlyKpis,
+        syncRows,
+      });
+      const meta = client ? metaByClient[client.id] ?? null : metaByClient[clientId] ?? null;
 
       setData({
         client,
@@ -119,6 +131,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         activityLog,
         health,
         issues,
+        meta,
       });
       setError(null);
     } catch (err) {

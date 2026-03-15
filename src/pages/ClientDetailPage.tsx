@@ -22,6 +22,8 @@ import {
   formatNumber,
   formatRoas,
   healthStatusLabel,
+  metaSyncStatusClass,
+  metaSyncStatusLabel,
   statusLabel,
   sumOperatingKpis,
 } from '../lib/utils';
@@ -31,6 +33,7 @@ import type {
   Alert,
   Client,
   ClientHealthScore,
+  ClientMetaOverview,
   ClientFile,
   ClientDailyOperatingKpi,
   DailySale,
@@ -56,6 +59,7 @@ export function ClientDetailPage() {
     activityLog,
     health,
     issues,
+    meta,
     loading,
     addSale,
     addFile,
@@ -99,6 +103,9 @@ export function ClientDetailPage() {
   const criticalAlerts = alerts.filter(
     (alert) => alert.severity === 'critical' && ['unread', 'read'].includes(alert.status),
   );
+  const metaStatus = meta?.sync_status ?? 'no_data';
+  const metaStatusValueClass =
+    metaStatus === 'ok' ? 'text-green' : metaStatus === 'stale' ? 'text-amber' : '';
 
   const allTabs: { key: Tab; label: string; icon: ReactNode }[] = [
     { key: 'overview', label: 'Resumen', icon: <BarChart2 size={14} /> },
@@ -137,6 +144,12 @@ export function ClientDetailPage() {
               <ExternalLink size={11} /> Drive
             </a>
           )}
+          <span className={`status-pill ${metaSyncStatusClass(metaStatus)}`}>
+            Meta {metaSyncStatusLabel(metaStatus)}
+          </span>
+          <span className="meta-chip">
+            {meta?.last_sync_at ? `Última sync ${formatDateTime(meta.last_sync_at)}` : 'Sin sincronización'}
+          </span>
         </div>
         {canRegisterSales && (
           <button className="btn-primary" onClick={() => setShowSalesModal(true)}>
@@ -158,6 +171,18 @@ export function ClientDetailPage() {
             </span>
           </div>
         )}
+        <div className="kpi-strip-item">
+          <span className="kpi-strip-label">Estado Meta</span>
+          <span className={`kpi-strip-value ${metaStatusValueClass}`}>
+            {metaSyncStatusLabel(metaStatus)}
+          </span>
+        </div>
+        <div className="kpi-strip-item">
+          <span className="kpi-strip-label">Ads MTD</span>
+          <span className="kpi-strip-value">
+            {meta?.has_mtd_data ? formatCop(meta.mtd_spend) : '—'}
+          </span>
+        </div>
         <div className="kpi-strip-item">
           <span className="kpi-strip-label">Inversión 30d</span>
           <span className="kpi-strip-value">{formatCop(operatingTotals.spend)}</span>
@@ -207,6 +232,7 @@ export function ClientDetailPage() {
           client={client}
           health={health}
           issues={issues}
+          meta={meta}
           operatingTotals={operatingTotals}
           operatingRows={recentOperatingKpis}
           activityLog={activityLog}
@@ -260,6 +286,7 @@ function ClientOverview({
   client,
   health,
   issues,
+  meta,
   activityLog,
   showOperational,
 }: {
@@ -268,9 +295,12 @@ function ClientOverview({
   client: Client;
   health: ClientHealthScore | null;
   issues: OperationalIssue[];
+  meta: ClientMetaOverview | null;
   activityLog: ActivityLog[];
   showOperational: boolean;
 }) {
+  const metaStatus = meta?.sync_status ?? 'no_data';
+
   return (
     <div className="tab-content overview-grid">
       {showOperational && health && (
@@ -288,6 +318,56 @@ function ClientOverview({
           </div>
         </div>
       )}
+
+      <div className="card section-block">
+        <div className="section-heading"><h2>Salud Meta</h2></div>
+        <div className="operational-summary-row">
+          <span className={`status-pill ${metaSyncStatusClass(metaStatus)}`}>
+            Meta {metaSyncStatusLabel(metaStatus)}
+          </span>
+          <span className="meta-chip">
+            {meta?.last_sync_at ? `Última sync ${formatDateTime(meta.last_sync_at)}` : 'Sin sincronización'}
+          </span>
+          <span className="meta-chip">
+            {meta?.active_accounts ?? 0} cuenta{(meta?.active_accounts ?? 0) === 1 ? '' : 's'} activa{(meta?.active_accounts ?? 0) === 1 ? '' : 's'}
+          </span>
+          {(meta?.stale_accounts ?? 0) > 0 && (
+            <span className="meta-chip">{meta?.stale_accounts} desactualizadas</span>
+          )}
+        </div>
+
+        {(meta?.active_accounts ?? 0) === 0 ? (
+          <p className="empty-note">No hay cuentas Meta activas asociadas a este cliente.</p>
+        ) : (
+          <>
+            <div className="metric-grid-4">
+              <MetricBox label="Inversión MTD" value={formatCop(meta?.mtd_spend ?? 0)} />
+              <MetricBox
+                label="ROAS Ads MTD"
+                value={formatRoas(meta?.mtd_ad_roas ?? 0)}
+                highlight={
+                  !meta?.has_mtd_data
+                    ? undefined
+                    : (meta?.mtd_ad_roas ?? 0) >= 3
+                      ? 'green'
+                      : (meta?.mtd_ad_roas ?? 0) >= 2
+                        ? 'amber'
+                        : 'red'
+                }
+              />
+              <MetricBox label="Mensajes MTD" value={formatNumber(meta?.mtd_messages ?? 0)} />
+              <MetricBox label="Leads MTD" value={formatNumber(meta?.mtd_leads ?? 0)} />
+              <MetricBox label="Compras MTD" value={formatNumber(meta?.mtd_purchases ?? 0)} />
+              <MetricBox label="Valor compras MTD" value={formatCop(meta?.mtd_purchase_value ?? 0)} />
+              <MetricBox label="Sync OK" value={String(meta?.synced_accounts ?? 0)} />
+              <MetricBox label="Sync pendiente" value={String(meta?.stale_accounts ?? 0)} highlight={(meta?.stale_accounts ?? 0) > 0 ? 'amber' : 'green'} />
+            </div>
+            {!meta?.has_mtd_data && (
+              <p className="empty-note">Todavía no hay métricas Ads MTD disponibles para este cliente.</p>
+            )}
+          </>
+        )}
+      </div>
 
       <div className="card section-block">
         <div className="section-heading"><h2>Métricas Ads — Últimos 30 días</h2></div>
