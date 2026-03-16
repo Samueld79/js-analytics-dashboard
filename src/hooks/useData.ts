@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listAdMetrics } from '../services/adMetrics';
 import { listMonthlyOperatingKpis } from '../services/dashboard';
+import { listMetaAccountSyncRows } from '../services/meta';
 import { listTasks, updateTask as saveTask } from '../services/tasks';
 import type {
   AdMetric,
+  AdAccountSyncRow,
   ClientMonthlyOperatingKpi,
   Task,
   TaskUpdateInput,
@@ -49,6 +51,24 @@ export function useMonthlyOperatingKpis(clientId?: string, monthsBack = 6) {
   }, [load]);
 
   return { monthlyKpis, loading, reload: load };
+}
+
+export function useMetaSyncRows(clientId?: string) {
+  const [syncRows, setSyncRows] = useState<AdAccountSyncRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const data = await listMetaAccountSyncRows({ clientId });
+    setSyncRows(data);
+    setLoading(false);
+  }, [clientId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { syncRows, loading, reload: load };
 }
 
 export function useTasks(clientId?: string) {

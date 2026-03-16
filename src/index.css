@@ -4607,6 +4607,10 @@ tbody tr:hover td {
   gap: 14px;
 }
 
+.report-kpi-primary-grid {
+  align-items: stretch;
+}
+
 .report-kpi-card {
   display: grid;
   gap: 8px;
@@ -4652,6 +4656,53 @@ tbody tr:hover td {
 .report-history-grid {
   display: grid;
   gap: 18px;
+}
+
+.report-overview-grid {
+  align-items: start;
+}
+
+.report-overview-card {
+  display: grid;
+  gap: 16px;
+}
+
+.report-coverage-list {
+  display: grid;
+  gap: 10px;
+}
+
+.report-coverage-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.report-coverage-main {
+  display: grid;
+  gap: 4px;
+}
+
+.report-coverage-main strong {
+  color: var(--gs-text);
+  font-size: 0.88rem;
+}
+
+.report-coverage-main span {
+  color: var(--gs-text-soft);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.report-inline-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .distribution-card,
@@ -4740,6 +4791,13 @@ tbody tr:hover td {
   gap: 14px;
 }
 
+.report-pending-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .objective-metric-card.is-pending {
   opacity: 0.86;
   border-style: dashed;
@@ -4812,6 +4870,10 @@ tbody tr:hover td {
     grid-template-columns: 1fr;
   }
 
+  .report-inline-summary {
+    grid-template-columns: 1fr;
+  }
+
   .distribution-layout {
     grid-template-columns: 1fr;
   }
@@ -4841,6 +4903,10 @@ tbody tr:hover td {
 
   .report-objective-grid {
     grid-template-columns: 1fr;
+  }
+
+  .report-coverage-item {
+    flex-direction: column;
   }
 }
 
