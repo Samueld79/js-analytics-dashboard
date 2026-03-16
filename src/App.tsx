@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { BrandSignature } from './components/BrandSignature';
 import { Sidebar } from './components/Sidebar';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { isSupabaseConfigured } from './lib/supabase';
@@ -32,8 +33,10 @@ function AppContent() {
       <div className="auth-shell">
         <div className="page-bg" />
         <div className="auth-card card section-block">
-          <h1 className="page-title">Growth Strategy JS</h1>
-          <p className="page-subtitle">Validando acceso y contexto operativo...</p>
+          <BrandSignature
+            subtitle="Validando acceso y contexto operativo..."
+            className="auth-brand-signature"
+          />
         </div>
       </div>
     );

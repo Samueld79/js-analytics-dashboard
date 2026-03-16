@@ -168,7 +168,7 @@ export function MetricsPage() {
             <p className="empty-note">No hay métricas registradas para este mes.</p>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="metrics-summary-table">
                 <thead>
                   <tr>
                     <th>Cliente</th>
@@ -224,7 +224,7 @@ export function MetricsPage() {
           <p className="empty-note">No hay detalle Ads para el filtro actual.</p>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="metrics-detail-table">
               <thead>
                 <tr>
                   {selectedClient === 'all' && <th>Cliente</th>}

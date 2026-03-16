@@ -27,6 +27,7 @@ import {
   formatPct,
   formatRoas,
   healthStatusLabel,
+  hasSpecialMonthlyMetricData,
   metaSyncStatusClass,
   metaSyncStatusLabel,
   resolveMonthlyProfileVisits,
@@ -468,6 +469,7 @@ export function ClientDetailPage() {
             socialMetric={selectedSocialMetric}
             profileVisits={selectedProfileVisits}
             followerConversion={selectedFollowerConversion}
+            hasSpecialMetricData={hasSpecialMonthlyMetricData(selectedSocialMetric)}
             operatingTotals={selectedPeriodTotals}
             rollingTotals={operatingTotals}
             operatingRows={recentOperatingKpis}
@@ -553,6 +555,7 @@ function ClientOverview({
   socialMetric,
   profileVisits,
   followerConversion,
+  hasSpecialMetricData,
   showOperational,
 }: {
   operatingTotals: ReturnType<typeof sumOperatingKpis>;
@@ -569,6 +572,7 @@ function ClientOverview({
   socialMetric: SocialMonthlyMetric | null;
   profileVisits: ReturnType<typeof resolveMonthlyProfileVisits>;
   followerConversion: number | null;
+  hasSpecialMetricData: boolean;
   showOperational: boolean;
 }) {
   const metaStatus = meta?.sync_status ?? 'no_data';
@@ -734,6 +738,47 @@ function ClientOverview({
       </div>
 
       <div className="card section-block">
+        <div className="section-heading"><h2>Métricas especiales — {selectedMonthLabel}</h2></div>
+        <p className="source-note">
+          Cierre mensual manual para señales especiales de negocio. No se mezclan con Ads rolling
+          ni se infieren desde otras fuentes.
+        </p>
+        <div className="operational-summary-row">
+          <span className={`meta-chip ${socialMetric ? 'source-manual' : 'source-unknown'}`}>
+            {socialMetric ? 'Fuente manual mensual' : 'Sin cierre mensual cargado'}
+          </span>
+        </div>
+        {hasSpecialMetricData ? (
+          <div className="metric-grid-4">
+            <MetricBox
+              label="Clicks WhatsApp"
+              value={formatNullableCount(socialMetric?.whatsapp_clicks)}
+            />
+            <MetricBox
+              label="Clicks al link"
+              value={formatNullableCount(socialMetric?.link_clicks)}
+            />
+            <MetricBox
+              label="Nuevos clientes reportados"
+              value={formatNullableCount(socialMetric?.new_customers_reported)}
+            />
+            <MetricBox
+              label="Recompra reportada"
+              value={formatNullableCount(socialMetric?.returning_customers_reported)}
+            />
+            <MetricBox
+              label="Visitas a tienda"
+              value={formatNullableCount(socialMetric?.store_visits_reported)}
+            />
+          </div>
+        ) : (
+          <p className="empty-note">
+            Todavía no hay métricas especiales cargadas para este mes.
+          </p>
+        )}
+      </div>
+
+      <div className="card section-block">
         <div className="section-heading"><h2>Ads recientes — últimos 7 días</h2></div>
         <p className="source-note">
           Bloque rolling para leer tendencia reciente sin cambiar el consolidado mensual.
@@ -863,8 +908,8 @@ function MonthlyHistoryCard({
       {rows.length === 0 ? (
         <p className="empty-note">Todavía no hay meses consolidados para este cliente.</p>
       ) : (
-        <div className="table-wrap">
-          <table>
+        <div className="table-wrap responsive-card-table">
+          <table className="monthly-history-table">
             <thead>
               <tr>
                 <th>Mes</th>
@@ -884,27 +929,29 @@ function MonthlyHistoryCard({
                     key={`${row.client_id}-${row.month}`}
                     className={isSelected ? 'is-selected-row' : undefined}
                   >
-                    <td>
+                    <td data-label="Mes">
                       <div className="table-primary-cell">
                         <strong>{getMonthLabel(row.month)}</strong>
                         {isSelected && <span className="table-secondary-note">Mes visible</span>}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Fuente Ads">
                       <span className={`meta-chip ${adDataOriginClass(row.adsOrigin)}`}>
                         {adDataOriginLabel(row.adsOrigin)}
                       </span>
                     </td>
-                    <td className="num-col">{formatCop(row.spend)}</td>
+                    <td className="num-col" data-label="Ads">{formatCop(row.spend)}</td>
                     <td
+                      data-label="ROAS Ads"
                       className={`num-col ${
                         row.ad_roas >= 3 ? 'text-green' : row.ad_roas >= 2 ? 'text-amber' : 'text-red'
                       }`}
                     >
                       {formatRoas(row.ad_roas)}
                     </td>
-                    <td className="num-col">{formatCop(row.total_sales)}</td>
+                    <td className="num-col" data-label="Ventas">{formatCop(row.total_sales)}</td>
                     <td
+                      data-label="ROAS Real"
                       className={`num-col ${
                         row.real_roas >= 3
                           ? 'text-green'
@@ -1025,7 +1072,7 @@ function ClientMetricsTab({
           <p className="empty-note">No hay métricas Ads para el mes seleccionado.</p>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="client-metrics-table">
               <thead>
                 <tr>
                   <th>Fecha</th>
@@ -1144,8 +1191,8 @@ function ClientSalesTab({
         {orderedSales.length === 0 ? (
           <p className="empty-note">No hay ventas reportadas para el mes seleccionado.</p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap responsive-card-table">
+            <table className="client-sales-table">
               <thead>
                 <tr>
                   <th>Fecha</th>
@@ -1160,13 +1207,13 @@ function ClientSalesTab({
               <tbody>
                 {orderedSales.map((sale) => (
                   <tr key={sale.id}>
-                    <td>{formatDate(sale.date)}</td>
-                    <td className="num-col">{formatCop(sale.total_sales)}</td>
-                    <td className="num-col">{formatCop(sale.new_client_sales)}</td>
-                    <td className="num-col">{formatCop(sale.repeat_sales)}</td>
-                    <td className="num-col">{formatCop(sale.physical_store_sales)}</td>
-                    <td className="num-col">{formatCop(sale.online_sales)}</td>
-                    <td className="text-muted">{sale.observations ?? '—'}</td>
+                    <td data-label="Fecha">{formatDate(sale.date)}</td>
+                    <td className="num-col" data-label="Total">{formatCop(sale.total_sales)}</td>
+                    <td className="num-col" data-label="Nuevo">{formatCop(sale.new_client_sales)}</td>
+                    <td className="num-col" data-label="Recompra">{formatCop(sale.repeat_sales)}</td>
+                    <td className="num-col" data-label="Físico">{formatCop(sale.physical_store_sales)}</td>
+                    <td className="num-col" data-label="Online">{formatCop(sale.online_sales)}</td>
+                    <td className="text-muted" data-label="Observaciones">{sale.observations ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1176,6 +1223,11 @@ function ClientSalesTab({
       </div>
     </div>
   );
+}
+
+function formatNullableCount(value: number | null | undefined): string {
+  if (value == null) return 'Sin dato';
+  return formatNumber(value);
 }
 
 function ClientStrategiesTab({
@@ -1304,8 +1356,8 @@ function ClientFilesTab({
             {onAddFile ? ' Agrega links de Drive para ordenar creativos y documentos.' : ''}
           </p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap responsive-card-table">
+            <table className="client-files-table">
               <thead>
                 <tr>
                   <th>Nombre</th>
@@ -1318,11 +1370,11 @@ function ClientFilesTab({
               <tbody>
                 {files.map((file) => (
                   <tr key={file.id}>
-                    <td>{file.name}</td>
-                    <td>{file.file_type}</td>
-                    <td>{file.strategy_id ? strategyMap.get(file.strategy_id) ?? '—' : '—'}</td>
-                    <td>{new Date(file.created_at).toLocaleDateString('es-CO')}</td>
-                    <td>
+                    <td data-label="Nombre">{file.name}</td>
+                    <td data-label="Tipo">{file.file_type}</td>
+                    <td data-label="Estrategia">{file.strategy_id ? strategyMap.get(file.strategy_id) ?? '—' : '—'}</td>
+                    <td data-label="Registrado">{new Date(file.created_at).toLocaleDateString('es-CO')}</td>
+                    <td data-label="Link">
                       <a href={file.drive_url} target="_blank" rel="noreferrer" className="link-small">
                         Abrir
                       </a>

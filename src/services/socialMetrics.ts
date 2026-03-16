@@ -20,7 +20,16 @@ function isMissingSocialSchemaError(error: unknown): boolean {
   const code = 'code' in error && typeof error.code === 'string' ? error.code : '';
   const message = 'message' in error && typeof error.message === 'string' ? error.message : '';
 
-  return code === 'PGRST205' || code === '42P01' || /social_monthly_metrics/i.test(message);
+  return (
+    code === 'PGRST205' ||
+    code === 'PGRST204' ||
+    code === '42P01' ||
+    code === '42703' ||
+    /social_monthly_metrics/i.test(message) ||
+    /whatsapp_clicks|link_clicks|new_customers_reported|returning_customers_reported|store_visits_reported/i.test(
+      message,
+    )
+  );
 }
 
 function getMonthFloor(monthsBack: number): string {
@@ -90,11 +99,31 @@ export async function upsertSocialMonthlyMetric(
 
   const newFollowers = normalizeInteger(input.new_followers);
   const profileVisits = normalizeInteger(input.profile_visits, true);
+  const whatsappClicks = normalizeInteger(input.whatsapp_clicks, true);
+  const linkClicks = normalizeInteger(input.link_clicks, true);
+  const newCustomersReported = normalizeInteger(input.new_customers_reported, true);
+  const returningCustomersReported = normalizeInteger(input.returning_customers_reported, true);
+  const storeVisitsReported = normalizeInteger(input.store_visits_reported, true);
   if (newFollowers == null || newFollowers < 0) {
     return { data: null, error: 'Los nuevos seguidores no pueden ser negativos.' };
   }
   if (profileVisits != null && profileVisits < 0) {
     return { data: null, error: 'Las visitas al perfil no pueden ser negativas.' };
+  }
+  if (whatsappClicks != null && whatsappClicks < 0) {
+    return { data: null, error: 'Los clicks de WhatsApp no pueden ser negativos.' };
+  }
+  if (linkClicks != null && linkClicks < 0) {
+    return { data: null, error: 'Los clicks al link no pueden ser negativos.' };
+  }
+  if (newCustomersReported != null && newCustomersReported < 0) {
+    return { data: null, error: 'Los nuevos clientes reportados no pueden ser negativos.' };
+  }
+  if (returningCustomersReported != null && returningCustomersReported < 0) {
+    return { data: null, error: 'La recompra reportada no puede ser negativa.' };
+  }
+  if (storeVisitsReported != null && storeVisitsReported < 0) {
+    return { data: null, error: 'Las visitas a tienda reportadas no pueden ser negativas.' };
   }
 
   const createdBy = input.created_by ?? (await getCreatedUserId());
@@ -103,6 +132,11 @@ export async function upsertSocialMonthlyMetric(
     month: monthFloor,
     new_followers: newFollowers ?? 0,
     profile_visits: profileVisits,
+    whatsapp_clicks: whatsappClicks,
+    link_clicks: linkClicks,
+    new_customers_reported: newCustomersReported,
+    returning_customers_reported: returningCustomersReported,
+    store_visits_reported: storeVisitsReported,
     source: input.source.trim() || 'manual_monthly_followers',
     notes: input.notes?.trim() || null,
     created_by: createdBy,
@@ -112,7 +146,23 @@ export async function upsertSocialMonthlyMetric(
     .from('social_monthly_metrics')
     .upsert(payload, { onConflict: 'client_id,month' })
     .select(
-      'id,client_id,month,new_followers,profile_visits,source,notes,created_by,created_at,updated_at',
+      [
+        'id',
+        'client_id',
+        'month',
+        'new_followers',
+        'profile_visits',
+        'whatsapp_clicks',
+        'link_clicks',
+        'new_customers_reported',
+        'returning_customers_reported',
+        'store_visits_reported',
+        'source',
+        'notes',
+        'created_by',
+        'created_at',
+        'updated_at',
+      ].join(','),
     )
     .maybeSingle();
 
@@ -120,7 +170,8 @@ export async function upsertSocialMonthlyMetric(
     if (isMissingSocialSchemaError(error)) {
       return {
         data: null,
-        error: 'Falta aplicar la migración de social_monthly_metrics en Supabase.',
+        error:
+          'Falta aplicar la migración supabase/phase-7-social-monthly-special-metrics.sql en Supabase.',
       };
     }
     console.error('[socialMetrics] upsertSocialMonthlyMetric', error);
@@ -130,13 +181,17 @@ export async function upsertSocialMonthlyMetric(
     };
   }
 
-  const normalized =
-    data && typeof data.month === 'string'
-      ? {
-          ...data,
-          month: getMonthKey(data.month),
-        }
-      : data;
+  const normalized = (() => {
+    if (!data || typeof data !== 'object') return data;
+
+    const record = data as Record<string, unknown>;
+    if (typeof record.month !== 'string') return data;
+
+    return {
+      ...record,
+      month: getMonthKey(record.month),
+    };
+  })();
 
   return { data: (normalized ?? null) as SocialMonthlyMetric | null, error: null };
 }

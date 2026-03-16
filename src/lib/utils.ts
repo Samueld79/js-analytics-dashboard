@@ -321,6 +321,15 @@ export type MarketingActionSummary = {
   leads: number | null;
 };
 
+export type MonthlySpecialMetricsSummary = {
+  rowsWithData: number;
+  whatsappClicks: number;
+  linkClicks: number;
+  newCustomersReported: number;
+  returningCustomersReported: number;
+  storeVisitsReported: number;
+};
+
 export function buildMarketingActionSummary(metrics: AdMetric[]): MarketingActionSummary {
   return {
     sourceOrigin: summarizeAdDataOrigin(metrics.map((metric) => metric.source)),
@@ -337,6 +346,53 @@ export function buildMarketingActionSummary(metrics: AdMetric[]): MarketingActio
     video50: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.video50),
     leads: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.leads),
   };
+}
+
+function hasMonthlyMetricValue(value: number | null | undefined): boolean {
+  return value != null && Number.isFinite(value) && value >= 0;
+}
+
+export function hasSpecialMonthlyMetricData(metric?: SocialMonthlyMetric | null): boolean {
+  if (!metric) return false;
+
+  return [
+    metric.whatsapp_clicks,
+    metric.link_clicks,
+    metric.new_customers_reported,
+    metric.returning_customers_reported,
+    metric.store_visits_reported,
+  ].some(hasMonthlyMetricValue);
+}
+
+export function buildMonthlySpecialMetricsSummary(
+  metrics: SocialMonthlyMetric[],
+): MonthlySpecialMetricsSummary {
+  return metrics.reduce<MonthlySpecialMetricsSummary>(
+    (summary, metric) => {
+      const hasRowData = hasSpecialMonthlyMetricData(metric);
+
+      return {
+        rowsWithData: summary.rowsWithData + (hasRowData ? 1 : 0),
+        whatsappClicks: summary.whatsappClicks + toSafeInteger(metric.whatsapp_clicks),
+        linkClicks: summary.linkClicks + toSafeInteger(metric.link_clicks),
+        newCustomersReported:
+          summary.newCustomersReported + toSafeInteger(metric.new_customers_reported),
+        returningCustomersReported:
+          summary.returningCustomersReported +
+          toSafeInteger(metric.returning_customers_reported),
+        storeVisitsReported:
+          summary.storeVisitsReported + toSafeInteger(metric.store_visits_reported),
+      };
+    },
+    {
+      rowsWithData: 0,
+      whatsappClicks: 0,
+      linkClicks: 0,
+      newCustomersReported: 0,
+      returningCustomersReported: 0,
+      storeVisitsReported: 0,
+    },
+  );
 }
 
 export function resolveMonthlyProfileVisits(params: {

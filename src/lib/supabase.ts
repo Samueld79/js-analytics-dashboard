@@ -240,6 +240,11 @@ export type SocialMonthlyMetric = {
   month: string;
   new_followers: number;
   profile_visits?: number | null;
+  whatsapp_clicks?: number | null;
+  link_clicks?: number | null;
+  new_customers_reported?: number | null;
+  returning_customers_reported?: number | null;
+  store_visits_reported?: number | null;
   source: string;
   notes?: string | null;
   created_by?: string | null;
@@ -252,6 +257,11 @@ export type SocialMonthlyMetricInput = {
   month: string;
   new_followers: number;
   profile_visits?: number | null;
+  whatsapp_clicks?: number | null;
+  link_clicks?: number | null;
+  new_customers_reported?: number | null;
+  returning_customers_reported?: number | null;
+  store_visits_reported?: number | null;
   source: string;
   notes?: string | null;
   created_by?: string | null;

@@ -4,12 +4,14 @@ import { useSocialMonthlyMetrics } from '../hooks/useSocialMonthlyMetrics';
 import {
   adDataOriginClass,
   adDataOriginLabel,
+  buildMonthlySpecialMetricsSummary,
   buildMarketingActionSummary,
   formatCop,
   formatDateTime,
   formatNumber,
   formatRoas,
   healthStatusLabel,
+  hasSpecialMonthlyMetricData,
   metaSyncStatusClass,
   metaSyncStatusLabel,
   resolveMonthlyProfileVisits,
@@ -41,6 +43,9 @@ export function DashboardPage() {
   const executiveMonthLabel = getMonthLabel(executiveMonth);
   const executiveRows = monthlyKpis.filter((row) => getMonthKey(row.month) === executiveMonth);
   const executiveAdMetrics = rawAdMetrics.filter((row) => getMonthKey(row.date) === executiveMonth);
+  const executiveSocialMetrics = socialMonthlyMetrics.filter(
+    (metric) => getMonthKey(metric.month) === executiveMonth,
+  );
   const executiveMarketing = buildMarketingActionSummary(executiveAdMetrics);
   const clientNameById = new Map(listedClients.map((client) => [client.id, client.name]));
   const executiveSocialClientIds = new Set<string>();
@@ -88,6 +93,26 @@ export function DashboardPage() {
       ? (socialFollowersTotal / socialProfileVisitsTotal) * 100
       : null;
   const overall = sumOperatingKpis(executiveRows);
+  const executiveSpecialSummary = buildMonthlySpecialMetricsSummary(executiveSocialMetrics);
+  const executiveSpecialRows = executiveSocialMetrics
+    .filter((metric) => hasSpecialMonthlyMetricData(metric))
+    .map((metric) => ({
+      clientId: metric.client_id,
+      clientName: clientNameById.get(metric.client_id) ?? 'Cliente sin nombre',
+      metric,
+    }))
+    .sort((left, right) => {
+      const scoreLeft =
+        (left.metric.new_customers_reported ?? 0) +
+        (left.metric.whatsapp_clicks ?? 0) +
+        (left.metric.link_clicks ?? 0);
+      const scoreRight =
+        (right.metric.new_customers_reported ?? 0) +
+        (right.metric.whatsapp_clicks ?? 0) +
+        (right.metric.link_clicks ?? 0);
+
+      return scoreRight - scoreLeft;
+    });
   const rollingOverall = sumOperatingKpis(dailyKpis);
   const pendingTasks = tasks.filter(t => t.status === 'pending').length;
   const criticalAlerts = alerts.filter(a => a.severity === 'critical' && a.status === 'unread');
@@ -417,8 +442,8 @@ export function DashboardPage() {
           {executiveSocialRows.length === 0 ? (
             <p className="empty-note">Todavía no hay cierres sociales mensuales para el mes ejecutivo.</p>
           ) : (
-            <div className="table-wrap">
-              <table>
+            <div className="table-wrap responsive-card-table">
+              <table className="social-summary-table">
                 <thead>
                   <tr>
                     <th>Cliente</th>
@@ -432,8 +457,8 @@ export function DashboardPage() {
                 <tbody>
                   {executiveSocialRows.map((entry) => (
                     <tr key={entry.clientId}>
-                      <td>{entry.clientName}</td>
-                      <td>
+                      <td data-label="Cliente">{entry.clientName}</td>
+                      <td data-label="Fuente">
                         <span
                           className={`meta-chip ${
                             entry.socialMetric ? 'source-manual' : adDataOriginClass(entry.profileVisits.sourceOrigin)
@@ -442,16 +467,16 @@ export function DashboardPage() {
                           {entry.socialMetric ? 'Manual mensual' : entry.profileVisits.sourceLabel}
                         </span>
                       </td>
-                      <td className="num-col">
+                      <td className="num-col" data-label="Seguidores">
                         {entry.socialMetric ? formatNumber(entry.socialMetric.new_followers) : 'Sin dato'}
                       </td>
-                      <td className="num-col">
+                      <td className="num-col" data-label="Visitas perfil">
                         {entry.profileVisits.value != null ? formatNumber(entry.profileVisits.value) : 'Sin dato'}
                       </td>
-                      <td className="num-col">
+                      <td className="num-col" data-label="Conversión">
                         {entry.followerConversion != null ? `${entry.followerConversion.toFixed(1)}%` : '—'}
                       </td>
-                      <td className="num-col">Pendiente de fuente</td>
+                      <td className="num-col" data-label="Costo seguidor">Pendiente de fuente</td>
                     </tr>
                   ))}
                 </tbody>
@@ -462,6 +487,89 @@ export function DashboardPage() {
             `new_followers` sale solo de `social_monthly_metrics`. `profile_visits` prioriza cierre
             manual y luego Ads si ese action type existe.
           </p>
+        </div>
+
+        <div className="card section-block">
+          <div className="section-heading">
+            <h2>Métricas especiales</h2>
+          </div>
+          <p className="source-note">
+            Cierre mensual por cliente para señales especiales de negocio. No se infieren desde
+            Ads ni desde ventas si no fueron reportadas.
+          </p>
+          <div className="operational-summary-row">
+            <span className="meta-chip">{executiveMonthLabel}</span>
+            <span className="meta-chip source-manual">Fuente manual mensual</span>
+          </div>
+          <div className="metric-grid-4">
+            <MetricBoxMini
+              label="Clicks WhatsApp"
+              value={
+                executiveSpecialSummary.rowsWithData > 0
+                  ? formatNumber(executiveSpecialSummary.whatsappClicks)
+                  : 'Sin dato'
+              }
+            />
+            <MetricBoxMini
+              label="Clicks al link"
+              value={
+                executiveSpecialSummary.rowsWithData > 0
+                  ? formatNumber(executiveSpecialSummary.linkClicks)
+                  : 'Sin dato'
+              }
+            />
+            <MetricBoxMini
+              label="Nuevos clientes reportados"
+              value={
+                executiveSpecialSummary.rowsWithData > 0
+                  ? formatNumber(executiveSpecialSummary.newCustomersReported)
+                  : 'Sin dato'
+              }
+            />
+            <MetricBoxMini
+              label="Recompra reportada"
+              value={
+                executiveSpecialSummary.rowsWithData > 0
+                  ? formatNumber(executiveSpecialSummary.returningCustomersReported)
+                  : 'Sin dato'
+              }
+            />
+            <MetricBoxMini
+              label="Visitas a tienda"
+              value={
+                executiveSpecialSummary.rowsWithData > 0
+                  ? formatNumber(executiveSpecialSummary.storeVisitsReported)
+                  : 'Sin dato'
+              }
+            />
+          </div>
+          {executiveSpecialRows.length === 0 ? (
+            <p className="empty-note">
+              Todavía no hay métricas especiales mensuales cargadas para el mes ejecutivo.
+            </p>
+          ) : (
+            <div className="special-metrics-list">
+              {executiveSpecialRows.map(({ clientId, clientName, metric }) => (
+                <Link
+                  key={`${clientId}-${metric.month}`}
+                  to={`/clients/${clientId}`}
+                  className="special-metric-row special-metric-link"
+                >
+                  <div className="special-metric-main">
+                    <strong>{clientName}</strong>
+                    <span>
+                      WhatsApp {formatNullableCount(metric.whatsapp_clicks)} · Link{' '}
+                      {formatNullableCount(metric.link_clicks)} · Nuevos clientes{' '}
+                      {formatNullableCount(metric.new_customers_reported)} · Recompra{' '}
+                      {formatNullableCount(metric.returning_customers_reported)} · Tienda{' '}
+                      {formatNullableCount(metric.store_visits_reported)}
+                    </span>
+                  </div>
+                  <span className="meta-chip source-manual">Manual mensual</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="card section-block insight-card">
@@ -589,4 +697,9 @@ function formatNullableMetric(value: number | null, fallback = '—'): string {
 function formatNullablePct(part: number | null, total: number | null): string {
   if (part == null || total == null || total <= 0) return 'Sin dato';
   return `${((part / total) * 100).toFixed(1)}%`;
+}
+
+function formatNullableCount(value: number | null | undefined): string {
+  if (value == null) return 'Sin dato';
+  return formatNumber(value);
 }

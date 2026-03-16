@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { BrandSignature } from './BrandSignature';
 import {
   LayoutDashboard,
   Users,
@@ -14,6 +15,8 @@ import {
   LogOut,
   ChevronsLeft,
   ChevronsRight,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useAuth } from '../hooks/useAuth';
@@ -41,12 +44,64 @@ export function Sidebar() {
       return false;
     }
   });
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 660px)').matches;
+  });
 
   const nav = isInternal
     ? INTERNAL_NAV
-    : defaultClientId
+      : defaultClientId
       ? [{ to: '/mi-espacio', icon: LockKeyhole, label: 'Mi espacio' }]
       : [];
+  const sidebarCollapsed = collapsed && !isMobileViewport;
+  const activeLabel = useMemo(() => {
+    const activeEntry = nav.find(({ to }) => {
+      if (to === '/') return loc.pathname === '/';
+      if (to === '/mi-espacio') {
+        return (
+          loc.pathname === '/mi-espacio' ||
+          (defaultClientId ? loc.pathname === `/clients/${defaultClientId}` : false)
+        );
+      }
+      return loc.pathname.startsWith(to);
+    });
+
+    return activeEntry?.label ?? (isInternal ? 'Navegación' : 'Mi espacio');
+  }, [defaultClientId, isInternal, loc.pathname, nav]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const media = window.matchMedia('(max-width: 660px)');
+    const syncViewport = (matches: boolean) => {
+      setIsMobileViewport(matches);
+      if (!matches) {
+        setMobileOpen(false);
+      }
+    };
+
+    syncViewport(media.matches);
+    const handleChange = (event: MediaQueryListEvent) => syncViewport(event.matches);
+    media.addEventListener('change', handleChange);
+
+    return () => media.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [loc.pathname]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    document.body.classList.toggle('mobile-nav-open', mobileOpen);
+
+    return () => {
+      document.body.classList.remove('mobile-nav-open');
+    };
+  }, [mobileOpen]);
 
   function toggleSidebar() {
     setCollapsed((current) => {
@@ -63,81 +118,101 @@ export function Sidebar() {
   }
 
   return (
-    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
-      <div className="sidebar-brand">
-        <div className="sidebar-logo">
-          <TrendingUp size={18} />
+    <>
+      <button
+        className="mobile-nav-trigger"
+        onClick={() => setMobileOpen((current) => !current)}
+        aria-label={mobileOpen ? 'Cerrar navegación' : 'Abrir navegación'}
+        aria-expanded={mobileOpen}
+      >
+        {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+        <div className="mobile-nav-copy">
+          <BrandSignature
+            compact
+            subtitle={activeLabel}
+            className="mobile-brand-signature"
+          />
         </div>
-        <div className="sidebar-brand-copy">
-          <span className="sidebar-brand-name">Growth Strategy JS</span>
-          <span className="sidebar-brand-sub">
-            {isInternal ? 'Panel de crecimiento' : 'Workspace privado'}
-          </span>
-        </div>
-        <button
-          className="sidebar-toggle"
-          onClick={toggleSidebar}
-          title={collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
-          aria-label={collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
-        >
-          {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
-        </button>
-      </div>
-
-      <nav className="sidebar-nav">
-        <div className="sidebar-section-label">Navegación</div>
-        {nav.map(({ to, icon: Icon, label, badge }) => {
-          const active =
-            to === '/'
-              ? loc.pathname === '/'
-              : to === '/mi-espacio'
-                ? loc.pathname === '/mi-espacio' ||
-                  (defaultClientId ? loc.pathname === `/clients/${defaultClientId}` : false)
-                : loc.pathname.startsWith(to);
-
-          return (
-            <Link
-              key={to}
-              to={to}
-              className={`sidebar-link ${active ? 'active' : ''}`}
-              title={collapsed ? label : undefined}
-            >
-              <Icon size={16} />
-              <span className="sidebar-link-text">{label}</span>
-              {badge && unreadCount > 0 && (
-                <span className="sidebar-badge">{unreadCount}</span>
-              )}
-              {active && !collapsed && <ChevronRight size={14} className="sidebar-chevron" />}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="sidebar-footer">
-        {authEnabled && (
-          <div className="sidebar-user-card">
-            <div className="sidebar-user-copy">
-              <div className="sidebar-user-name">
-                {profile?.full_name ?? profile?.email ?? 'Sesion activa'}
-              </div>
-              <div className="sidebar-user-role">{roleLabel(role)}</div>
-            </div>
-            <button className="sidebar-signout" onClick={() => void signOut()} title="Cerrar sesion">
-              <LogOut size={14} />
-            </button>
-          </div>
-        )}
-        {isInternal && (
-          <Link
-            to="/settings"
-            className="sidebar-link small"
-            title={collapsed ? 'Configuración' : undefined}
+      </button>
+      <button
+        className={`sidebar-backdrop ${mobileOpen ? 'visible' : ''}`}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden={!mobileOpen}
+        tabIndex={mobileOpen ? 0 : -1}
+      />
+      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-brand">
+          <BrandSignature
+            subtitle={isInternal ? 'Panel de crecimiento' : 'Workspace privado'}
+            className="sidebar-brand-signature"
+          />
+          <button
+            className="sidebar-toggle"
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
+            aria-label={sidebarCollapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
           >
-            <Settings size={14} />
-            <span className="sidebar-link-text">Configuración</span>
-          </Link>
-        )}
-      </div>
-    </aside>
+            {sidebarCollapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+          </button>
+        </div>
+
+        <nav className="sidebar-nav">
+          <div className="sidebar-section-label">Navegación</div>
+          {nav.map(({ to, icon: Icon, label, badge }) => {
+            const active =
+              to === '/'
+                ? loc.pathname === '/'
+                : to === '/mi-espacio'
+                  ? loc.pathname === '/mi-espacio' ||
+                    (defaultClientId ? loc.pathname === `/clients/${defaultClientId}` : false)
+                  : loc.pathname.startsWith(to);
+
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={`sidebar-link ${active ? 'active' : ''}`}
+                title={sidebarCollapsed ? label : undefined}
+                onClick={() => setMobileOpen(false)}
+              >
+                <Icon size={16} />
+                <span className="sidebar-link-text">{label}</span>
+                {badge && unreadCount > 0 && (
+                  <span className="sidebar-badge">{unreadCount}</span>
+                )}
+                {active && !sidebarCollapsed && <ChevronRight size={14} className="sidebar-chevron" />}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-footer">
+          {authEnabled && (
+            <div className="sidebar-user-card">
+              <div className="sidebar-user-copy">
+                <div className="sidebar-user-name">
+                  {profile?.full_name ?? profile?.email ?? 'Sesion activa'}
+                </div>
+                <div className="sidebar-user-role">{roleLabel(role)}</div>
+              </div>
+              <button className="sidebar-signout" onClick={() => void signOut()} title="Cerrar sesion">
+                <LogOut size={14} />
+              </button>
+            </div>
+          )}
+          {isInternal && (
+            <Link
+              to="/settings"
+              className="sidebar-link small"
+              title={sidebarCollapsed ? 'Configuración' : undefined}
+              onClick={() => setMobileOpen(false)}
+            >
+              <Settings size={14} />
+              <span className="sidebar-link-text">Configuración</span>
+            </Link>
+          )}
+        </div>
+      </aside>
+    </>
   );
 }

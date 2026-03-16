@@ -166,8 +166,8 @@ export function SalesPage() {
         {rows.length === 0 ? (
           <p className="empty-note">No hay clientes o ventas registradas todavía.</p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap responsive-card-table">
+            <table className="sales-tracking-table">
               <thead>
                 <tr>
                   <th>Cliente</th>
@@ -185,30 +185,31 @@ export function SalesPage() {
                 {rows.map(
                   ({ client, latestSale, totalSales, newClientSales, repeatSales, spend, realRoas, pendingYesterday }) => (
                     <tr key={client.id}>
-                      <td>
+                      <td data-label="Cliente">
                         <div className="table-primary-cell">
                           <strong>{client.name}</strong>
                           <span className="table-secondary-note">{client.niche ?? 'Sin nicho'}</span>
                         </div>
                       </td>
-                      <td>{latestSale ? formatDate(latestSale.date) : '—'}</td>
-                      <td className="num-col">{formatCop(totalSales)}</td>
-                      <td className="num-col">{formatCop(newClientSales)}</td>
-                      <td className="num-col">{formatCop(repeatSales)}</td>
-                      <td className="num-col">{formatCop(spend)}</td>
+                      <td data-label="Última carga">{latestSale ? formatDate(latestSale.date) : '—'}</td>
+                      <td className="num-col" data-label="Ventas mes">{formatCop(totalSales)}</td>
+                      <td className="num-col" data-label="Nuevo">{formatCop(newClientSales)}</td>
+                      <td className="num-col" data-label="Recompra">{formatCop(repeatSales)}</td>
+                      <td className="num-col" data-label="Ads mes">{formatCop(spend)}</td>
                       <td
+                        data-label="ROAS Real"
                         className={`num-col ${
                           realRoas >= 3 ? 'text-green' : realRoas >= 2 ? 'text-amber' : 'text-red'
                         }`}
                       >
                         {spend > 0 ? formatRoas(realRoas) : '—'}
                       </td>
-                      <td>
+                      <td data-label="Estado reciente">
                         <span className={`status-pill status-${pendingYesterday ? 'amber' : 'green'}`}>
                           {pendingYesterday ? 'Pendiente ayer' : 'Al día'}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Acción">
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           <button className="btn-secondary" onClick={() => setSelectedClient(client)}>
                             <Plus size={14} /> Registrar

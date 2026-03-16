@@ -74,6 +74,11 @@ export function HistoricalMonthlyModal({
   const [socialForm, setSocialForm] = useState({
     new_followers: '',
     profile_visits: '',
+    whatsapp_clicks: '',
+    link_clicks: '',
+    new_customers_reported: '',
+    returning_customers_reported: '',
+    store_visits_reported: '',
     source: 'manual_monthly_followers',
     notes: '',
   });
@@ -121,9 +126,26 @@ export function HistoricalMonthlyModal({
     () =>
       Boolean(
         month &&
-          (socialForm.new_followers.trim() !== '' || socialForm.profile_visits.trim() !== ''),
+          [
+            socialForm.new_followers,
+            socialForm.profile_visits,
+            socialForm.whatsapp_clicks,
+            socialForm.link_clicks,
+            socialForm.new_customers_reported,
+            socialForm.returning_customers_reported,
+            socialForm.store_visits_reported,
+          ].some((value) => value.trim() !== ''),
       ),
-    [month, socialForm.new_followers, socialForm.profile_visits],
+    [
+      month,
+      socialForm.link_clicks,
+      socialForm.new_customers_reported,
+      socialForm.new_followers,
+      socialForm.profile_visits,
+      socialForm.returning_customers_reported,
+      socialForm.store_visits_reported,
+      socialForm.whatsapp_clicks,
+    ],
   );
 
   function setAdsField(field: keyof typeof adsForm, value: string) {
@@ -201,6 +223,17 @@ export function HistoricalMonthlyModal({
       month,
       new_followers: parseDecimal(socialForm.new_followers),
       profile_visits: socialForm.profile_visits ? parseDecimal(socialForm.profile_visits) : null,
+      whatsapp_clicks: socialForm.whatsapp_clicks ? parseDecimal(socialForm.whatsapp_clicks) : null,
+      link_clicks: socialForm.link_clicks ? parseDecimal(socialForm.link_clicks) : null,
+      new_customers_reported: socialForm.new_customers_reported
+        ? parseDecimal(socialForm.new_customers_reported)
+        : null,
+      returning_customers_reported: socialForm.returning_customers_reported
+        ? parseDecimal(socialForm.returning_customers_reported)
+        : null,
+      store_visits_reported: socialForm.store_visits_reported
+        ? parseDecimal(socialForm.store_visits_reported)
+        : null,
       source: socialForm.source.trim() || 'manual_monthly_followers',
       notes: socialForm.notes.trim() || null,
     });
@@ -387,7 +420,7 @@ export function HistoricalMonthlyModal({
 
             <section className="history-section">
               <div className="section-heading">
-                <h2>Seguidores mensual</h2>
+                <h2>Crecimiento social y métricas especiales</h2>
               </div>
 
               <div className="history-fields-grid">
@@ -398,6 +431,26 @@ export function HistoricalMonthlyModal({
                 <label className="form-field">
                   <span className="form-label">Visitas al perfil</span>
                   <input className="form-input" type="number" min="0" step="1" value={socialForm.profile_visits} onChange={(event) => setSocialField('profile_visits', event.target.value)} />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Clicks WhatsApp</span>
+                  <input className="form-input" type="number" min="0" step="1" value={socialForm.whatsapp_clicks} onChange={(event) => setSocialField('whatsapp_clicks', event.target.value)} />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Clicks al link</span>
+                  <input className="form-input" type="number" min="0" step="1" value={socialForm.link_clicks} onChange={(event) => setSocialField('link_clicks', event.target.value)} />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Nuevos clientes reportados</span>
+                  <input className="form-input" type="number" min="0" step="1" value={socialForm.new_customers_reported} onChange={(event) => setSocialField('new_customers_reported', event.target.value)} />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Recompra reportada</span>
+                  <input className="form-input" type="number" min="0" step="1" value={socialForm.returning_customers_reported} onChange={(event) => setSocialField('returning_customers_reported', event.target.value)} />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Visitas a tienda reportadas</span>
+                  <input className="form-input" type="number" min="0" step="1" value={socialForm.store_visits_reported} onChange={(event) => setSocialField('store_visits_reported', event.target.value)} />
                 </label>
                 <label className="form-field">
                   <span className="form-label">Fuente</span>
@@ -419,12 +472,14 @@ export function HistoricalMonthlyModal({
               {socialError && <p className="empty-note">{socialError}</p>}
               {!socialError && socialSuccess && <p className="history-success">{socialSuccess}</p>}
               {!socialError && !socialSuccess && (
-                <p className="empty-note">Usa cierre mensual manual. Los seguidores no se infieren desde Ads.</p>
+                <p className="empty-note">
+                  Usa cierre mensual manual. Los seguidores no se infieren desde Ads y el costo por seguidor sigue pendiente de fuente separada.
+                </p>
               )}
 
               <div className="history-actions">
                 <button className="btn-primary" onClick={() => void handleSaveSocial()} disabled={!canSaveSocial || savingSocial}>
-                  {savingSocial ? 'Guardando social...' : 'Guardar cierre social'}
+                  {savingSocial ? 'Guardando cierre mensual...' : 'Guardar cierre mensual'}
                 </button>
               </div>
             </section>

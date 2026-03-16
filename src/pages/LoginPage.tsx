@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { Loader2, Lock, Mail, TrendingUp } from 'lucide-react';
+import { Loader2, Lock, Mail } from 'lucide-react';
+import { BrandSignature } from '../components/BrandSignature';
 import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
@@ -27,13 +28,10 @@ export function LoginPage() {
       <div className="page-bg" />
       <div className="auth-card card section-block">
         <div className="auth-header">
-          <div className="auth-logo">
-            <TrendingUp size={18} />
-          </div>
-          <div>
-            <h1 className="page-title">Growth Strategy JS</h1>
-            <p className="page-subtitle">Acceso al panel de crecimiento y workspace privado</p>
-          </div>
+          <BrandSignature
+            subtitle="Acceso al panel de crecimiento y workspace privado"
+            className="auth-brand-signature"
+          />
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
