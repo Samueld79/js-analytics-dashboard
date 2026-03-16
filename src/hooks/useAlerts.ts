@@ -6,7 +6,7 @@ import {
   type AlertStatus,
   type ServiceMutationResult,
 } from '../lib/supabase';
-import { listAlerts, updateAlertStatus } from '../services/alerts';
+import { listAlerts, postponeAlert, updateAlertStatus } from '../services/alerts';
 
 export function useAlerts() {
   const { isInternal } = useAuth();
@@ -51,6 +51,15 @@ export function useAlerts() {
   const markRead = useCallback((id: string) => changeStatus(id, 'read'), [changeStatus]);
   const resolve = useCallback((id: string) => changeStatus(id, 'resolved'), [changeStatus]);
   const dismiss = useCallback((id: string) => changeStatus(id, 'dismissed'), [changeStatus]);
+  const postpone = useCallback(
+    (id: string, until: string) => postponeAlert(id, until).then((result) => {
+      if (result.data) {
+        setAlerts((current) => current.map((alert) => (alert.id === id ? result.data ?? alert : alert)));
+      }
+      return result;
+    }),
+    [],
+  );
 
   const unreadCount = useMemo(
     () => alerts.filter((alert) => alert.status === 'unread').length,
@@ -66,6 +75,7 @@ export function useAlerts() {
     markRead,
     resolve,
     dismiss,
+    postpone,
     isConfigured: isSupabaseConfigured,
   };
 }

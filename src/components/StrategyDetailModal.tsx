@@ -8,7 +8,7 @@ import type {
   Strategy,
   StrategyHistory,
 } from '../lib/supabase';
-import { formatCop } from '../lib/utils';
+import { formatCop, statusLabel } from '../lib/utils';
 
 interface Props {
   strategy: Strategy;
@@ -90,7 +90,34 @@ export function StrategyDetailModal({
             </div>
           )}
 
-          {strategy.monthly_budget && (
+          <div className="strategy-detail-meta-grid">
+            <div className="strategy-detail-meta-item">
+              <span className="strategy-detail-meta-label">Estado</span>
+              <strong>{statusLabel(strategy.status)}</strong>
+            </div>
+            <div className="strategy-detail-meta-item">
+              <span className="strategy-detail-meta-label">Versión</span>
+              <strong>v{strategy.latest_version ?? strategy.version ?? 1}</strong>
+            </div>
+            <div className="strategy-detail-meta-item">
+              <span className="strategy-detail-meta-label">Creada</span>
+              <strong>{new Date(strategy.created_at).toLocaleDateString('es-CO', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}</strong>
+            </div>
+            <div className="strategy-detail-meta-item">
+              <span className="strategy-detail-meta-label">Actualizada</span>
+              <strong>{new Date(strategy.updated_at).toLocaleDateString('es-CO', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}</strong>
+            </div>
+          </div>
+
+          {strategy.monthly_budget != null && (
             <div className="strategy-detail-budget">
               Presupuesto mensual: <strong>{formatCop(strategy.monthly_budget)}</strong>
             </div>
@@ -180,6 +207,32 @@ export function StrategyDetailModal({
             )}
           </div>
 
+          {strategy.creatives.length > 0 && (
+            <section className="strategy-section">
+              <h3 className="strategy-section-title">Creativos y piezas</h3>
+              <div className="strategy-cols">
+                {strategy.creatives.map((creative, index) => (
+                  <div key={`${creative.type ?? 'creative'}-${index}`} className="campaign-entry">
+                    <strong>{creative.type ?? `Creativo ${index + 1}`}</strong>
+                    {creative.description && (
+                      <span className="campaign-meta">{creative.description}</span>
+                    )}
+                    {creative.link && (
+                      <a
+                        href={creative.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="drive-link"
+                      >
+                        <ExternalLink size={13} /> Abrir recurso
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {(seg.ages || seg.cities?.length || seg.audiences?.length || seg.exclusions?.length) && (
             <section className="strategy-section">
               <h3 className="strategy-section-title">Segmentacion</h3>
@@ -233,16 +286,16 @@ export function StrategyDetailModal({
 
           {strategy.notes && (
             <section className="strategy-section">
-              <h3 className="strategy-section-title">Notas</h3>
+              <h3 className="strategy-section-title">Notas y observaciones estratégicas</h3>
               <p className="notes-text">{strategy.notes}</p>
             </section>
           )}
 
           {strategy.raw_input && (
-            <section className="strategy-section">
-              <h3 className="strategy-section-title">Texto original</h3>
+            <details className="strategy-disclosure">
+              <summary>Texto original del estratega</summary>
               <pre className="raw-input">{strategy.raw_input}</pre>
-            </section>
+            </details>
           )}
 
           <section className="strategy-section">

@@ -6,9 +6,11 @@ import { useClients, useStrategies } from '../hooks/useData';
 import type { StrategyInput } from '../lib/supabase';
 import {
   buildChecklistFromStrategy,
+  getStrategyContextPreview,
   queryClientMemory,
   structureStrategyFromText,
   summarizePreviousStrategy,
+  type StrategyContextSnapshot,
   type StructuredStrategyResponse,
 } from '../services/ai';
 import { saveStructuredDraftToMemory } from '../services/memory';
@@ -65,6 +67,8 @@ export function AIAgentPage() {
   const [previousSummary, setPreviousSummary] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [contextPreview, setContextPreview] = useState<StrategyContextSnapshot | null>(null);
+  const [contextLoading, setContextLoading] = useState(false);
 
   const {
     strategies,
@@ -83,6 +87,41 @@ export function AIAgentPage() {
     setRawInput('');
     setChatHistory([]);
     setMessage(null);
+    setContextPreview(null);
+  }, [selectedClient]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadContextPreview() {
+      if (!selectedClient) {
+        setContextPreview(null);
+        setContextLoading(false);
+        return;
+      }
+
+      setContextLoading(true);
+      try {
+        const result = await getStrategyContextPreview(selectedClient);
+        if (!cancelled) {
+          setContextPreview(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setContextPreview(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setContextLoading(false);
+        }
+      }
+    }
+
+    void loadContextPreview();
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedClient]);
 
   const client = clients.find((entry) => entry.id === selectedClient);
@@ -278,6 +317,47 @@ export function AIAgentPage() {
             Contexto: {client.name} · {client.niche ?? 'Sin nicho'} · {strategies.length} estrategia{strategies.length !== 1 ? 's' : ''} registrada{strategies.length !== 1 ? 's' : ''}
           </div>
         )}
+        {contextLoading && (
+          <p className="empty-note">Cargando contexto operativo y memoria real del cliente...</p>
+        )}
+        {contextPreview && (
+          <div className="ai-context-grid">
+            <div className="ai-context-stat">
+              <span className="ai-context-label">Periodo base</span>
+              <strong>{contextPreview.monthLabel}</strong>
+              <span>{contextPreview.monthlySpend > 0 ? `${contextPreview.monthlyMessages} mensajes` : 'Sin cierre consolidado'}</span>
+            </div>
+            <div className="ai-context-stat">
+              <span className="ai-context-label">ROAS real</span>
+              <strong>{contextPreview.monthlySpend > 0 ? `${contextPreview.monthlyRealRoas.toFixed(2)}x` : '—'}</strong>
+              <span>{contextPreview.monthlySales > 0 ? `Ventas ${Intl.NumberFormat('es-CO').format(contextPreview.monthlySales)}` : 'Sin ventas reportadas'}</span>
+            </div>
+            <div className="ai-context-stat">
+              <span className="ai-context-label">Alertas activas</span>
+              <strong>{contextPreview.activeAlerts.length}</strong>
+              <span>{contextPreview.activeAlerts[0] ?? 'Sin alertas abiertas'}</span>
+            </div>
+            <div className="ai-context-stat">
+              <span className="ai-context-label">Base estratégica</span>
+              <strong>{contextPreview.previousStrategyTitle ?? 'Sin estrategia aprobada'}</strong>
+              <span>{contextPreview.learningHighlights[0] ?? 'Sin aprendizajes guardados'}</span>
+            </div>
+          </div>
+        )}
+        {contextPreview && (contextPreview.memoryHighlights.length > 0 || contextPreview.learningHighlights.length > 0) && (
+          <div className="period-chip-row">
+            {contextPreview.memoryHighlights.slice(0, 4).map((item) => (
+              <span key={item} className="meta-chip">
+                {item}
+              </span>
+            ))}
+            {contextPreview.learningHighlights.slice(0, 2).map((item) => (
+              <span key={item} className="meta-chip source-manual">
+                {item}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="ai-context-actions">
           <button className="btn-secondary" onClick={() => void handlePreviousSummary()} disabled={!selectedClient || structureLoading}>
             <FileText size={14} /> Resumen anterior
@@ -340,6 +420,32 @@ export function AIAgentPage() {
           {structuredResult && (
             <div className="ai-output card section-block">
               <div className="section-heading"><h2>Estrategia estructurada</h2></div>
+              <div className="period-chip-row">
+                <span className="meta-chip">
+                  {structuredResult.generationMode === 'edge_function'
+                    ? 'IA server-side'
+                    : 'Modo local enriquecido'}
+                </span>
+                <span className="meta-chip">{structuredResult.contextSnapshot.monthLabel}</span>
+                <span className="meta-chip">
+                  {structuredResult.contextSnapshot.activeAlerts.length} alerta{structuredResult.contextSnapshot.activeAlerts.length !== 1 ? 's' : ''} activas
+                </span>
+                <span className="meta-chip">
+                  {structuredResult.contextSnapshot.previousStrategyTitle ?? 'Sin estrategia aprobada'}
+                </span>
+              </div>
+
+              <div className="ai-summary-block">
+                <h3>Contexto usado por IA</h3>
+                <p>
+                  {structuredResult.contextSnapshot.monthlySpend > 0
+                    ? `Ads ${structuredResult.contextSnapshot.monthLabel}: ${structuredResult.contextSnapshot.monthlySpend.toLocaleString('es-CO')} de inversión, ${structuredResult.contextSnapshot.monthlyMessages.toLocaleString('es-CO')} mensajes y ROAS real ${structuredResult.contextSnapshot.monthlyRealRoas.toFixed(2)}x.`
+                    : `No había cierre consolidado para ${structuredResult.contextSnapshot.monthLabel}; se usó memoria, alertas activas y estrategia previa.`}
+                </p>
+                {structuredResult.contextSnapshot.previousSummary && (
+                  <p>{structuredResult.contextSnapshot.previousSummary}</p>
+                )}
+              </div>
 
               <div className="form-row-2">
                 <div className="form-field">
@@ -555,13 +661,18 @@ export function AIAgentPage() {
             {chatHistory.length === 0 && (
               <div className="chat-placeholder">
                 <Bot size={32} />
-                <p>Pregunta sobre el historial de estrategias, publicos usados o aprendizajes del cliente.</p>
+                <p>
+                  {selectedClient
+                    ? 'Consulta estrategias anteriores, publicos usados, campañas apagadas, aprendizajes y cambios recientes.'
+                    : 'Selecciona un cliente para consultar su memoria real.'}
+                </p>
                 <div className="chat-suggestions">
                   {[
                     'Dame resumen de la estrategia anterior',
                     'Que publicos hemos usado antes',
                     'Que aprendizajes tiene este cliente',
                     'Que campanas se apagaron',
+                    'Que cambios recientes hubo',
                   ].map((suggestion) => (
                     <button key={suggestion} className="suggestion-chip" onClick={() => setQuery(suggestion)}>
                       {suggestion}

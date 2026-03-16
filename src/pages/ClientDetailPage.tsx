@@ -32,6 +32,7 @@ import {
   healthStatusLabel,
   hasSpecialMonthlyMetricData,
   isDateWithinRange,
+  isAlertSnoozed,
   metaSyncStatusClass,
   metaSyncStatusLabel,
   resolveMonthlyProfileVisits,
@@ -300,7 +301,10 @@ export function ClientDetailPage() {
   }
 
   const criticalAlerts = alerts.filter(
-    (alert) => alert.severity === 'critical' && ['unread', 'read'].includes(alert.status),
+    (alert) =>
+      alert.severity === 'critical' &&
+      ['unread', 'read'].includes(alert.status) &&
+      !isAlertSnoozed(alert),
   );
   const metaStatus = meta?.sync_status ?? 'no_data';
   const activeMonth = selectedMonth || fallbackMonth;

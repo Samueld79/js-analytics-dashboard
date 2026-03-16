@@ -4,6 +4,7 @@ import { useSocialMonthlyMetrics } from '../hooks/useSocialMonthlyMetrics';
 import {
   adDataOriginClass,
   adDataOriginLabel,
+  alertStateLabel,
   buildMonthlySpecialMetricsSummary,
   buildMarketingActionSummary,
   formatCop,
@@ -12,6 +13,7 @@ import {
   formatRoas,
   healthStatusLabel,
   hasSpecialMonthlyMetricData,
+  isAlertSnoozed,
   metaSyncStatusClass,
   metaSyncStatusLabel,
   resolveMonthlyProfileVisits,
@@ -115,7 +117,11 @@ export function DashboardPage() {
     });
   const rollingOverall = sumOperatingKpis(dailyKpis);
   const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-  const criticalAlerts = alerts.filter(a => a.severity === 'critical' && a.status === 'unread');
+  const openAlerts = alerts.filter(
+    (alert) => ['unread', 'read'].includes(alert.status) && !isAlertSnoozed(alert),
+  );
+  const recentAlerts = [...openAlerts].slice(0, 5);
+  const criticalAlerts = openAlerts.filter((alert) => alert.severity === 'critical');
   const healthEntries = clients.map((client) => ({
     client,
     health: healthByClient[client.id],
@@ -140,6 +146,15 @@ export function DashboardPage() {
   const metaNoDataCount = metaEntries.filter(
     (entry) => !entry.meta || entry.meta.sync_status === 'no_data',
   ).length;
+  const hasMeaningfulMarketingData =
+    executiveMarketing.messagingStarted > 0 ||
+    executiveMarketing.messagingConnections > 0 ||
+    (executiveMarketing.messagingFirstReply ?? 0) > 0 ||
+    (executiveMarketing.videoViews ?? 0) > 0 ||
+    (executiveMarketing.profileVisits ?? 0) > 0 ||
+    (executiveMarketing.thruplays ?? 0) > 0;
+  const hasExecutiveSocialData = executiveSocialRows.length > 0;
+  const hasExecutiveSpecialData = executiveSpecialRows.length > 0;
 
   const clientSummaries = clients.map(c => {
     const monthRow = monthlyKpis.find(
@@ -177,7 +192,7 @@ export function DashboardPage() {
         <KpiBox icon={<TrendingUp size={18} />} label={`Ventas ${executiveMonthLabel}`} value={formatCop(overall.total_sales)} color="green" />
         <KpiBox icon={<BarChart3 size={18} />} label={`ROAS Ads ${executiveMonthLabel}`} value={formatRoas(overall.ad_roas)} color="amber" />
         <KpiBox icon={<MessageSquare size={18} />} label={`Mensajes ${executiveMonthLabel}`} value={formatNumber(overall.messages)} color="purple" />
-        <KpiBox icon={<BarChart3 size={18} />} label="Clientes al día" value={String(healthyClients)} color="green" />
+        <KpiBox icon={<AlertTriangle size={18} />} label="Alertas críticas" value={String(criticalAlerts.length)} color="red" />
         <KpiBox icon={<AlertTriangle size={18} />} label="Clientes en riesgo" value={String(clientsAtRisk.length)} color="amber" />
       </div>
 
@@ -244,6 +259,47 @@ export function DashboardPage() {
                   </span>
                 </Link>
               ))
+            )}
+          </div>
+        </div>
+
+        <div className="card section-block">
+          <div className="section-heading">
+            <h2>Alertas recientes</h2>
+            <span className="badge-count">{openAlerts.length}</span>
+          </div>
+          <p className="source-note">Lectura operativa actual. Las alertas pospuestas no ocupan prioridad arriba.</p>
+          <div className="task-list-compact">
+            {recentAlerts.length === 0 ? (
+              <p className="empty-note">No hay alertas abiertas ahora mismo.</p>
+            ) : (
+              recentAlerts.map((alert) => {
+                const client = clients.find((entry) => entry.id === alert.client_id);
+
+                return (
+                  <Link
+                    key={alert.id}
+                    to={alert.client_id ? `/clients/${alert.client_id}` : '/alerts'}
+                    className="client-risk-row"
+                  >
+                    <div className="task-info-compact">
+                      <span className="task-title-compact">{alert.title}</span>
+                      <span className="task-due">{client?.name ?? 'General'}</span>
+                    </div>
+                    <span
+                      className={`status-pill ${
+                        alert.severity === 'critical'
+                          ? 'status-red'
+                          : alert.severity === 'warning'
+                            ? 'status-amber'
+                            : 'status-blue'
+                      }`}
+                    >
+                      {alertStateLabel(alert)}
+                    </span>
+                  </Link>
+                );
+              })
             )}
           </div>
         </div>
@@ -321,6 +377,7 @@ export function DashboardPage() {
         )}
 
         {/* Agency insight */}
+        {hasMeaningfulMarketingData && (
         <div className="card section-block">
           <div className="section-heading">
             <h2>Objetivos especiales</h2>
@@ -406,7 +463,9 @@ export function DashboardPage() {
             />
           </div>
         </div>
+        )}
 
+        {hasExecutiveSocialData && (
         <div className="card section-block">
           <div className="section-heading">
             <h2>Crecimiento social</h2>
@@ -488,7 +547,9 @@ export function DashboardPage() {
             manual y luego Ads si ese action type existe.
           </p>
         </div>
+        )}
 
+        {hasExecutiveSpecialData && (
         <div className="card section-block">
           <div className="section-heading">
             <h2>Métricas especiales</h2>
@@ -571,6 +632,41 @@ export function DashboardPage() {
             </div>
           )}
         </div>
+        )}
+
+        {(!hasMeaningfulMarketingData || !hasExecutiveSocialData || !hasExecutiveSpecialData) && (
+          <div className="card section-block low-priority-card">
+            <div className="section-heading">
+              <h2>Fuentes pendientes</h2>
+            </div>
+            <p className="source-note">
+              Estos frentes quedan abajo hasta que exista data real suficiente para lectura ejecutiva.
+            </p>
+            <div className="special-metrics-list">
+              {!hasMeaningfulMarketingData && (
+                <SpecialMetricRow
+                  title="Objetivos especiales"
+                  status="Pendiente de fuente"
+                  detail="Falta más granularidad útil en raw_actions para subir este bloque al primer nivel."
+                />
+              )}
+              {!hasExecutiveSocialData && (
+                <SpecialMetricRow
+                  title="Crecimiento social"
+                  status="Sin dato"
+                  detail="Todavía no hay cierres sociales cargados para el mes ejecutivo."
+                />
+              )}
+              {!hasExecutiveSpecialData && (
+                <SpecialMetricRow
+                  title="Métricas especiales"
+                  status="Sin dato"
+                  detail="Todavía no hay cierres especiales mensuales reportados para el mes ejecutivo."
+                />
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="card section-block insight-card">
           <div className="section-heading"><h2>Vista Estratégica</h2></div>
@@ -625,7 +721,9 @@ function useDashboardWithCounts() {
   const dashboard = useDashboard(30);
   return {
     ...dashboard,
-    unreadCount: dashboard.alerts.filter((alert) => alert.status === 'unread').length,
+    unreadCount: dashboard.alerts.filter(
+      (alert) => alert.status === 'unread' && !isAlertSnoozed(alert),
+    ).length,
   };
 }
 

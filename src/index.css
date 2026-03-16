@@ -4302,3 +4302,210 @@ tbody tr:hover td {
     grid-template-columns: 1fr;
   }
 }
+
+/* Release polish: IA, estrategias, alertas y dashboard ejecutivo */
+
+.ai-context-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ai-context-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(124, 147, 198, 0.18);
+  background: linear-gradient(180deg, rgba(10, 17, 32, 0.92), rgba(9, 14, 27, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.ai-context-stat strong {
+  color: #f4f8ff;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.ai-context-stat span {
+  color: #8ea5cb;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.ai-context-label {
+  color: #5fd6ff !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.68rem !important;
+}
+
+.ai-summary-block p + p {
+  margin-top: 10px;
+}
+
+.strategy-detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.strategy-detail-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(124, 147, 198, 0.16);
+  background: rgba(9, 16, 28, 0.74);
+}
+
+.strategy-detail-meta-item strong {
+  color: #f2f6ff;
+  font-size: 0.95rem;
+}
+
+.strategy-detail-meta-label {
+  color: #82b4ff;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.strategy-disclosure {
+  border: 1px solid rgba(124, 147, 198, 0.16);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(9, 16, 28, 0.72);
+}
+
+.strategy-disclosure summary {
+  cursor: pointer;
+  color: #cfe1ff;
+  font-weight: 600;
+  list-style: none;
+}
+
+.strategy-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.strategy-disclosure[open] summary {
+  margin-bottom: 10px;
+}
+
+.alert-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.alert-action-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.alert-action-pill:hover {
+  transform: translateY(-1px);
+}
+
+.alert-action-pill.action-success {
+  background: rgba(26, 161, 111, 0.14);
+  border-color: rgba(26, 161, 111, 0.35);
+  color: #8dffcd;
+}
+
+.alert-action-pill.action-neutral {
+  background: rgba(77, 155, 255, 0.12);
+  border-color: rgba(77, 155, 255, 0.26);
+  color: #9cd5ff;
+}
+
+.alert-action-pill.action-danger {
+  background: rgba(255, 96, 96, 0.12);
+  border-color: rgba(255, 96, 96, 0.26);
+  color: #ffb7b7;
+}
+
+.alert-postpone-panel {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(124, 147, 198, 0.18);
+  background: rgba(7, 14, 28, 0.72);
+}
+
+.alert-quick-chip {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(124, 147, 198, 0.18);
+  background: rgba(12, 20, 35, 0.9);
+  color: #dbe8ff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.alert-quick-chip.primary {
+  background: linear-gradient(135deg, rgba(32, 195, 255, 0.22), rgba(125, 88, 255, 0.22));
+  border-color: rgba(95, 214, 255, 0.28);
+  color: #f6fbff;
+}
+
+.alert-date-input {
+  min-width: 160px;
+}
+
+.low-priority-card {
+  opacity: 0.94;
+}
+
+@media (max-width: 1024px) {
+  .ai-context-grid,
+  .strategy-detail-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .alert-actions {
+    width: 100%;
+  }
+
+  .alert-postpone-panel {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+  .ai-context-grid,
+  .strategy-detail-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .alert-action-pill {
+    width: 100%;
+  }
+
+  .alert-date-input {
+    min-width: 0;
+    width: 100%;
+  }
+}

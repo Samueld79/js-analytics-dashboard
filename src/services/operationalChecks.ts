@@ -8,7 +8,7 @@ import type {
   OperationalIssueType,
   Task,
 } from '../lib/supabase';
-import { toFiniteNumber } from '../lib/utils';
+import { isAlertSnoozed, toFiniteNumber } from '../lib/utils';
 import {
   createCriticalOpenAlertsAlert,
   createLowRealRoasAlert,
@@ -124,6 +124,7 @@ function buildClientOperationalIssues(params: {
     (alert) =>
       alert.severity === 'critical' &&
       ['unread', 'read'].includes(alert.status) &&
+      !isAlertSnoozed(alert) &&
       alert.type !== 'critical_open_alerts',
   );
 

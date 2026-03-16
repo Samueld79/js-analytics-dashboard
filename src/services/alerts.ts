@@ -9,6 +9,7 @@ import {
   type AlertStatus,
   type ServiceMutationResult,
 } from '../lib/supabase';
+import { getAlertSnoozedUntil } from '../lib/utils';
 import { logActivitySafe } from './activityLog';
 import { isMissingRpcFunction, normalizeOptionalText } from './serviceHelpers';
 
@@ -30,6 +31,22 @@ export async function listAlerts({ clientId }: ListAlertsParams = {}): Promise<A
   }
 
   return (data ?? []) as Alert[];
+}
+
+function mergeAlertMetadata(
+  base: Record<string, unknown> | null | undefined,
+  patch: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  return {
+    ...(base ?? {}),
+    ...(patch ?? {}),
+  };
+}
+
+function isFutureIsoDate(value?: string | null): boolean {
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) && timestamp > Date.now();
 }
 
 export function buildRuleKey(parts: Array<string | number | null | undefined>): string {
@@ -107,6 +124,12 @@ export async function createOrTouchOperationalAlert(params: {
   }
 
   if (existing) {
+    const existingMetadata =
+      existing.metadata && typeof existing.metadata === 'object'
+        ? (existing.metadata as Record<string, unknown>)
+        : {};
+    const snoozedUntil = getAlertSnoozedUntil(existing);
+    const keepSnoozed = isFutureIsoDate(snoozedUntil);
     const { data, error } = await supabase
       .from('alerts')
       .update({
@@ -114,8 +137,13 @@ export async function createOrTouchOperationalAlert(params: {
         body: payload.body,
         severity: payload.severity,
         triggered_by: payload.triggered_by,
-        metadata: payload.metadata,
-        status: 'unread',
+        metadata: keepSnoozed
+          ? mergeAlertMetadata(payload.metadata, {
+              ...existingMetadata,
+              snoozed_until: snoozedUntil,
+            })
+          : payload.metadata,
+        status: keepSnoozed ? 'read' : 'unread',
         last_triggered_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
@@ -240,6 +268,74 @@ export async function updateAlertStatus(
         rule_key: (data as Alert).rule_key,
         severity: (data as Alert).severity,
         status,
+      },
+    });
+  }
+
+  return { data: (data ?? null) as Alert | null, error: null };
+}
+
+export async function postponeAlert(
+  id: string,
+  snoozedUntil: string,
+): Promise<ServiceMutationResult<Alert>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const timestamp = new Date(snoozedUntil).getTime();
+  if (!Number.isFinite(timestamp) || timestamp <= Date.now()) {
+    return { data: null, error: 'La fecha para posponer debe ser futura.' };
+  }
+
+  const { data: current, error: currentError } = await supabase
+    .from('alerts')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (currentError || !current) {
+    console.error('[alerts] postponeAlert load', currentError);
+    return {
+      data: null,
+      error: getErrorMessage(currentError, 'No se pudo cargar la alerta a posponer.'),
+    };
+  }
+
+  const currentMetadata =
+    current.metadata && typeof current.metadata === 'object'
+      ? (current.metadata as Record<string, unknown>)
+      : {};
+
+  const { data, error } = await supabase
+    .from('alerts')
+    .update({
+      status: 'read',
+      resolved_at: null,
+      metadata: mergeAlertMetadata(currentMetadata, {
+        snoozed_until: new Date(snoozedUntil).toISOString(),
+      }),
+    })
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[alerts] postponeAlert update', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo posponer la alerta.') };
+  }
+
+  if (data) {
+    await logActivitySafe({
+      client_id: (data as Alert).client_id ?? null,
+      entity_type: 'alert',
+      entity_id: (data as Alert).id,
+      action: 'alert_snoozed',
+      description: `${(data as Alert).title}.`,
+      metadata: {
+        rule_key: (data as Alert).rule_key,
+        severity: (data as Alert).severity,
+        snoozed_until: new Date(snoozedUntil).toISOString(),
       },
     });
   }

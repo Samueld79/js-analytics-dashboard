@@ -1,5 +1,6 @@
 import type {
   AdMetric,
+  Alert,
   ClientDailyOperatingKpi,
   ClientMonthlyOperatingKpi,
   DailySale,
@@ -455,6 +456,64 @@ export function statusLabel(status: string): string {
     churned: 'Cancelado',
   };
   return map[status] ?? status;
+}
+
+function readAlertMetadataField(
+  alert: Pick<Alert, 'metadata'> | null | undefined,
+  key: string,
+): unknown {
+  if (!alert?.metadata || typeof alert.metadata !== 'object') return null;
+  return (alert.metadata as Record<string, unknown>)[key];
+}
+
+export function getAlertSnoozedUntil(
+  alert: Pick<Alert, 'metadata'> | null | undefined,
+): string | null {
+  const value = readAlertMetadataField(alert, 'snoozed_until');
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+export function isAlertSnoozed(
+  alert: Pick<Alert, 'metadata'> | null | undefined,
+  now = new Date(),
+): boolean {
+  const snoozedUntil = getAlertSnoozedUntil(alert);
+  if (!snoozedUntil) return false;
+
+  const timestamp = new Date(snoozedUntil).getTime();
+  if (!Number.isFinite(timestamp)) return false;
+
+  return timestamp > now.getTime();
+}
+
+export function alertStateLabel(
+  alert: Pick<Alert, 'status' | 'metadata'>,
+): string {
+  if (isAlertSnoozed(alert)) return 'Pospuesta';
+
+  const map: Record<Alert['status'], string> = {
+    unread: 'Nueva',
+    read: 'Abierta',
+    resolved: 'Realizada',
+    dismissed: 'Descartada',
+  };
+
+  return map[alert.status] ?? alert.status;
+}
+
+export function alertStateClass(
+  alert: Pick<Alert, 'status' | 'metadata'>,
+): string {
+  if (isAlertSnoozed(alert)) return 'status-blue';
+
+  const map: Record<Alert['status'], string> = {
+    unread: 'status-red',
+    read: 'status-amber',
+    resolved: 'status-green',
+    dismissed: 'status-gray',
+  };
+
+  return map[alert.status] ?? 'status-gray';
 }
 
 export function priorityLabel(p: string): string {
