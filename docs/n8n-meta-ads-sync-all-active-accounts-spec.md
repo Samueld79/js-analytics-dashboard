@@ -2,6 +2,11 @@
 
 Especificación endurecida para n8n Cloud. Mantiene la lógica ya validada y agrega trazabilidad con `ad_import_runs` y `ad_import_errors`.
 
+Estado:
+- este documento describe endurecimiento pendiente
+- no describe el flujo base activo actual
+- antes de implementarlo, revisar también [docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md)
+
 Nota de esquema:
 - `public.ad_metrics` se mantiene sin cambios.
 - Este workflow no escribe `import_run_id` en `ad_metrics`.

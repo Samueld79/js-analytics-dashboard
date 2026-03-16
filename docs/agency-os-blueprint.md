@@ -1,5 +1,10 @@
 # Agency OS Blueprint
 
+Nota:
+- documento historico de blueprint
+- no es la fuente de verdad operativa actual
+- para estado real del repo usar `README.md` y los runbooks en `docs/`
+
 Blueprint operativo sobre el repo actual para pasar de dashboard demo a sistema interno modular.
 
 ## 1. Schema SQL Final

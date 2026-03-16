@@ -1,4 +1,4 @@
-import { getMonthLabel } from "../../utils/calculations";
+import { getMonthLabel } from '../../utils/monthLabel';
 
 type LineChartPoint = {
   month: string;

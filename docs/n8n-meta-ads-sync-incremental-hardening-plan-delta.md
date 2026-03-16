@@ -2,6 +2,10 @@
 
 Delta corregido sobre [docs/n8n-meta-ads-sync-incremental-hardening-plan.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan.md).
 
+Estado:
+- este delta aplica solo si decides implementar el endurecimiento pendiente
+- no significa que `ad_import_runs` o `ad_import_errors` ya formen parte del flujo activo actual
+
 Este delta reemplaza solo los bloques que hoy tienen:
 - referencias frágiles entre nodos dentro de `Code`
 - bodies HTTP ambiguos en n8n

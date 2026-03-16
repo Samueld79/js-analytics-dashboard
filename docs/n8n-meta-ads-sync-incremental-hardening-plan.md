@@ -2,6 +2,11 @@
 
 Plan incremental sobre el workflow ya validado `Meta Ads Sync - All Active Accounts`.
 
+Estado:
+- este plan es endurecimiento pendiente
+- no implica que `ad_import_runs` o `ad_import_errors` ya esten activos
+- para ejecutar este plan sin referencias fragiles, aplicar tambien el delta documentado en [docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md)
+
 Reglas de este plan:
 - no tocar `public.ad_metrics`
 - no escribir `import_run_id` en `ad_metrics`
