@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listAdMetrics } from '../services/adMetrics';
+import { listMonthlyOperatingKpis } from '../services/dashboard';
 import { listTasks, updateTask as saveTask } from '../services/tasks';
 import type {
   AdMetric,
+  ClientMonthlyOperatingKpi,
   Task,
   TaskUpdateInput,
 } from '../lib/supabase';
@@ -29,6 +31,24 @@ export function useAdMetrics(clientId?: string, days = 30) {
   }, [load]);
 
   return { metrics, loading, reload: load };
+}
+
+export function useMonthlyOperatingKpis(clientId?: string, monthsBack = 6) {
+  const [monthlyKpis, setMonthlyKpis] = useState<ClientMonthlyOperatingKpi[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const data = await listMonthlyOperatingKpis({ clientId, monthsBack });
+    setMonthlyKpis(data);
+    setLoading(false);
+  }, [clientId, monthsBack]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { monthlyKpis, loading, reload: load };
 }
 
 export function useTasks(clientId?: string) {

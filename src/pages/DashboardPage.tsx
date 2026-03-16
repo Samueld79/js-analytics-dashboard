@@ -1,33 +1,43 @@
+import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  DollarSign,
+  MessageSquare,
+  ShieldAlert,
+  Sparkles,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
+import { useAdMetrics } from '../hooks/useData';
 import { useDashboard } from '../hooks/useDashboard';
-import { useAdMetrics, useClients } from '../hooks/useData';
 import { useSocialMonthlyMetrics } from '../hooks/useSocialMonthlyMetrics';
 import {
   adDataOriginClass,
   adDataOriginLabel,
   alertStateLabel,
-  buildMonthlySpecialMetricsSummary,
   buildMarketingActionSummary,
+  buildMonthlySpecialMetricsSummary,
   formatCop,
   formatDateTime,
   formatNumber,
   formatRoas,
   healthStatusLabel,
-  hasSpecialMonthlyMetricData,
   isAlertSnoozed,
   metaSyncStatusClass,
   metaSyncStatusLabel,
   resolveMonthlyProfileVisits,
   sumOperatingKpis,
+  summarizeAdDataOrigin,
 } from '../lib/utils';
-import { Link } from 'react-router-dom';
-import { TrendingUp, MessageSquare, DollarSign, BarChart3, AlertTriangle, ArrowRight } from 'lucide-react';
 import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
 
 export function DashboardPage() {
   const {
     clients,
     alerts,
-    dailyKpis,
     monthlyKpis,
     tasks,
     healthByClient,
@@ -35,41 +45,54 @@ export function DashboardPage() {
     metaByClient,
     unreadCount,
   } = useDashboardWithCounts();
-  const { metrics: rawAdMetrics } = useAdMetrics(undefined, 120);
-  const { clients: listedClients } = useClients();
+  const { metrics: rawAdMetrics } = useAdMetrics(undefined, 180);
   const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(undefined, 12);
-  const monthlyExecutiveMonths = listAvailableMonthKeys(monthlyKpis.map((row) => row.month));
-  const socialExecutiveMonths = listAvailableMonthKeys(socialMonthlyMetrics.map((row) => row.month));
+
   const executiveMonth =
-    monthlyExecutiveMonths[0] ?? socialExecutiveMonths[0] ?? new Date().toISOString().slice(0, 7);
+    listAvailableMonthKeys([
+      ...monthlyKpis.map((row) => row.month),
+      ...socialMonthlyMetrics.map((row) => row.month),
+      ...rawAdMetrics.map((row) => row.date),
+    ])[0] ?? new Date().toISOString().slice(0, 7);
   const executiveMonthLabel = getMonthLabel(executiveMonth);
+
   const executiveRows = monthlyKpis.filter((row) => getMonthKey(row.month) === executiveMonth);
   const executiveAdMetrics = rawAdMetrics.filter((row) => getMonthKey(row.date) === executiveMonth);
   const executiveSocialMetrics = socialMonthlyMetrics.filter(
-    (metric) => getMonthKey(metric.month) === executiveMonth,
+    (row) => getMonthKey(row.month) === executiveMonth,
   );
-  const executiveMarketing = buildMarketingActionSummary(executiveAdMetrics);
-  const clientNameById = new Map(listedClients.map((client) => [client.id, client.name]));
-  const executiveSocialClientIds = new Set<string>();
-  socialMonthlyMetrics
-    .filter((metric) => getMonthKey(metric.month) === executiveMonth)
-    .forEach((metric) => executiveSocialClientIds.add(metric.client_id));
-  executiveAdMetrics.forEach((metric) => executiveSocialClientIds.add(metric.client_id));
-  const executiveSocialRows = [...executiveSocialClientIds]
-    .map((clientId) => {
+  const overall = sumOperatingKpis(executiveRows);
+  const marketing = buildMarketingActionSummary(executiveAdMetrics);
+  const specialSummary = buildMonthlySpecialMetricsSummary(executiveSocialMetrics);
+
+  const clientNameById = new Map(clients.map((client) => [client.id, client.name]));
+  const clientAlertCount = new Map<string, number>();
+  const openAlerts = alerts.filter(
+    (alert) => ['unread', 'read'].includes(alert.status) && !isAlertSnoozed(alert),
+  );
+
+  openAlerts.forEach((alert) => {
+    if (!alert.client_id) return;
+    clientAlertCount.set(alert.client_id, (clientAlertCount.get(alert.client_id) ?? 0) + 1);
+  });
+
+  const recentAlerts = [...openAlerts].slice(0, 5);
+  const criticalAlerts = openAlerts.filter((alert) => alert.severity === 'critical');
+  const clientsWithAlerts = new Set(openAlerts.map((alert) => alert.client_id).filter(Boolean)).size;
+  const pendingTasks = tasks.filter((task) => task.status === 'pending').length;
+
+  const socialRows = clients
+    .map((client) => {
       const socialMetric =
-        socialMonthlyMetrics.find(
-          (metric) =>
-            metric.client_id === clientId && getMonthKey(metric.month) === executiveMonth,
-        ) ?? null;
+        executiveSocialMetrics.find((metric) => metric.client_id === client.id) ?? null;
       const profileVisits = resolveMonthlyProfileVisits({
         socialMetric,
-        adMetrics: executiveAdMetrics.filter((metric) => metric.client_id === clientId),
+        adMetrics: executiveAdMetrics.filter((metric) => metric.client_id === client.id),
       });
 
       return {
-        clientId,
-        clientName: clientNameById.get(clientId) ?? 'Cliente sin nombre',
+        clientId: client.id,
+        clientName: client.name,
         socialMetric,
         profileVisits,
         followerConversion:
@@ -80,95 +103,108 @@ export function DashboardPage() {
     })
     .filter((entry) => entry.socialMetric || entry.profileVisits.value != null)
     .sort((left, right) => (right.socialMetric?.new_followers ?? 0) - (left.socialMetric?.new_followers ?? 0));
-  const socialFollowersTotal = executiveSocialRows.reduce(
+
+  const socialFollowersTotal = socialRows.reduce(
     (total, entry) => total + (entry.socialMetric?.new_followers ?? 0),
     0,
   );
-  const socialProfileVisitsRows = executiveSocialRows.filter((entry) => entry.profileVisits.value != null);
-  const socialProfileVisitsTotal = socialProfileVisitsRows.reduce(
+  const socialProfileVisitsTotal = socialRows.reduce(
     (total, entry) => total + (entry.profileVisits.value ?? 0),
     0,
   );
-  const hasFollowerData = executiveSocialRows.some((entry) => entry.socialMetric);
   const socialConversion =
     socialFollowersTotal > 0 && socialProfileVisitsTotal > 0
       ? (socialFollowersTotal / socialProfileVisitsTotal) * 100
       : null;
-  const overall = sumOperatingKpis(executiveRows);
-  const executiveSpecialSummary = buildMonthlySpecialMetricsSummary(executiveSocialMetrics);
-  const executiveSpecialRows = executiveSocialMetrics
-    .filter((metric) => hasSpecialMonthlyMetricData(metric))
-    .map((metric) => ({
-      clientId: metric.client_id,
-      clientName: clientNameById.get(metric.client_id) ?? 'Cliente sin nombre',
-      metric,
-    }))
-    .sort((left, right) => {
-      const scoreLeft =
-        (left.metric.new_customers_reported ?? 0) +
-        (left.metric.whatsapp_clicks ?? 0) +
-        (left.metric.link_clicks ?? 0);
-      const scoreRight =
-        (right.metric.new_customers_reported ?? 0) +
-        (right.metric.whatsapp_clicks ?? 0) +
-        (right.metric.link_clicks ?? 0);
 
-      return scoreRight - scoreLeft;
+  const clientExecutiveRows = clients
+    .map((client) => {
+      const monthRow = executiveRows.find((row) => row.client_id === client.id) ?? null;
+      const health = healthByClient[client.id];
+      const issues = issuesByClient[client.id] ?? [];
+      const socialMetric = executiveSocialMetrics.find((row) => row.client_id === client.id) ?? null;
+
+      return {
+        client,
+        monthRow,
+        health,
+        issues,
+        socialMetric,
+        alertCount: clientAlertCount.get(client.id) ?? 0,
+      };
+    })
+    .filter(
+      (entry) =>
+        Boolean(entry.monthRow) ||
+        entry.alertCount > 0 ||
+        Boolean(entry.socialMetric) ||
+        Boolean(entry.health),
+    )
+    .sort((left, right) => {
+      const leftRoas = left.monthRow?.real_roas ?? -1;
+      const rightRoas = right.monthRow?.real_roas ?? -1;
+      if (rightRoas !== leftRoas) return rightRoas - leftRoas;
+
+      const leftSales = left.monthRow?.total_sales ?? 0;
+      const rightSales = right.monthRow?.total_sales ?? 0;
+      if (rightSales !== leftSales) return rightSales - leftSales;
+
+      return (right.monthRow?.spend ?? 0) - (left.monthRow?.spend ?? 0);
     });
-  const rollingOverall = sumOperatingKpis(dailyKpis);
-  const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-  const openAlerts = alerts.filter(
-    (alert) => ['unread', 'read'].includes(alert.status) && !isAlertSnoozed(alert),
-  );
-  const recentAlerts = [...openAlerts].slice(0, 5);
-  const criticalAlerts = openAlerts.filter((alert) => alert.severity === 'critical');
-  const healthEntries = clients.map((client) => ({
-    client,
-    health: healthByClient[client.id],
-    issues: issuesByClient[client.id] ?? [],
-  }));
-  const healthyClients = healthEntries.filter((entry) => entry.health?.status === 'healthy').length;
-  const clientsAtRisk = healthEntries
+
+  const topClients = clientExecutiveRows.slice(0, 6);
+  const clientsAtRisk = [...clientExecutiveRows]
     .filter((entry) => (entry.health?.status ?? 'healthy') !== 'healthy')
-    .sort((a, b) => (a.health?.score ?? 100) - (b.health?.score ?? 100));
+    .sort((left, right) => (left.health?.score ?? 100) - (right.health?.score ?? 100))
+    .slice(0, 6);
+
   const metaEntries = clients
     .map((client) => ({
       client,
       meta: metaByClient[client.id] ?? null,
     }))
-    .sort((a, b) => {
-      const statusWeight = getMetaStatusWeight(a.meta?.sync_status) - getMetaStatusWeight(b.meta?.sync_status);
+    .sort((left, right) => {
+      const statusWeight =
+        getMetaStatusWeight(left.meta?.sync_status) - getMetaStatusWeight(right.meta?.sync_status);
       if (statusWeight !== 0) return statusWeight;
-      return a.client.name.localeCompare(b.client.name);
+      return left.client.name.localeCompare(right.client.name);
     });
-  const metaOkCount = metaEntries.filter((entry) => entry.meta?.sync_status === 'ok').length;
   const metaStaleCount = metaEntries.filter((entry) => entry.meta?.sync_status === 'stale').length;
-  const metaNoDataCount = metaEntries.filter(
-    (entry) => !entry.meta || entry.meta.sync_status === 'no_data',
-  ).length;
-  const hasMeaningfulMarketingData =
-    executiveMarketing.messagingStarted > 0 ||
-    executiveMarketing.messagingConnections > 0 ||
-    (executiveMarketing.messagingFirstReply ?? 0) > 0 ||
-    (executiveMarketing.videoViews ?? 0) > 0 ||
-    (executiveMarketing.profileVisits ?? 0) > 0 ||
-    (executiveMarketing.thruplays ?? 0) > 0;
-  const hasExecutiveSocialData = executiveSocialRows.length > 0;
-  const hasExecutiveSpecialData = executiveSpecialRows.length > 0;
-
-  const clientSummaries = clients.map(c => {
-    const monthRow = monthlyKpis.find(
-      (kpi) => kpi.client_id === c.id && getMonthKey(kpi.month) === executiveMonth,
-    ) ?? null;
-    return { client: c, monthRow, health: healthByClient[c.id] };
-  }).sort((a, b) => (b.monthRow?.ad_roas ?? 0) - (a.monthRow?.ad_roas ?? 0));
+  const hasExecutiveSocialData = socialRows.length > 0;
+  const hasExecutiveSpecialData = specialSummary.rowsWithData > 0;
+  const pendingSourceItems = [
+    !hasExecutiveSocialData
+      ? {
+          title: 'Crecimiento social mensual',
+          detail: 'Todavía no hay cierres sociales mensuales suficientes para llevarlo a primer nivel.',
+        }
+      : null,
+    marketing.profileVisits == null
+      ? {
+          title: 'Visitas al perfil desde Ads',
+          detail: 'La fuente actual no está trayendo profile_visit_view en el mes ejecutivo.',
+        }
+      : null,
+    !hasExecutiveSpecialData
+      ? {
+          title: 'Métricas especiales',
+          detail:
+            'No hay cierres especiales mensuales suficientes para destacar WhatsApp, link o nuevos clientes en portada.',
+        }
+      : null,
+    {
+      title: 'Distribución de presupuesto por objetivo',
+      detail:
+        'Sigue pendiente hasta tener spend por campaña u objetivo. ad_metrics hoy agrega por cuenta y fecha.',
+    },
+  ].filter(Boolean) as Array<{ title: string; detail: string }>;
 
   return (
-    <div className="page-content">
+    <div className="page-content reporting-page executive-dashboard-page">
       <div className="page-header">
         <div>
           <h1 className="page-title">Dashboard General</h1>
-          <p className="page-subtitle">Resumen ejecutivo · {executiveMonthLabel}</p>
+          <p className="page-subtitle">Tablero ejecutivo del mes visible · {executiveMonthLabel}</p>
         </div>
         <div className="header-actions">
           {unreadCount > 0 && (
@@ -177,76 +213,246 @@ export function DashboardPage() {
               {unreadCount} alerta{unreadCount !== 1 ? 's' : ''} sin revisar
             </Link>
           )}
+          <Link to="/metrics" className="btn-secondary">
+            <BarChart3 size={14} />
+            Ver desempeño mensual
+          </Link>
         </div>
       </div>
 
-      <div className="operational-summary-row dashboard-period-legend">
-        <span className="meta-chip">KPIs y ranking: {executiveMonthLabel}</span>
-        <span className="meta-chip">Riesgo, tareas y alertas: lectura operativa actual</span>
-        <span className="meta-chip">Meta: sync actual + MTD del mes en curso</span>
-      </div>
-
-      {/* Global KPIs */}
-      <div className="kpi-row">
-        <KpiBox icon={<DollarSign size={18} />} label={`Ads ${executiveMonthLabel}`} value={formatCop(overall.spend)} color="blue" />
-        <KpiBox icon={<TrendingUp size={18} />} label={`Ventas ${executiveMonthLabel}`} value={formatCop(overall.total_sales)} color="green" />
-        <KpiBox icon={<BarChart3 size={18} />} label={`ROAS Ads ${executiveMonthLabel}`} value={formatRoas(overall.ad_roas)} color="amber" />
-        <KpiBox icon={<MessageSquare size={18} />} label={`Mensajes ${executiveMonthLabel}`} value={formatNumber(overall.messages)} color="purple" />
-        <KpiBox icon={<AlertTriangle size={18} />} label="Alertas críticas" value={String(criticalAlerts.length)} color="red" />
-        <KpiBox icon={<AlertTriangle size={18} />} label="Clientes en riesgo" value={String(clientsAtRisk.length)} color="amber" />
-      </div>
-
-      <div className="dashboard-grid">
-        {/* Client rankings */}
-        <div className="card section-block">
-          <div className="section-heading">
-            <h2>Clientes por ROAS Ads</h2>
-            <Link to="/clients" className="link-small">Ver todos <ArrowRight size={12} /></Link>
+      <div className="card section-block period-toolbar-card">
+        <div className="period-toolbar">
+          <div className="period-toolbar-copy">
+            <div className="section-heading">
+              <h2>Lectura principal</h2>
+            </div>
+            <p className="source-note">
+              Esta portada prioriza el mes ejecutivo y deja la capa técnica abajo. Alertas, riesgo y
+              estado Meta siguen leyendo operación actual.
+            </p>
+            <div className="period-chip-row">
+              <span className="meta-chip">{executiveMonthLabel}</span>
+              <span className="meta-chip">KPIs y top clientes: mensual</span>
+              <span className="meta-chip">Alertas y riesgo: actual</span>
+              <span className="meta-chip">Fuente principal: Supabase</span>
+            </div>
           </div>
-          <p className="source-note">Ranking del mes ejecutivo: {executiveMonthLabel}.</p>
-          <div className="client-ranking">
-            {clientSummaries.length === 0 ? (
-              <p className="empty-note">No hay clientes o metricas cargadas todavia.</p>
-            ) : (
-              clientSummaries.map(({ client, monthRow, health }, i) => (
-                <Link key={client.id} to={`/clients/${client.id}`} className="client-rank-row">
-                  <span className={`rank-num ${i === 0 ? 'rank-top' : ''}`}>#{i + 1}</span>
-                  <div className="rank-info">
-                    <span className="rank-name">{client.name}</span>
-                    <span className="rank-niche">{client.niche}</span>
-                    {health && (
-                      <span className={`health-badge status-${health.status}`}>
-                        Salud {health.score} · {healthStatusLabel(health.status)}
+        </div>
+      </div>
+
+      <div className="kpi-row executive-kpi-row">
+        <KpiBox
+          icon={<DollarSign size={18} />}
+          label={`Inversión ${executiveMonthLabel}`}
+          value={formatCop(overall.spend)}
+          color="blue"
+        />
+        <KpiBox
+          icon={<TrendingUp size={18} />}
+          label={`Ventas ${executiveMonthLabel}`}
+          value={formatCop(overall.total_sales)}
+          color="green"
+        />
+        <KpiBox
+          icon={<BarChart3 size={18} />}
+          label={`ROAS real ${executiveMonthLabel}`}
+          value={formatRoas(overall.real_roas)}
+          color="amber"
+        />
+        <KpiBox
+          icon={<MessageSquare size={18} />}
+          label={`Conversaciones ${executiveMonthLabel}`}
+          value={formatNumber(marketing.messagingStarted)}
+          color="purple"
+        />
+        <KpiBox
+          icon={<ShieldAlert size={18} />}
+          label="Clientes con alertas"
+          value={String(clientsWithAlerts)}
+          color="red"
+        />
+        <KpiBox
+          icon={<Users size={18} />}
+          label={`Crecimiento social ${executiveMonthLabel}`}
+          value={hasExecutiveSocialData ? formatNumber(socialFollowersTotal) : 'Sin dato'}
+          color="blue"
+        />
+      </div>
+
+      <div className="executive-focus-grid">
+        <section className="card section-block executive-spotlight-card">
+          <div className="section-heading">
+            <h2>Clientes destacados</h2>
+            <Link to="/clients" className="link-small">
+              Ver clientes <ArrowRight size={12} />
+            </Link>
+          </div>
+          <p className="source-note">
+            Destacados por ROAS real y ventas del mes visible. Si un cliente no tiene data mensual,
+            no domina esta lista.
+          </p>
+
+          {topClients.length === 0 ? (
+            <p className="empty-note">No hay clientes con data suficiente para destacar este mes.</p>
+          ) : (
+            <div className="executive-client-list">
+              {topClients.map(({ client, monthRow, health, alertCount, socialMetric }) => (
+                <Link key={client.id} to={`/clients/${client.id}`} className="executive-client-row">
+                  <div className="executive-client-main">
+                    <div className="table-primary-cell">
+                      <strong>{client.name}</strong>
+                      <span className="table-secondary-note">
+                        {client.niche ?? 'Sin nicho'} · {monthRow ? formatCop(monthRow.spend) : 'Sin Ads'}
                       </span>
-                    )}
+                    </div>
+                    <div className="period-chip-row">
+                      {health && (
+                        <span className={`status-pill status-${healthTone(health.status)}`}>
+                          Salud {health.score} · {healthStatusLabel(health.status)}
+                        </span>
+                      )}
+                      {alertCount > 0 && (
+                        <span className="status-pill status-red">{alertCount} alerta(s)</span>
+                      )}
+                      {socialMetric && socialMetric.new_followers > 0 && (
+                        <span className="status-pill status-blue">
+                          +{formatNumber(socialMetric.new_followers)} seguidores
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="rank-metrics">
-                    <span className={`roas-pill ${(monthRow?.ad_roas ?? 0) >= 3 ? 'roas-good' : (monthRow?.ad_roas ?? 0) >= 2 ? 'roas-ok' : 'roas-low'}`}>
-                      {formatRoas(monthRow?.ad_roas ?? 0)}
+                  <div className="executive-client-metrics">
+                    <span className={roasClass(monthRow?.real_roas ?? 0)}>
+                      {formatRoas(monthRow?.real_roas ?? 0)}
                     </span>
-                    <span className="rank-spend">{formatCop(monthRow?.spend ?? 0)}</span>
-                    {(monthRow?.total_sales ?? 0) > 0 && (
-                      <span className="rank-sales">↳ {formatCop(monthRow?.total_sales ?? 0)}</span>
-                    )}
+                    <span className="table-secondary-note">
+                      {formatCop(monthRow?.total_sales ?? 0)} ventas
+                    </span>
                   </div>
-                  <ArrowRight size={14} className="rank-arrow" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="card section-block executive-radar-card">
+          <div className="section-heading">
+            <h2>Radar operativo</h2>
+            <Link to="/alerts" className="link-small">
+              Ver alertas <ArrowRight size={12} />
+            </Link>
+          </div>
+          <p className="source-note">
+            Resumen actual de riesgo, alertas y sincronización sin contaminar la cabecera ejecutiva.
+          </p>
+
+          <div className="executive-micro-grid">
+            <MetricBoxMini label="Alertas críticas" value={String(criticalAlerts.length)} />
+            <MetricBoxMini label="Clientes en riesgo" value={String(clientsAtRisk.length)} />
+            <MetricBoxMini label="Meta desactualizado" value={String(metaStaleCount)} />
+            <MetricBoxMini label="Tareas pendientes" value={String(pendingTasks)} />
+          </div>
+
+          <div className="task-list-compact">
+            {recentAlerts.length === 0 ? (
+              <p className="empty-note">No hay alertas abiertas ahora mismo.</p>
+            ) : (
+              recentAlerts.map((alert) => (
+                <Link
+                  key={alert.id}
+                  to={alert.client_id ? `/clients/${alert.client_id}` : '/alerts'}
+                  className="client-risk-row"
+                >
+                  <div className="task-info-compact">
+                    <span className="task-title-compact">{alert.title}</span>
+                    <span className="task-due">
+                      {alert.client_id ? clientNameById.get(alert.client_id) ?? 'Cliente' : 'General'}
+                    </span>
+                  </div>
+                  <span
+                    className={`status-pill ${
+                      alert.severity === 'critical'
+                        ? 'status-red'
+                        : alert.severity === 'warning'
+                          ? 'status-amber'
+                          : 'status-blue'
+                    }`}
+                  >
+                    {alertStateLabel(alert)}
+                  </span>
                 </Link>
               ))
             )}
           </div>
-        </div>
+        </section>
+      </div>
 
-        <div className="card section-block">
+      <div className="dashboard-grid dashboard-secondary-grid">
+        {hasExecutiveSocialData && (
+          <section className="card section-block">
+            <div className="section-heading">
+              <h2>Crecimiento social</h2>
+            </div>
+            <p className="source-note">
+              Cierre mensual de seguidores y visitas al perfil. No se infieren seguidores desde Ads.
+            </p>
+            <div className="metric-grid-4">
+              <MetricBoxMini
+                label="Nuevos seguidores"
+                value={formatNumber(socialFollowersTotal)}
+              />
+              <MetricBoxMini
+                label="Visitas al perfil"
+                value={socialProfileVisitsTotal > 0 ? formatNumber(socialProfileVisitsTotal) : 'Sin dato'}
+              />
+              <MetricBoxMini
+                label="Conversión visita → seguidor"
+                value={socialConversion != null ? `${socialConversion.toFixed(1)}%` : '—'}
+              />
+              <MetricBoxMini label="Costo por seguidor" value="Pendiente de fuente" />
+            </div>
+            <div className="special-metrics-list compact-grid-list">
+              {socialRows.slice(0, 5).map((entry) => (
+                <Link
+                  key={entry.clientId}
+                  to={`/clients/${entry.clientId}`}
+                  className="special-metric-row special-metric-link"
+                >
+                  <div className="special-metric-main">
+                    <strong>{entry.clientName}</strong>
+                    <span>
+                      Seguidores {entry.socialMetric ? formatNumber(entry.socialMetric.new_followers) : 'Sin dato'} ·
+                      Perfil {entry.profileVisits.value != null ? ` ${formatNumber(entry.profileVisits.value)}` : ' Sin dato'}
+                    </span>
+                  </div>
+                  <span
+                    className={`meta-chip ${
+                      entry.socialMetric
+                        ? 'source-manual'
+                        : adDataOriginClass(entry.profileVisits.sourceOrigin)
+                    }`}
+                  >
+                    {entry.socialMetric ? 'Manual mensual' : entry.profileVisits.sourceLabel}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="card section-block">
           <div className="section-heading">
             <h2>Clientes en riesgo</h2>
             <span className="badge-count">{clientsAtRisk.length}</span>
           </div>
-          <p className="source-note">Lectura operativa actual sobre salud, tareas y alertas.</p>
+          <p className="source-note">
+            Lectura operativa actual basada en salud, issues y alertas abiertas.
+          </p>
           <div className="task-list-compact">
             {clientsAtRisk.length === 0 ? (
-              <p className="empty-note">Todos los clientes estan al dia.</p>
+              <p className="empty-note">No hay clientes en riesgo ahora mismo.</p>
             ) : (
-              clientsAtRisk.slice(0, 6).map(({ client, health, issues }) => (
+              clientsAtRisk.map(({ client, health, issues }) => (
                 <Link key={client.id} to={`/clients/${client.id}`} className="client-risk-row">
                   <div className="task-info-compact">
                     <span className="task-title-compact">{client.name}</span>
@@ -261,60 +467,19 @@ export function DashboardPage() {
               ))
             )}
           </div>
-        </div>
+        </section>
 
-        <div className="card section-block">
-          <div className="section-heading">
-            <h2>Alertas recientes</h2>
-            <span className="badge-count">{openAlerts.length}</span>
-          </div>
-          <p className="source-note">Lectura operativa actual. Las alertas pospuestas no ocupan prioridad arriba.</p>
-          <div className="task-list-compact">
-            {recentAlerts.length === 0 ? (
-              <p className="empty-note">No hay alertas abiertas ahora mismo.</p>
-            ) : (
-              recentAlerts.map((alert) => {
-                const client = clients.find((entry) => entry.id === alert.client_id);
-
-                return (
-                  <Link
-                    key={alert.id}
-                    to={alert.client_id ? `/clients/${alert.client_id}` : '/alerts'}
-                    className="client-risk-row"
-                  >
-                    <div className="task-info-compact">
-                      <span className="task-title-compact">{alert.title}</span>
-                      <span className="task-due">{client?.name ?? 'General'}</span>
-                    </div>
-                    <span
-                      className={`status-pill ${
-                        alert.severity === 'critical'
-                          ? 'status-red'
-                          : alert.severity === 'warning'
-                            ? 'status-amber'
-                            : 'status-blue'
-                      }`}
-                    >
-                      {alertStateLabel(alert)}
-                    </span>
-                  </Link>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        <div className="card section-block">
+        <section className="card section-block">
           <div className="section-heading">
             <h2>Estado Meta</h2>
             <span className="badge-count">{metaStaleCount}</span>
           </div>
-          <p className="source-note">Sync actual por cuenta y KPI MTD del mes en curso.</p>
+          <p className="source-note">Estado actual de sincronización y lectura MTD por cliente.</p>
           <div className="task-list-compact">
             {metaEntries.length === 0 ? (
               <p className="empty-note">No hay clientes activos para revisar sincronización Meta.</p>
             ) : (
-              metaEntries.map(({ client, meta }) => (
+              metaEntries.slice(0, 6).map(({ client, meta }) => (
                 <Link key={client.id} to={`/clients/${client.id}`} className="client-risk-row">
                   <div className="task-info-compact">
                     <span className="task-title-compact">{client.name}</span>
@@ -327,392 +492,63 @@ export function DashboardPage() {
                   <span className={`status-pill ${metaSyncStatusClass(meta?.sync_status ?? 'no_data')}`}>
                     {metaSyncStatusLabel(meta?.sync_status ?? 'no_data')}
                   </span>
-                  <span className="type-chip">
-                    {meta?.has_mtd_data ? formatCop(meta.mtd_spend) : 'MTD vacío'}
-                  </span>
-                  <span className="type-chip">
-                    {meta?.has_mtd_data ? formatRoas(meta.mtd_ad_roas) : 'ROAS —'}
-                  </span>
                 </Link>
               ))
             )}
           </div>
-        </div>
-
-        {/* Pending tasks */}
-        <div className="card section-block">
-          <div className="section-heading">
-            <h2>Tareas Pendientes</h2>
-            <span className="badge-count">{pendingTasks}</span>
-          </div>
-          <p className="source-note">Tareas abiertas hoy. No depende del mes ejecutivo.</p>
-          <div className="task-list-compact">
-            {tasks.filter(t => t.status === 'pending').slice(0, 5).map(task => (
-              <div key={task.id} className="task-item-compact">
-                <span className={`priority-dot priority-${task.priority}`} />
-                <div className="task-info-compact">
-                  <span className="task-title-compact">{task.title}</span>
-                  {task.due_date && <span className="task-due">{new Date(task.due_date + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</span>}
-                </div>
-                <span className={`type-chip type-${task.type}`}>{task.type}</span>
-              </div>
-            ))}
-            {pendingTasks === 0 && <p className="empty-note">No hay tareas pendientes 🎉</p>}
-          </div>
-        </div>
-
-        {/* Critical Alerts */}
-        {criticalAlerts.length > 0 && (
-          <div className="card section-block alert-card-section">
-            <div className="section-heading">
-              <h2>⚠️ Alertas Críticas</h2>
-            </div>
-            {criticalAlerts.map(a => (
-              <div key={a.id} className="alert-item critical">
-                <strong>{a.title}</strong>
-                {a.body && <p>{a.body}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Agency insight */}
-        {hasMeaningfulMarketingData && (
-        <div className="card section-block">
-          <div className="section-heading">
-            <h2>Objetivos especiales</h2>
-          </div>
-          <p className="source-note">
-            Lectura del mes ejecutivo con la fuente actual de Ads. No mezcla mensajes, perfil y video
-            como el mismo resultado.
-          </p>
-          <div className="operational-summary-row">
-            <span className="meta-chip">{executiveMonthLabel}</span>
-            <span className={`meta-chip ${adDataOriginClass(executiveMarketing.sourceOrigin)}`}>
-              {adDataOriginLabel(executiveMarketing.sourceOrigin)}
-            </span>
-            <span className="meta-chip">Fuente base: raw_actions agregados por cuenta/día</span>
-          </div>
-          <div className="metric-grid-4">
-            <MetricBoxMini
-              label="Mensajes iniciados"
-              value={formatNumber(executiveMarketing.messagingStarted)}
-            />
-            <MetricBoxMini
-              label="Primeras respuestas"
-              value={formatNullableMetric(executiveMarketing.messagingFirstReply)}
-            />
-            <MetricBoxMini
-              label="Conexiones de mensaje"
-              value={formatNumber(executiveMarketing.messagingConnections)}
-            />
-            <MetricBoxMini
-              label="Visualizaciones de video"
-              value={formatNullableMetric(executiveMarketing.videoViews)}
-            />
-            <MetricBoxMini
-              label="Visitas al perfil"
-              value={formatNullableMetric(executiveMarketing.profileVisits, 'Sin dato')}
-            />
-            <MetricBoxMini
-              label="Thruplays"
-              value={formatNullableMetric(executiveMarketing.thruplays, 'Sin dato')}
-            />
-            <MetricBoxMini
-              label="Video 25%"
-              value={formatNullablePct(executiveMarketing.video25, executiveMarketing.videoViews)}
-            />
-            <MetricBoxMini
-              label="Video 50%"
-              value={formatNullablePct(executiveMarketing.video50, executiveMarketing.videoViews)}
-            />
-          </div>
-          <div className="special-metrics-list">
-            <SpecialMetricRow
-              title="Mix de inversión por objetivo"
-              status="Pendiente de fuente"
-              detail="Requiere spend por campaña y clasificación de objetivo. Hoy ad_metrics agrega por cuenta y día."
-            />
-            <SpecialMetricRow
-              title="CPR ponderado de mensajes"
-              status="Pendiente de fuente"
-              detail={`Mensajes iniciados detectados: ${formatNumber(executiveMarketing.messagingStarted)}. Falta gasto aislado de campañas de mensajes.`}
-            />
-            <SpecialMetricRow
-              title="Costo por visita al perfil"
-              status={executiveMarketing.profileVisits == null ? 'Sin dato' : 'Pendiente de fuente'}
-              detail={
-                executiveMarketing.profileVisits == null
-                  ? 'La fuente actual no está trayendo profile_visit_view.'
-                  : 'Hay visitas detectadas, pero falta gasto separado de campañas de perfil.'
-              }
-            />
-            <SpecialMetricRow
-              title="Costo por thruplay"
-              status={executiveMarketing.thruplays == null ? 'Sin dato' : 'Pendiente de fuente'}
-              detail={
-                executiveMarketing.thruplays == null
-                  ? 'La fuente actual no está trayendo video_thruplay_watched_actions.'
-                  : 'Hay thruplays detectados, pero falta gasto separado de campañas de video.'
-              }
-            />
-            <SpecialMetricRow
-              title="Top campañas y concentración de gasto"
-              status="Pendiente de fuente"
-              detail="Requiere campaign_id / campaign_name y spend por campaña para ranking y top 3."
-            />
-          </div>
-        </div>
-        )}
-
-        {hasExecutiveSocialData && (
-        <div className="card section-block">
-          <div className="section-heading">
-            <h2>Crecimiento social</h2>
-          </div>
-          <p className="source-note">
-            Seguidores cargados al cierre mensual. No se infieren desde Ads. Las visitas al perfil
-            usan cierre manual y, si falta, fallback desde Ads solo cuando existe `profile_visit_view`.
-          </p>
-          <div className="operational-summary-row">
-            <span className="meta-chip">{executiveMonthLabel}</span>
-            <span className="meta-chip source-manual">Seguidores: fuente manual mensual</span>
-            <span className="meta-chip source-unknown">Costo por seguidor: pendiente de fuente</span>
-          </div>
-          <div className="metric-grid-4">
-            <MetricBoxMini
-              label="Nuevos seguidores del mes"
-              value={hasFollowerData ? formatNumber(socialFollowersTotal) : 'Sin dato'}
-            />
-            <MetricBoxMini
-              label="Visitas al perfil del mes"
-              value={
-                socialProfileVisitsRows.length > 0
-                  ? formatNumber(socialProfileVisitsTotal)
-                  : 'Sin dato'
-              }
-            />
-            <MetricBoxMini
-              label="Conversión visita → seguidor"
-              value={socialConversion != null ? `${socialConversion.toFixed(1)}%` : '—'}
-            />
-            <MetricBoxMini label="Costo por seguidor" value="Pendiente de fuente" />
-          </div>
-          {executiveSocialRows.length === 0 ? (
-            <p className="empty-note">Todavía no hay cierres sociales mensuales para el mes ejecutivo.</p>
-          ) : (
-            <div className="table-wrap responsive-card-table">
-              <table className="social-summary-table">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Fuente</th>
-                    <th className="num-col">Seguidores</th>
-                    <th className="num-col">Visitas perfil</th>
-                    <th className="num-col">Conversión</th>
-                    <th className="num-col">Costo seguidor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {executiveSocialRows.map((entry) => (
-                    <tr key={entry.clientId}>
-                      <td data-label="Cliente">{entry.clientName}</td>
-                      <td data-label="Fuente">
-                        <span
-                          className={`meta-chip ${
-                            entry.socialMetric ? 'source-manual' : adDataOriginClass(entry.profileVisits.sourceOrigin)
-                          }`}
-                        >
-                          {entry.socialMetric ? 'Manual mensual' : entry.profileVisits.sourceLabel}
-                        </span>
-                      </td>
-                      <td className="num-col" data-label="Seguidores">
-                        {entry.socialMetric ? formatNumber(entry.socialMetric.new_followers) : 'Sin dato'}
-                      </td>
-                      <td className="num-col" data-label="Visitas perfil">
-                        {entry.profileVisits.value != null ? formatNumber(entry.profileVisits.value) : 'Sin dato'}
-                      </td>
-                      <td className="num-col" data-label="Conversión">
-                        {entry.followerConversion != null ? `${entry.followerConversion.toFixed(1)}%` : '—'}
-                      </td>
-                      <td className="num-col" data-label="Costo seguidor">Pendiente de fuente</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="source-note">
-            `new_followers` sale solo de `social_monthly_metrics`. `profile_visits` prioriza cierre
-            manual y luego Ads si ese action type existe.
-          </p>
-        </div>
-        )}
+        </section>
 
         {hasExecutiveSpecialData && (
-        <div className="card section-block">
-          <div className="section-heading">
-            <h2>Métricas especiales</h2>
-          </div>
-          <p className="source-note">
-            Cierre mensual por cliente para señales especiales de negocio. No se infieren desde
-            Ads ni desde ventas si no fueron reportadas.
-          </p>
-          <div className="operational-summary-row">
-            <span className="meta-chip">{executiveMonthLabel}</span>
-            <span className="meta-chip source-manual">Fuente manual mensual</span>
-          </div>
-          <div className="metric-grid-4">
-            <MetricBoxMini
-              label="Clicks WhatsApp"
-              value={
-                executiveSpecialSummary.rowsWithData > 0
-                  ? formatNumber(executiveSpecialSummary.whatsappClicks)
-                  : 'Sin dato'
-              }
-            />
-            <MetricBoxMini
-              label="Clicks al link"
-              value={
-                executiveSpecialSummary.rowsWithData > 0
-                  ? formatNumber(executiveSpecialSummary.linkClicks)
-                  : 'Sin dato'
-              }
-            />
-            <MetricBoxMini
-              label="Nuevos clientes reportados"
-              value={
-                executiveSpecialSummary.rowsWithData > 0
-                  ? formatNumber(executiveSpecialSummary.newCustomersReported)
-                  : 'Sin dato'
-              }
-            />
-            <MetricBoxMini
-              label="Recompra reportada"
-              value={
-                executiveSpecialSummary.rowsWithData > 0
-                  ? formatNumber(executiveSpecialSummary.returningCustomersReported)
-                  : 'Sin dato'
-              }
-            />
-            <MetricBoxMini
-              label="Visitas a tienda"
-              value={
-                executiveSpecialSummary.rowsWithData > 0
-                  ? formatNumber(executiveSpecialSummary.storeVisitsReported)
-                  : 'Sin dato'
-              }
-            />
-          </div>
-          {executiveSpecialRows.length === 0 ? (
-            <p className="empty-note">
-              Todavía no hay métricas especiales mensuales cargadas para el mes ejecutivo.
-            </p>
-          ) : (
-            <div className="special-metrics-list">
-              {executiveSpecialRows.map(({ clientId, clientName, metric }) => (
-                <Link
-                  key={`${clientId}-${metric.month}`}
-                  to={`/clients/${clientId}`}
-                  className="special-metric-row special-metric-link"
-                >
-                  <div className="special-metric-main">
-                    <strong>{clientName}</strong>
-                    <span>
-                      WhatsApp {formatNullableCount(metric.whatsapp_clicks)} · Link{' '}
-                      {formatNullableCount(metric.link_clicks)} · Nuevos clientes{' '}
-                      {formatNullableCount(metric.new_customers_reported)} · Recompra{' '}
-                      {formatNullableCount(metric.returning_customers_reported)} · Tienda{' '}
-                      {formatNullableCount(metric.store_visits_reported)}
-                    </span>
-                  </div>
-                  <span className="meta-chip source-manual">Manual mensual</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-        )}
-
-        {(!hasMeaningfulMarketingData || !hasExecutiveSocialData || !hasExecutiveSpecialData) && (
-          <div className="card section-block low-priority-card">
+          <section className="card section-block">
             <div className="section-heading">
-              <h2>Fuentes pendientes</h2>
+              <h2>Métricas especiales</h2>
             </div>
             <p className="source-note">
-              Estos frentes quedan abajo hasta que exista data real suficiente para lectura ejecutiva.
+              Cierres mensuales manuales para clicks y señales de negocio. Solo suben aquí cuando
+              ya existe data real.
             </p>
-            <div className="special-metrics-list">
-              {!hasMeaningfulMarketingData && (
-                <SpecialMetricRow
-                  title="Objetivos especiales"
-                  status="Pendiente de fuente"
-                  detail="Falta más granularidad útil en raw_actions para subir este bloque al primer nivel."
-                />
-              )}
-              {!hasExecutiveSocialData && (
-                <SpecialMetricRow
-                  title="Crecimiento social"
-                  status="Sin dato"
-                  detail="Todavía no hay cierres sociales cargados para el mes ejecutivo."
-                />
-              )}
-              {!hasExecutiveSpecialData && (
-                <SpecialMetricRow
-                  title="Métricas especiales"
-                  status="Sin dato"
-                  detail="Todavía no hay cierres especiales mensuales reportados para el mes ejecutivo."
-                />
-              )}
+            <div className="metric-grid-4">
+              <MetricBoxMini
+                label="Clicks WhatsApp"
+                value={formatNumber(specialSummary.whatsappClicks)}
+              />
+              <MetricBoxMini
+                label="Clicks al link"
+                value={formatNumber(specialSummary.linkClicks)}
+              />
+              <MetricBoxMini
+                label="Nuevos clientes"
+                value={formatNumber(specialSummary.newCustomersReported)}
+              />
+              <MetricBoxMini
+                label="Recompra"
+                value={formatNumber(specialSummary.returningCustomersReported)}
+              />
+              <MetricBoxMini
+                label="Visitas a tienda"
+                value={formatNumber(specialSummary.storeVisitsReported)}
+              />
             </div>
-          </div>
+            <p className="source-note">
+              Fuente visible: {adDataOriginLabel(summarizeAdDataOrigin(executiveAdMetrics.map((row) => row.source)))} para Ads y manual mensual para señales especiales.
+            </p>
+          </section>
         )}
-
-        <div className="card section-block insight-card">
-          <div className="section-heading"><h2>Vista Estratégica</h2></div>
-          <div className="insight-stats">
-            <div className="insight-stat">
-              <span className="insight-num">{clients.filter(c => c.status === 'active').length}</span>
-              <span className="insight-label">clientes activos</span>
-            </div>
-            <div className="insight-stat">
-              <span className="insight-num">
-                {clientSummaries.filter((entry) => (entry.monthRow?.ad_roas ?? 0) >= 3).length}
-              </span>
-              <span className="insight-label">ROAS ≥ 3x</span>
-            </div>
-            <div className="insight-stat">
-              <span className="insight-num">{pendingTasks}</span>
-              <span className="insight-label">tareas abiertas</span>
-            </div>
-            <div className="insight-stat">
-              <span className="insight-num">{unreadCount}</span>
-              <span className="insight-label">alertas nuevas</span>
-            </div>
-            <div className="insight-stat">
-              <span className="insight-num">{healthyClients}</span>
-              <span className="insight-label">clientes al día</span>
-            </div>
-            <div className="insight-stat">
-              <span className="insight-num">{metaOkCount}</span>
-              <span className="insight-label">sync Meta OK</span>
-            </div>
-            <div className="insight-stat">
-              <span className="insight-num">{metaStaleCount}</span>
-              <span className="insight-label">sync Meta stale</span>
-            </div>
-            <div className="insight-stat">
-              <span className="insight-num">{metaNoDataCount}</span>
-              <span className="insight-label">sin datos Meta</span>
-            </div>
-          </div>
-          <p className="insight-text">
-            Mes ejecutivo {executiveMonthLabel}: {formatRoas(overall.ad_roas)} de ROAS Ads con {formatCop(overall.spend)} de inversión.
-            {overall.total_sales > 0 && ` Ventas reportadas del mes: ${formatCop(overall.total_sales)}.`}
-            {rollingOverall.total_sales > 0 && ` Rolling operativo 30d: ${formatCop(rollingOverall.total_sales)} en ventas.`}
-          </p>
-        </div>
       </div>
+
+      {pendingSourceItems.length > 0 && (
+        <details className="card section-block dashboard-collapsible">
+          <summary>
+            <Sparkles size={14} />
+            Fuentes pendientes y capas secundarias
+          </summary>
+          <div className="special-metrics-list">
+            {pendingSourceItems.map((item) => (
+              <PendingItem key={item.title} title={item.title} detail={item.detail} />
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -740,7 +576,29 @@ function getMetaStatusWeight(status?: 'ok' | 'stale' | 'no_data' | null): number
   }
 }
 
-function KpiBox({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
+function healthTone(status: 'healthy' | 'warning' | 'critical'): 'green' | 'amber' | 'red' {
+  if (status === 'healthy') return 'green';
+  if (status === 'warning') return 'amber';
+  return 'red';
+}
+
+function roasClass(roas: number): string {
+  if (roas >= 3) return 'roas-pill roas-good';
+  if (roas >= 2) return 'roas-pill roas-ok';
+  return 'roas-pill roas-low';
+}
+
+function KpiBox({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  color: string;
+}) {
   return (
     <div className={`kpi-box kpi-${color}`}>
       <div className="kpi-box-icon">{icon}</div>
@@ -767,13 +625,11 @@ function MetricBoxMini({
   );
 }
 
-function SpecialMetricRow({
+function PendingItem({
   title,
-  status,
   detail,
 }: {
   title: string;
-  status: string;
   detail: string;
 }) {
   return (
@@ -782,22 +638,7 @@ function SpecialMetricRow({
         <strong>{title}</strong>
         <span>{detail}</span>
       </div>
-      <span className="status-pill status-gray">{status}</span>
+      <span className="status-pill status-gray">Pendiente</span>
     </div>
   );
-}
-
-function formatNullableMetric(value: number | null, fallback = '—'): string {
-  if (value == null) return fallback;
-  return formatNumber(value);
-}
-
-function formatNullablePct(part: number | null, total: number | null): string {
-  if (part == null || total == null || total <= 0) return 'Sin dato';
-  return `${((part / total) * 100).toFixed(1)}%`;
-}
-
-function formatNullableCount(value: number | null | undefined): string {
-  if (value == null) return 'Sin dato';
-  return formatNumber(value);
 }
