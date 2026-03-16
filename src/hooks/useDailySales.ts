@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   isSupabaseConfigured,
   type DailySale,
@@ -7,7 +7,21 @@ import {
 } from '../lib/supabase';
 import { listDailySales, upsertDailySale } from '../services/dailySales';
 
-export function useDailySales(clientId?: string, days = 30) {
+type UseDailySalesParams = {
+  clientId?: string;
+  days?: number;
+  startDate?: string;
+  endDate?: string;
+};
+
+export function useDailySales(clientIdOrParams?: string | UseDailySalesParams, days = 30) {
+  const params = useMemo(
+    () =>
+      typeof clientIdOrParams === 'string'
+        ? { clientId: clientIdOrParams, days }
+        : { days, ...(clientIdOrParams ?? {}) },
+    [clientIdOrParams, days],
+  );
   const [sales, setSales] = useState<DailySale[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +29,7 @@ export function useDailySales(clientId?: string, days = 30) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listDailySales({ clientId, days });
+      const data = await listDailySales(params);
       setSales(data);
       setError(null);
     } catch (err) {
@@ -25,7 +39,7 @@ export function useDailySales(clientId?: string, days = 30) {
     } finally {
       setLoading(false);
     }
-  }, [clientId, days]);
+  }, [params]);
 
   useEffect(() => {
     void load();
@@ -35,7 +49,7 @@ export function useDailySales(clientId?: string, days = 30) {
     async (sale: DailySaleInput): Promise<ServiceMutationResult<DailySale>> => {
       const result = await upsertDailySale(sale);
       if (!result.error) {
-        await load();
+        void load();
       }
       return result;
     },

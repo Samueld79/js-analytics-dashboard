@@ -4213,3 +4213,92 @@ tbody tr:hover td {
     height: 48px;
   }
 }
+
+.sales-quick-actions {
+  min-width: 320px;
+  display: grid;
+  gap: 12px;
+}
+
+.sales-filter-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.sales-filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-chip-button {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--gs-muted);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font: inherit;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.filter-chip-button:hover {
+  border-color: rgba(87, 239, 255, 0.22);
+  color: var(--gs-text);
+}
+
+.filter-chip-button.active {
+  background: linear-gradient(135deg, rgba(27, 168, 255, 0.18), rgba(123, 92, 255, 0.18));
+  border-color: rgba(87, 239, 255, 0.28);
+  color: #f6fbff;
+  box-shadow: 0 0 0 1px rgba(87, 239, 255, 0.08) inset;
+}
+
+.sales-filter-tools,
+.sales-custom-range,
+.sales-simple-fields {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sales-search-field {
+  min-width: 0;
+}
+
+.history-fields-grid-compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.modal-sales-simple {
+  max-width: 520px;
+}
+
+.simple-sales-table {
+  min-width: 100%;
+}
+
+@media (max-width: 900px) {
+  .sales-quick-actions {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 660px) {
+  .sales-filter-chip-row {
+    gap: 8px;
+  }
+
+  .filter-chip-button {
+    flex: 1 1 calc(50% - 8px);
+    justify-content: center;
+    text-align: center;
+  }
+
+  .sales-filter-tools,
+  .sales-custom-range,
+  .sales-simple-fields {
+    grid-template-columns: 1fr;
+  }
+}

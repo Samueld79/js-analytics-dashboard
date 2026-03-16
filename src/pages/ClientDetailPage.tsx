@@ -26,8 +26,12 @@ import {
   formatNumber,
   formatPct,
   formatRoas,
+  getDateKey,
+  getMonthStartKey,
+  getYearStartKey,
   healthStatusLabel,
   hasSpecialMonthlyMetricData,
+  isDateWithinRange,
   metaSyncStatusClass,
   metaSyncStatusLabel,
   resolveMonthlyProfileVisits,
@@ -180,6 +184,23 @@ export function ClientDetailPage() {
     () => sumSales(selectedMonthSales),
     [selectedMonthSales],
   );
+  const today = getDateKey();
+  const currentMonthStart = getMonthStartKey();
+  const currentYearStart = getYearStartKey();
+  const currentMonthSales = useMemo(
+    () => sales.filter((row) => isDateWithinRange(row.date, currentMonthStart, today)),
+    [currentMonthStart, sales, today],
+  );
+  const currentYearSales = useMemo(
+    () => sales.filter((row) => isDateWithinRange(row.date, currentYearStart, today)),
+    [currentYearStart, sales, today],
+  );
+  const currentMonthSalesTotals = useMemo(() => sumSales(currentMonthSales), [currentMonthSales]);
+  const currentYearSalesTotals = useMemo(() => sumSales(currentYearSales), [currentYearSales]);
+  const recentSales = useMemo(
+    () => [...sales].sort((a, b) => compareDesc(a.date, b.date)).slice(0, 8),
+    [sales],
+  );
   const selectedPeriodTotals = useMemo(() => {
     if (selectedMonthRow) return sumOperatingKpis([selectedMonthRow]);
 
@@ -278,7 +299,6 @@ export function ClientDetailPage() {
     );
   }
 
-  const operatingTotals = sumOperatingKpis(dailyKpis);
   const criticalAlerts = alerts.filter(
     (alert) => alert.severity === 'critical' && ['unread', 'read'].includes(alert.status),
   );
@@ -471,8 +491,12 @@ export function ClientDetailPage() {
             followerConversion={selectedFollowerConversion}
             hasSpecialMetricData={hasSpecialMonthlyMetricData(selectedSocialMetric)}
             operatingTotals={selectedPeriodTotals}
-            rollingTotals={operatingTotals}
             operatingRows={recentOperatingKpis}
+            currentMonthSalesTotals={currentMonthSalesTotals}
+            currentYearSalesTotals={currentYearSalesTotals}
+            currentMonthSalesCount={currentMonthSales.length}
+            currentYearSalesCount={currentYearSales.length}
+            recentSales={recentSales}
             activityLog={activityLog}
             showOperational={isInternal}
           />
@@ -542,7 +566,6 @@ export function ClientDetailPage() {
 
 function ClientOverview({
   operatingTotals,
-  rollingTotals,
   operatingRows,
   client,
   health,
@@ -556,10 +579,14 @@ function ClientOverview({
   profileVisits,
   followerConversion,
   hasSpecialMetricData,
+  currentMonthSalesTotals,
+  currentYearSalesTotals,
+  currentMonthSalesCount,
+  currentYearSalesCount,
+  recentSales,
   showOperational,
 }: {
   operatingTotals: ReturnType<typeof sumOperatingKpis>;
-  rollingTotals: ReturnType<typeof sumOperatingKpis>;
   operatingRows: ClientDailyOperatingKpi[];
   client: Client;
   health: ClientHealthScore | null;
@@ -573,9 +600,16 @@ function ClientOverview({
   profileVisits: ReturnType<typeof resolveMonthlyProfileVisits>;
   followerConversion: number | null;
   hasSpecialMetricData: boolean;
+  currentMonthSalesTotals: ReturnType<typeof sumSales>;
+  currentYearSalesTotals: ReturnType<typeof sumSales>;
+  currentMonthSalesCount: number;
+  currentYearSalesCount: number;
+  recentSales: DailySale[];
   showOperational: boolean;
 }) {
   const metaStatus = meta?.sync_status ?? 'no_data';
+  const currentSalesMonthLabel = getMonthLabel(getDateKey());
+  const currentSalesYearLabel = getDateKey().slice(0, 4);
 
   return (
     <div className="tab-content overview-grid">
@@ -682,22 +716,59 @@ function ClientOverview({
       </div>
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Ventas reportadas — {selectedMonthLabel}</h2></div>
+        <div className="section-heading"><h2>Ventas del cliente</h2></div>
         <p className="source-note">
-          Las ventas vienen de `daily_sales` y pueden ser carga diaria o histórico mensual manual.
+          Captura simple sobre ventas diarias. Este bloque resume mes en curso, año en curso y
+          registros recientes del cliente.
         </p>
-        {operatingTotals.total_sales > 0 ? (
-          <div className="metric-grid-4">
-            <MetricBox label="Total ventas" value={formatCop(operatingTotals.total_sales)} />
-            <MetricBox label="Cliente nuevo" value={formatCop(operatingTotals.new_client_sales)} />
-            <MetricBox label="Recompra" value={formatCop(operatingTotals.repeat_sales)} highlight={operatingTotals.repeat_sales > operatingTotals.new_client_sales ? 'green' : undefined} />
-            <MetricBox label="Punto físico" value={formatCop(operatingTotals.physical_store_sales)} />
-            <MetricBox label="Online" value={formatCop(operatingTotals.online_sales)} />
+        {(currentMonthSalesTotals.total > 0 || currentYearSalesTotals.total > 0 || recentSales.length > 0) ? (
+          <>
+            <div className="operational-summary-row">
+              <span className="meta-chip">Mes actual · {currentSalesMonthLabel}</span>
+              <span className="meta-chip">Año actual · {currentSalesYearLabel}</span>
+              <span className="meta-chip">Fuente oficial · ventas diarias</span>
+            </div>
+            <div className="metric-grid-4">
+              <MetricBox label="Ventas del mes actual" value={formatCop(currentMonthSalesTotals.total)} />
+              <MetricBox label="Ventas del año actual" value={formatCop(currentYearSalesTotals.total)} />
+              <MetricBox label="Registros del mes" value={String(currentMonthSalesCount)} />
+              <MetricBox label="Registros del año" value={String(currentYearSalesCount)} />
+            </div>
+          </>
+        ) : (
+          <p className="empty-note">
+            No hay ventas registradas todavía para este cliente.
+          </p>
+        )}
+      </div>
+
+      <div className="card section-block">
+        <div className="section-heading"><h2>Ventas recientes</h2></div>
+        <p className="source-note">
+          Listado simple de los últimos registros guardados. Solo muestra fecha y valor.
+        </p>
+        {recentSales.length > 0 ? (
+          <div className="table-wrap responsive-card-table">
+            <table className="client-sales-table simple-sales-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th className="num-col">Venta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSales.map((sale) => (
+                  <tr key={sale.id}>
+                    <td data-label="Fecha">{formatDate(sale.date)}</td>
+                    <td className="num-col" data-label="Venta">{formatCop(sale.total_sales)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <p className="empty-note">
-            No hay ventas reportadas para el mes seleccionado. Usa "Registrar Ventas" o "Cargar
-            histórico" para completarlo.
+            Todavía no hay ventas recientes registradas.
           </p>
         )}
       </div>
@@ -809,49 +880,6 @@ function ClientOverview({
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </div>
-
-      <div className="card section-block">
-        <div className="section-heading"><h2>Ventas recientes — últimos 7 días</h2></div>
-        <p className="source-note">
-          Ventas reportadas recientes. El comparativo mensual se mantiene arriba en la lectura del
-          mes seleccionado.
-        </p>
-        {operatingRows.length === 0 ? (
-          <p className="empty-note">Todavía no hay ventas recientes registradas.</p>
-        ) : (
-          <div className="mini-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th className="num-col">Total</th>
-                  <th className="num-col">Nuevo</th>
-                  <th className="num-col">Recompra</th>
-                </tr>
-              </thead>
-              <tbody>
-                {operatingRows.map((row) => (
-                  <tr key={row.date}>
-                    <td>{formatDate(row.date)}</td>
-                    <td className="num-col">{formatCop(row.total_sales)}</td>
-                    <td className="num-col">{formatCop(row.new_client_sales)}</td>
-                    <td className="num-col">{formatCop(row.repeat_sales)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {rollingTotals.total_sales > 0 && (
-          <div className="operational-summary-row">
-            <span className="meta-chip">Rolling 30d {formatCop(rollingTotals.total_sales)}</span>
-            <span className="meta-chip">
-              ROAS real 30d {formatRoas(rollingTotals.real_roas)}
-            </span>
-            <span className="meta-chip">Mes seleccionado {selectedMonthLabel}</span>
           </div>
         )}
       </div>
@@ -1186,34 +1214,24 @@ function ClientSalesTab({
       <div className="card section-block">
         <div className="section-heading"><h2>Ventas reportadas — {selectedMonthLabel}</h2></div>
         <p className="source-note">
-          Esta tabla muestra ventas del mes seleccionado registradas en `daily_sales`.
+          Esta tabla muestra solo fecha y venta del mes seleccionado registradas en ventas diarias.
         </p>
         {orderedSales.length === 0 ? (
           <p className="empty-note">No hay ventas reportadas para el mes seleccionado.</p>
         ) : (
           <div className="table-wrap responsive-card-table">
-            <table className="client-sales-table">
+            <table className="client-sales-table simple-sales-table">
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th className="num-col">Total</th>
-                  <th className="num-col">Nuevo</th>
-                  <th className="num-col">Recompra</th>
-                  <th className="num-col">Físico</th>
-                  <th className="num-col">Online</th>
-                  <th>Observaciones</th>
+                  <th className="num-col">Venta</th>
                 </tr>
               </thead>
               <tbody>
                 {orderedSales.map((sale) => (
                   <tr key={sale.id}>
                     <td data-label="Fecha">{formatDate(sale.date)}</td>
-                    <td className="num-col" data-label="Total">{formatCop(sale.total_sales)}</td>
-                    <td className="num-col" data-label="Nuevo">{formatCop(sale.new_client_sales)}</td>
-                    <td className="num-col" data-label="Recompra">{formatCop(sale.repeat_sales)}</td>
-                    <td className="num-col" data-label="Físico">{formatCop(sale.physical_store_sales)}</td>
-                    <td className="num-col" data-label="Online">{formatCop(sale.online_sales)}</td>
-                    <td className="text-muted" data-label="Observaciones">{sale.observations ?? '—'}</td>
+                    <td className="num-col" data-label="Venta">{formatCop(sale.total_sales)}</td>
                   </tr>
                 ))}
               </tbody>

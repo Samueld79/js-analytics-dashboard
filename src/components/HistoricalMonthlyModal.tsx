@@ -9,7 +9,6 @@ import type {
   SocialMonthlyMetricInput,
 } from '../lib/supabase';
 import { getMonthLabel } from '../utils/monthLabel';
-import { validateDailySale } from '../lib/utils';
 
 type HistoricalAdsInput = Omit<HistoricalMonthlyAdMetricInput, 'client_id'>;
 type HistoricalSalesInput = Omit<HistoricalMonthlySaleInput, 'client_id'>;
@@ -65,11 +64,6 @@ export function HistoricalMonthlyModal({
   });
   const [salesForm, setSalesForm] = useState({
     total_sales: '',
-    new_client_sales: '',
-    repeat_sales: '',
-    physical_store_sales: '',
-    online_sales: '',
-    observations: '',
   });
   const [socialForm, setSocialForm] = useState({
     new_followers: '',
@@ -105,23 +99,12 @@ export function HistoricalMonthlyModal({
     [adsForm],
   );
 
-  const salesValues = useMemo(
-    () => ({
-      total_sales: parseDecimal(salesForm.total_sales),
-      new_client_sales: parseDecimal(salesForm.new_client_sales),
-      repeat_sales: parseDecimal(salesForm.repeat_sales),
-      physical_store_sales: parseDecimal(salesForm.physical_store_sales),
-      online_sales: parseDecimal(salesForm.online_sales),
-    }),
-    [salesForm],
-  );
-
-  const salesValidation = useMemo(() => validateDailySale(salesValues), [salesValues]);
+  const salesTotal = useMemo(() => parseDecimal(salesForm.total_sales), [salesForm.total_sales]);
   const canSaveAds = useMemo(
     () => Boolean(month && Object.values(adsValues).some((value) => (value ?? 0) > 0)),
     [adsValues, month],
   );
-  const canSaveSales = useMemo(() => Boolean(month && salesValues.total_sales > 0), [month, salesValues.total_sales]);
+  const canSaveSales = useMemo(() => Boolean(month && salesTotal > 0), [month, salesTotal]);
   const canSaveSocial = useMemo(
     () =>
       Boolean(
@@ -198,8 +181,12 @@ export function HistoricalMonthlyModal({
 
     const result = await onSaveSales({
       month,
-      ...salesValues,
-      observations: salesForm.observations.trim() || null,
+      total_sales: salesTotal,
+      new_client_sales: 0,
+      repeat_sales: 0,
+      physical_store_sales: 0,
+      online_sales: 0,
+      observations: null,
     });
 
     if (result.error) {
@@ -368,47 +355,20 @@ export function HistoricalMonthlyModal({
                 <h2>Ventas histórico</h2>
               </div>
 
-              <div className="history-fields-grid">
+              <div className="history-fields-grid history-fields-grid-compact">
                 <label className="form-field">
                   <span className="form-label">Ventas totales</span>
                   <input className="form-input" type="number" min="0" step="0.01" value={salesForm.total_sales} onChange={(event) => setSalesField('total_sales', event.target.value)} />
                 </label>
-                <label className="form-field">
-                  <span className="form-label">Cliente nuevo</span>
-                  <input className="form-input" type="number" min="0" step="0.01" value={salesForm.new_client_sales} onChange={(event) => setSalesField('new_client_sales', event.target.value)} />
-                </label>
-                <label className="form-field">
-                  <span className="form-label">Recompra</span>
-                  <input className="form-input" type="number" min="0" step="0.01" value={salesForm.repeat_sales} onChange={(event) => setSalesField('repeat_sales', event.target.value)} />
-                </label>
-                <label className="form-field">
-                  <span className="form-label">Punto físico</span>
-                  <input className="form-input" type="number" min="0" step="0.01" value={salesForm.physical_store_sales} onChange={(event) => setSalesField('physical_store_sales', event.target.value)} />
-                </label>
-                <label className="form-field">
-                  <span className="form-label">Online</span>
-                  <input className="form-input" type="number" min="0" step="0.01" value={salesForm.online_sales} onChange={(event) => setSalesField('online_sales', event.target.value)} />
-                </label>
               </div>
-
-              <label className="form-field">
-                <span className="form-label">Observaciones</span>
-                <textarea
-                  className="form-textarea"
-                  rows={3}
-                  value={salesForm.observations}
-                  onChange={(event) => setSalesField('observations', event.target.value)}
-                  placeholder="Contexto del mes, promociones, cierre contable, etc."
-                />
-              </label>
 
               {salesError && <p className="empty-note">{salesError}</p>}
               {!salesError && salesSuccess && <p className="history-success">{salesSuccess}</p>}
-              {!salesError && !salesSuccess && salesValidation.totalsMismatch && (
-                <p className="empty-note">Cliente nuevo + recompra no coincide con el total. Se guardará igual.</p>
-              )}
-              {!salesError && !salesSuccess && salesValidation.channelsMismatch && (
-                <p className="empty-note">Punto físico + online no coincide con el total. Se guardará igual.</p>
+              {!salesError && !salesSuccess && (
+                <p className="empty-note">
+                  En esta fase el histórico mensual de ventas guarda solo el total. Los demás
+                  campos se registran en cero.
+                </p>
               )}
 
               <div className="history-actions">

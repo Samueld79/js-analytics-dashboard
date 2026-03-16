@@ -14,6 +14,8 @@ import { logActivitySafe } from './activityLog';
 type ListDailySalesParams = {
   clientId?: string;
   days?: number;
+  startDate?: string;
+  endDate?: string;
 };
 
 function getSinceDate(days: number): string {
@@ -38,14 +40,22 @@ function normalizeMoney(value: number): number {
 export async function listDailySales({
   clientId,
   days = 30,
+  startDate,
+  endDate,
 }: ListDailySalesParams = {}): Promise<DailySale[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
-  let query = supabase
-    .from('daily_sales')
-    .select('*')
-    .gte('date', getSinceDate(days))
-    .order('date', { ascending: false });
+  let query = supabase.from('daily_sales').select('*').order('date', { ascending: false });
+
+  if (startDate) {
+    query = query.gte('date', startDate);
+  } else {
+    query = query.gte('date', getSinceDate(days));
+  }
+
+  if (endDate) {
+    query = query.lte('date', endDate);
+  }
 
   if (clientId) query = query.eq('client_id', clientId);
 
@@ -97,17 +107,18 @@ export async function upsertDailySale(
   }
 
   const lastSalesEntryAt = `${sale.date}T23:59:59`;
-  const { error: clientUpdateError } = await supabase
+  void supabase
     .from('clients')
     .update({ last_sales_entry_at: lastSalesEntryAt })
-    .eq('id', sale.client_id);
-
-  if (clientUpdateError) {
-    console.error('[dailySales] update client last_sales_entry_at', clientUpdateError);
-  }
+    .eq('id', sale.client_id)
+    .then(({ error: clientUpdateError }) => {
+      if (clientUpdateError) {
+        console.error('[dailySales] update client last_sales_entry_at', clientUpdateError);
+      }
+    });
 
   if (data) {
-    await logActivitySafe({
+    void logActivitySafe({
       client_id: sale.client_id,
       entity_type: 'daily_sale',
       entity_id: (data as DailySale).id,

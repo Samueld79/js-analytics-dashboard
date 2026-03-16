@@ -229,7 +229,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
     async (sale: DailySaleInput): Promise<ServiceMutationResult<import('../lib/supabase').DailySale>> => {
       const result = await upsertDailySale(sale);
       if (!result.error) {
-        await load();
+        void load();
       }
       return result;
     },

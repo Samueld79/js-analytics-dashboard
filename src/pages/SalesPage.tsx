@@ -1,96 +1,122 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { Plus, TrendingUp } from 'lucide-react';
-import { MonthSelector } from '../components/MonthSelector';
 import { SalesModal } from '../components/SalesModal';
-import { useDashboard } from '../hooks/useDashboard';
+import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import type { Client } from '../lib/supabase';
-import { formatCop, formatDate, formatRoas, sumSales } from '../lib/utils';
-import { getMonthLabel, getMonthKey, listAvailableMonthKeys } from '../utils/monthLabel';
+import {
+  formatCop,
+  formatDate,
+  getDateKey,
+  getMonthStartKey,
+  getYearStartKey,
+  getYesterdayKey,
+  isDateWithinRange,
+  sumSales,
+} from '../lib/utils';
+import { getMonthLabel } from '../utils/monthLabel';
+
+type SalesFilterKey = 'today' | 'yesterday' | 'last7' | 'month' | 'year' | 'custom';
+
+const FILTER_OPTIONS: Array<{ key: SalesFilterKey; label: string }> = [
+  { key: 'today', label: 'Hoy' },
+  { key: 'yesterday', label: 'Ayer' },
+  { key: 'last7', label: 'Últimos 7 días' },
+  { key: 'month', label: 'Mes actual' },
+  { key: 'year', label: 'Año actual' },
+  { key: 'custom', label: 'Rango personalizado' },
+];
+
+function sortByDateDesc(left: { date: string }, right: { date: string }) {
+  return right.date.localeCompare(left.date);
+}
+
+function getRangeBounds(filter: SalesFilterKey, today: string, customFrom: string, customTo: string) {
+  if (filter === 'today') return { startDate: today, endDate: today, label: 'Hoy' };
+  if (filter === 'yesterday') {
+    const yesterday = getYesterdayKey();
+    return { startDate: yesterday, endDate: yesterday, label: 'Ayer' };
+  }
+  if (filter === 'last7') {
+    const startDate = getDateKey(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
+    return { startDate, endDate: today, label: 'Últimos 7 días' };
+  }
+  if (filter === 'month') {
+    return { startDate: getMonthStartKey(), endDate: today, label: `Mes actual · ${getMonthLabel(today)}` };
+  }
+  if (filter === 'year') {
+    const year = today.slice(0, 4);
+    return { startDate: getYearStartKey(), endDate: today, label: `Año actual · ${year}` };
+  }
+
+  return {
+    startDate: customFrom || undefined,
+    endDate: customTo || undefined,
+    label:
+      customFrom && customTo
+        ? `Rango personalizado · ${formatDate(customFrom)} a ${formatDate(customTo)}`
+        : 'Rango personalizado',
+  };
+}
 
 export function SalesPage() {
-  const { clients, dailyKpis, monthlyKpis, reload: reloadDashboard } = useDashboard(30);
-  const { sales, addSale, reload: reloadSales } = useDailySales(undefined, 400);
+  const { clients, loading: clientsLoading } = useClients();
+  const { sales, addSale, loading: salesLoading } = useDailySales(undefined, 1200);
   const [search, setSearch] = useState('');
+  const [filterKey, setFilterKey] = useState<SalesFilterKey>('month');
+  const [quickClientId, setQuickClientId] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState('');
 
-  const yesterday = useMemo(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 1);
-    return date.toISOString().split('T')[0];
-  }, []);
+  const today = getDateKey();
+  const monthStart = getMonthStartKey();
+  const yearStart = getYearStartKey();
+  const [customFrom, setCustomFrom] = useState(monthStart);
+  const [customTo, setCustomTo] = useState(today);
 
-  const availableMonths = useMemo(
-    () => listAvailableMonthKeys([...sales.map((sale) => sale.date), ...monthlyKpis.map((row) => row.month)]),
-    [monthlyKpis, sales],
+  const clientMap = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
+  const orderedSales = useMemo(() => [...sales].sort(sortByDateDesc), [sales]);
+  const todaySales = useMemo(
+    () => orderedSales.filter((sale) => isDateWithinRange(sale.date, today, today)),
+    [orderedSales, today],
   );
-  const fallbackMonth = availableMonths[0] ?? new Date().toISOString().slice(0, 7);
-
-  useEffect(() => {
-    if (!selectedMonth) {
-      setSelectedMonth(fallbackMonth);
-      return;
-    }
-
-    if (availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
-      setSelectedMonth(availableMonths[0]);
-    }
-  }, [availableMonths, fallbackMonth, selectedMonth]);
-
-  const activeMonth = selectedMonth || fallbackMonth;
-  const selectedMonthLabel = getMonthLabel(activeMonth);
   const monthSales = useMemo(
-    () => sales.filter((sale) => getMonthKey(sale.date) === activeMonth),
-    [activeMonth, sales],
+    () => orderedSales.filter((sale) => isDateWithinRange(sale.date, monthStart, today)),
+    [monthStart, orderedSales, today],
   );
-  const monthTotals = sumSales(monthSales);
+  const yearSales = useMemo(
+    () => orderedSales.filter((sale) => isDateWithinRange(sale.date, yearStart, today)),
+    [orderedSales, today, yearStart],
+  );
 
-  const latestSalesByClient = useMemo(() => {
-    const latest = new Map<string, (typeof sales)[number]>();
-    const ordered = [...sales].sort((a, b) => b.date.localeCompare(a.date));
+  const activeRange = useMemo(
+    () => getRangeBounds(filterKey, today, customFrom, customTo),
+    [customFrom, customTo, filterKey, today],
+  );
 
-    for (const sale of ordered) {
-      if (!latest.has(sale.client_id)) latest.set(sale.client_id, sale);
-    }
+  const filteredSales = useMemo(() => {
+    const term = search.trim().toLowerCase();
 
-    return latest;
-  }, [sales]);
+    return orderedSales.filter((sale) => {
+      const client = clientMap.get(sale.client_id);
+      const matchesSearch =
+        !term ||
+        client?.name.toLowerCase().includes(term) ||
+        client?.niche?.toLowerCase().includes(term) ||
+        sale.date.includes(term);
 
-  const rows = clients
-    .filter(
-      (client) =>
-        client.name.toLowerCase().includes(search.toLowerCase()) ||
-        (client.niche ?? '').toLowerCase().includes(search.toLowerCase()),
-    )
-    .map((client) => {
-      const monthlyRow =
-        monthlyKpis.find(
-          (row) => row.client_id === client.id && getMonthKey(row.month) === activeMonth,
-        ) ?? null;
-      const clientMonthSales = monthSales.filter((sale) => sale.client_id === client.id);
-      const salesTotals = sumSales(clientMonthSales);
-      const yesterdayRow =
-        dailyKpis.find((row) => row.client_id === client.id && row.date === yesterday) ?? null;
-      const latestSale = latestSalesByClient.get(client.id) ?? null;
-      const pendingYesterday = client.status === 'active' && (yesterdayRow?.total_sales ?? 0) <= 0;
-
-      return {
-        client,
-        latestSale,
-        pendingYesterday,
-        spend: monthlyRow?.spend ?? 0,
-        totalSales: salesTotals.total,
-        newClientSales: salesTotals.newClient,
-        repeatSales: salesTotals.repeat,
-        realRoas:
-          monthlyRow?.real_roas ?? ((monthlyRow?.spend ?? 0) > 0 ? salesTotals.total / (monthlyRow?.spend ?? 0) : 0),
-      };
+      return (
+        matchesSearch &&
+        isDateWithinRange(sale.date, activeRange.startDate, activeRange.endDate)
+      );
     });
+  }, [activeRange.endDate, activeRange.startDate, clientMap, orderedSales, search]);
 
-  const pendingClients = rows.filter((row) => row.pendingYesterday).length;
-  const clientsWithSales = rows.filter((row) => row.totalSales > 0).length;
+  const filteredTotal = useMemo(() => sumSales(filteredSales).total, [filteredSales]);
+  const todayTotal = useMemo(() => sumSales(todaySales).total, [todaySales]);
+  const monthTotal = useMemo(() => sumSales(monthSales).total, [monthSales]);
+  const yearTotal = useMemo(() => sumSales(yearSales).total, [yearSales]);
+  const currentMonthLabel = getMonthLabel(today);
+  const registerClient = selectedClient;
 
   return (
     <div className="page-content">
@@ -104,7 +130,7 @@ export function SalesPage() {
             Ventas
           </h1>
           <p className="page-subtitle">
-            Ventas reportadas del mes seleccionado · {selectedMonthLabel}
+            Registro simple sobre ventas diarias · solo fecha y venta
           </p>
         </div>
       </div>
@@ -113,130 +139,174 @@ export function SalesPage() {
         <div className="period-toolbar">
           <div className="period-toolbar-copy">
             <div className="section-heading">
-              <h2>Periodo visible</h2>
+              <h2>Captura simple</h2>
             </div>
             <p className="source-note">
-              Esta vista usa ventas reportadas en `daily_sales` para el mes seleccionado. El estado
-              "pendiente ayer" sigue siendo operativo y actual.
+              Esta fase registra solo fecha y venta. Los demás campos de ventas diarias se guardan
+              en cero para reducir fricción operativa.
             </p>
             <div className="period-chip-row">
-              <span className="meta-chip">{selectedMonthLabel}</span>
-              <span className="meta-chip">Ventas reportadas</span>
-              <span className="meta-chip">{clientsWithSales} clientes con ventas en el mes</span>
+              <span className="meta-chip">Mes actual · {currentMonthLabel}</span>
+              <span className="meta-chip">Año actual · {today.slice(0, 4)}</span>
+              <span className="meta-chip">Fuente oficial · ventas diarias</span>
             </div>
           </div>
-          <MonthSelector
-            label="Mes visible"
-            value={activeMonth}
-            options={availableMonths.length > 0 ? availableMonths : [fallbackMonth]}
-            helper="Se listan meses con ventas reportadas o con consolidado mensual disponible."
-            onChange={setSelectedMonth}
-          />
+
+          <div className="sales-quick-actions">
+            <label className="form-field">
+              <span className="form-label">Cliente para registrar</span>
+              <select
+                className="form-input"
+                value={quickClientId}
+                onChange={(event) => setQuickClientId(event.target.value)}
+              >
+                <option value="">Selecciona un cliente</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="btn-primary"
+              disabled={!quickClientId || clientsLoading}
+              onClick={() => {
+                const nextClient = clients.find((client) => client.id === quickClientId) ?? null;
+                setSelectedClient(nextClient);
+              }}
+            >
+              <Plus size={14} />
+              Registrar venta
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="search-bar-wrap">
-        <input
-          className="search-input"
-          placeholder="Buscar cliente..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </div>
-
       <div className="kpi-row">
-        <SalesKpi label="Ventas del mes" value={formatCop(monthTotals.total)} />
-        <SalesKpi label="Nuevo cliente" value={formatCop(monthTotals.newClient)} />
-        <SalesKpi label="Recompra" value={formatCop(monthTotals.repeat)} />
-        <SalesKpi label="Clientes con ventas" value={String(clientsWithSales)} />
-        <SalesKpi
-          label="Clientes pendientes ayer"
-          value={String(pendingClients)}
-          highlight={pendingClients > 0 ? 'amber' : 'green'}
-        />
+        <SalesKpi label="Ventas de hoy" value={formatCop(todayTotal)} />
+        <SalesKpi label="Ventas del mes actual" value={formatCop(monthTotal)} />
+        <SalesKpi label="Ventas del año actual" value={formatCop(yearTotal)} />
+        <SalesKpi label="Registros del mes actual" value={String(monthSales.length)} />
+        <SalesKpi label="Registros del año actual" value={String(yearSales.length)} />
       </div>
 
       <div className="card section-block">
         <div className="section-heading">
-          <h2>Seguimiento por cliente</h2>
+          <h2>Filtro de ventas</h2>
+        </div>
+        <div className="sales-filter-layout">
+          <div className="sales-filter-chip-row">
+            {FILTER_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                className={`filter-chip-button ${filterKey === option.key ? 'active' : ''}`}
+                onClick={() => setFilterKey(option.key)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="sales-filter-tools">
+            {filterKey === 'custom' && (
+              <div className="sales-custom-range">
+                <label className="form-field">
+                  <span className="form-label">Desde</span>
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={customFrom}
+                    onChange={(event) => setCustomFrom(event.target.value)}
+                  />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Hasta</span>
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={customTo}
+                    onChange={(event) => setCustomTo(event.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+
+            <label className="form-field sales-search-field">
+              <span className="form-label">Buscar</span>
+              <input
+                className="search-input"
+                placeholder="Cliente o fecha..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="period-chip-row">
+          <span className="meta-chip">{activeRange.label}</span>
+          <span className="meta-chip">{filteredSales.length} registros visibles</span>
+          <span className="meta-chip">Total visible {formatCop(filteredTotal)}</span>
+        </div>
+      </div>
+
+      <div className="card section-block">
+        <div className="section-heading">
+          <h2>Registros de ventas</h2>
         </div>
         <p className="source-note">
-          Ventas del mes seleccionado con referencia a Ads del mismo mes cuando existan métricas.
+          Vista simple del rango seleccionado. En desktop se muestra como tabla y en móvil baja a
+          cards responsivas.
         </p>
-        {rows.length === 0 ? (
-          <p className="empty-note">No hay clientes o ventas registradas todavía.</p>
+        {salesLoading ? (
+          <p className="empty-note">Cargando ventas...</p>
+        ) : filteredSales.length === 0 ? (
+          <p className="empty-note">No hay ventas para el filtro activo.</p>
         ) : (
           <div className="table-wrap responsive-card-table">
-            <table className="sales-tracking-table">
+            <table className="sales-simple-table">
               <thead>
                 <tr>
+                  <th>Fecha</th>
                   <th>Cliente</th>
-                  <th>Última carga</th>
-                  <th className="num-col">Ventas mes</th>
-                  <th className="num-col">Nuevo</th>
-                  <th className="num-col">Recompra</th>
-                  <th className="num-col">Ads mes</th>
-                  <th className="num-col">ROAS Real</th>
-                  <th>Estado reciente</th>
-                  <th>Acción</th>
+                  <th className="num-col">Venta</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(
-                  ({ client, latestSale, totalSales, newClientSales, repeatSales, spend, realRoas, pendingYesterday }) => (
-                    <tr key={client.id}>
+                {filteredSales.map((sale) => {
+                  const client = clientMap.get(sale.client_id);
+
+                  return (
+                    <tr key={sale.id}>
+                      <td data-label="Fecha">{formatDate(sale.date)}</td>
                       <td data-label="Cliente">
                         <div className="table-primary-cell">
-                          <strong>{client.name}</strong>
-                          <span className="table-secondary-note">{client.niche ?? 'Sin nicho'}</span>
+                          <strong>{client?.name ?? 'Cliente'}</strong>
+                          <span className="table-secondary-note">{client?.niche ?? 'Sin nicho'}</span>
                         </div>
                       </td>
-                      <td data-label="Última carga">{latestSale ? formatDate(latestSale.date) : '—'}</td>
-                      <td className="num-col" data-label="Ventas mes">{formatCop(totalSales)}</td>
-                      <td className="num-col" data-label="Nuevo">{formatCop(newClientSales)}</td>
-                      <td className="num-col" data-label="Recompra">{formatCop(repeatSales)}</td>
-                      <td className="num-col" data-label="Ads mes">{formatCop(spend)}</td>
-                      <td
-                        data-label="ROAS Real"
-                        className={`num-col ${
-                          realRoas >= 3 ? 'text-green' : realRoas >= 2 ? 'text-amber' : 'text-red'
-                        }`}
-                      >
-                        {spend > 0 ? formatRoas(realRoas) : '—'}
-                      </td>
-                      <td data-label="Estado reciente">
-                        <span className={`status-pill status-${pendingYesterday ? 'amber' : 'green'}`}>
-                          {pendingYesterday ? 'Pendiente ayer' : 'Al día'}
-                        </span>
-                      </td>
-                      <td data-label="Acción">
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          <button className="btn-secondary" onClick={() => setSelectedClient(client)}>
-                            <Plus size={14} /> Registrar
-                          </button>
-                          <Link to={`/clients/${client.id}`} className="btn-ghost">
-                            Ver cliente
-                          </Link>
-                        </div>
+                      <td className="num-col" data-label="Venta">
+                        {formatCop(sale.total_sales)}
                       </td>
                     </tr>
-                  ),
-                )}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {selectedClient && (
+      {registerClient && (
         <SalesModal
-          clientId={selectedClient.id}
-          clientName={selectedClient.name}
+          clientId={registerClient.id}
+          clientName={registerClient.name}
           onClose={() => setSelectedClient(null)}
           onSave={async (data) => {
             const result = await addSale(data);
             if (!result.error) {
-              await Promise.all([reloadSales(), reloadDashboard()]);
               setSelectedClient(null);
             }
             return result;
@@ -250,16 +320,14 @@ export function SalesPage() {
 function SalesKpi({
   label,
   value,
-  highlight,
 }: {
   label: string;
   value: string;
-  highlight?: 'green' | 'amber';
 }) {
   return (
     <div className="kpi-box">
       <div className="kpi-box-label">{label}</div>
-      <div className={`kpi-box-value ${highlight ? `text-${highlight}` : ''}`}>{value}</div>
+      <div className="kpi-box-value">{value}</div>
     </div>
   );
 }

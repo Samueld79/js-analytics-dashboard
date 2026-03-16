@@ -3,7 +3,6 @@ import type {
   ClientDailyOperatingKpi,
   ClientMonthlyOperatingKpi,
   DailySale,
-  DailySaleValidation,
   MetaSyncStatus,
   SocialMonthlyMetric,
 } from '../lib/supabase';
@@ -57,6 +56,37 @@ export function getMonthEndDate(monthKey: string): string {
   }
 
   return new Date(year, month, 0).toISOString().split('T')[0];
+}
+
+export function getDateKey(date = new Date()): string {
+  const current = new Date(date);
+  current.setHours(12, 0, 0, 0);
+  return current.toISOString().split('T')[0];
+}
+
+export function getYesterdayKey(date = new Date()): string {
+  const current = new Date(date);
+  current.setDate(current.getDate() - 1);
+  return getDateKey(current);
+}
+
+export function getMonthStartKey(date = new Date()): string {
+  const current = new Date(date);
+  current.setDate(1);
+  return getDateKey(current);
+}
+
+export function getYearStartKey(date = new Date()): string {
+  const current = new Date(date);
+  current.setMonth(0, 1);
+  return getDateKey(current);
+}
+
+export function isDateWithinRange(date: string, startDate?: string, endDate?: string): boolean {
+  if (!date) return false;
+  if (startDate && date < startDate) return false;
+  if (endDate && date > endDate) return false;
+  return true;
 }
 
 export const sumMetrics = (metrics: AdMetric[]) => ({
@@ -113,24 +143,6 @@ export const sumOperatingKpis = (rows: OperatingKpiRow[]) => {
     real_roas: spend > 0 ? totalSales / spend : 0,
   };
 };
-
-export function validateDailySale(values: {
-  total_sales: number;
-  new_client_sales: number;
-  repeat_sales: number;
-  physical_store_sales: number;
-  online_sales: number;
-}): DailySaleValidation {
-  const totalsBreakdown = values.new_client_sales + values.repeat_sales;
-  const channelsBreakdown = values.physical_store_sales + values.online_sales;
-  const hasTotalsBreakdown = values.new_client_sales > 0 || values.repeat_sales > 0;
-  const hasChannelsBreakdown = values.physical_store_sales > 0 || values.online_sales > 0;
-
-  return {
-    totalsMismatch: hasTotalsBreakdown && totalsBreakdown !== values.total_sales,
-    channelsMismatch: hasChannelsBreakdown && channelsBreakdown !== values.total_sales,
-  };
-}
 
 export const last7Days = (items: { date: string }[]) => {
   const cutoff = new Date();

@@ -267,11 +267,6 @@ export type SocialMonthlyMetricInput = {
   created_by?: string | null;
 };
 
-export type DailySaleValidation = {
-  totalsMismatch: boolean;
-  channelsMismatch: boolean;
-};
-
 export type CampaignEntry = {
   name: string;
   objective?: string;
