@@ -142,12 +142,20 @@ export const last30Days = (items: { date: string }[]) => {
 };
 
 export function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00');
+  if (!dateStr) return '—';
+
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (!Number.isFinite(d.getTime())) return '—';
+
   return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
 }
 
 export function formatDateTime(dateStr: string): string {
+  if (!dateStr) return '—';
+
   const d = new Date(dateStr);
+  if (!Number.isFinite(d.getTime())) return '—';
+
   return d.toLocaleDateString('es-CO', {
     day: 'numeric',
     month: 'short',

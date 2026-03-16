@@ -8,6 +8,7 @@ import type {
   OperationalIssueType,
   Task,
 } from '../lib/supabase';
+import { toFiniteNumber } from '../lib/utils';
 import {
   createCriticalOpenAlertsAlert,
   createLowRealRoasAlert,
@@ -69,8 +70,8 @@ function daysBetween(dateValue?: string | null): number | null {
 }
 
 function summarizeRealRoas(rows: ClientDailyOperatingKpi[]): number {
-  const spend = rows.reduce((sum, row) => sum + row.spend, 0);
-  const sales = rows.reduce((sum, row) => sum + row.total_sales, 0);
+  const spend = rows.reduce((sum, row) => sum + toFiniteNumber(row.spend), 0);
+  const sales = rows.reduce((sum, row) => sum + toFiniteNumber(row.total_sales), 0);
   return spend > 0 ? sales / spend : 0;
 }
 
@@ -97,7 +98,9 @@ function buildClientOperationalIssues(params: {
   const clientAlerts = params.alerts.filter((alert) => alert.client_id === params.client.id);
   const clientTasks = params.tasks.filter((task) => task.client_id === params.client.id);
 
-  const hasSalesYesterday = clientSales.some((sale) => sale.date === yesterday && sale.total_sales > 0);
+  const hasSalesYesterday = clientSales.some(
+    (sale) => sale.date === yesterday && toFiniteNumber(sale.total_sales) > 0,
+  );
   if (!hasSalesYesterday) {
     issues.push(
       buildIssue({
@@ -188,7 +191,9 @@ function buildClientOperationalIssues(params: {
   }
 
   const recentKpis = clientKpis.filter((row) => row.date >= getSinceDate(7));
-  const realRoas = summarizeRealRoas(recentKpis.filter((row) => row.spend > 0));
+  const realRoas = summarizeRealRoas(
+    recentKpis.filter((row) => toFiniteNumber(row.spend) > 0),
+  );
   if (realRoas > 0 && realRoas < REAL_ROAS_THRESHOLD) {
     issues.push(
       buildIssue({

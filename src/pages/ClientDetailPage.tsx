@@ -49,6 +49,33 @@ import type {
 
 type Tab = 'overview' | 'metrics' | 'sales' | 'strategies' | 'tasks' | 'files';
 
+function sortKey(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function compareDesc(left: unknown, right: unknown): number {
+  return sortKey(right).localeCompare(sortKey(left));
+}
+
+function sectionLabel(section: string): string {
+  const labels: Record<string, string> = {
+    client: 'cliente',
+    metrics: 'Ads',
+    dailyKpis: 'KPI diarios',
+    monthlyKpis: 'histórico mensual',
+    sales: 'ventas',
+    strategies: 'estrategias',
+    tasks: 'tareas',
+    alerts: 'alertas',
+    files: 'archivos',
+    activityLog: 'actividad',
+    meta: 'estado Meta',
+    operational: 'salud operativa',
+  };
+
+  return labels[section] ?? section;
+}
+
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const {
@@ -66,6 +93,8 @@ export function ClientDetailPage() {
     issues,
     meta,
     loading,
+    error,
+    sectionErrors,
     addSale,
     addHistoricalAds,
     addHistoricalSales,
@@ -79,47 +108,18 @@ export function ClientDetailPage() {
   const [showHistoricalModal, setShowHistoricalModal] = useState(false);
 
   const recentOperatingKpis = useMemo(
-    () => [...dailyKpis].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 7),
+    () => [...dailyKpis].sort((a, b) => compareDesc(a.date, b.date)).slice(0, 7),
     [dailyKpis],
   );
   const monthlyHistory = useMemo(
-    () => [...monthlyKpis].sort((a, b) => b.month.localeCompare(a.month)).slice(0, 6),
+    () => [...monthlyKpis].sort((a, b) => compareDesc(a.month, b.month)).slice(0, 6),
     [monthlyKpis],
   );
 
   const canRegisterSales = client ? canWriteSales(client.id) : false;
   const canLoadHistory = role === 'admin';
-
-  if (loading) {
-    return (
-      <div className="page-content">
-        <div className="empty-state">
-          <h3>Cargando cliente...</h3>
-        </div>
-      </div>
-    );
-  }
-
-  if (!client) {
-    return (
-      <div className="page-content">
-        <div className="empty-state">
-          <h3>Cliente no encontrado</h3>
-          <p>Verifica que el cliente exista en Supabase y que tengas acceso a su workspace.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const operatingTotals = sumOperatingKpis(dailyKpis);
-  const pendingTasks = tasks.filter((task) => task.status === 'pending');
-  const criticalAlerts = alerts.filter(
-    (alert) => alert.severity === 'critical' && ['unread', 'read'].includes(alert.status),
-  );
-  const metaStatus = meta?.sync_status ?? 'no_data';
-  const metaStatusValueClass =
-    metaStatus === 'ok' ? 'text-green' : metaStatus === 'stale' ? 'text-amber' : '';
-
+  const isResolvedClient =
+    Boolean(client) && Boolean(id) && (client?.id === id || client?.slug === id);
   const allTabs: { key: Tab; label: string; icon: ReactNode }[] = [
     { key: 'overview', label: 'Resumen', icon: <BarChart2 size={14} /> },
     { key: 'metrics', label: 'Ads', icon: <TrendingUp size={14} /> },
@@ -138,6 +138,40 @@ export function ClientDetailPage() {
     }
   }, [tab, tabs]);
 
+  if (loading && !isResolvedClient) {
+    return (
+      <div className="page-content">
+        <div className="empty-state">
+          <h3>Cargando cliente...</h3>
+        </div>
+      </div>
+    );
+  }
+
+  if (!client) {
+    return (
+      <div className="page-content">
+        <div className="empty-state">
+          <h3>{error ? 'No se pudo cargar el cliente' : 'Cliente no encontrado'}</h3>
+          <p>
+            {error
+              ? error
+              : 'Verifica que el cliente exista en Supabase y que tengas acceso a su workspace.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const operatingTotals = sumOperatingKpis(dailyKpis);
+  const pendingTasks = tasks.filter((task) => task.status === 'pending');
+  const criticalAlerts = alerts.filter(
+    (alert) => alert.severity === 'critical' && ['unread', 'read'].includes(alert.status),
+  );
+  const metaStatus = meta?.sync_status ?? 'no_data';
+  const metaStatusValueClass =
+    metaStatus === 'ok' ? 'text-green' : metaStatus === 'stale' ? 'text-amber' : '';
+
   return (
     <div className="page-content">
       <div className="page-header">
@@ -149,7 +183,7 @@ export function ClientDetailPage() {
           )}
           <div className="client-page-title">
             <h1 className="page-title">{client.name}</h1>
-            <span className="client-niche-tag">{client.niche}</span>
+            <span className="client-niche-tag">{client.niche || 'Sin nicho'}</span>
           </div>
           {client.main_city && <span className="meta-chip"><MapPin size={11} /> {client.main_city}</span>}
           {client.drive_folder_url && (
@@ -180,6 +214,24 @@ export function ClientDetailPage() {
 
       {isInternal && (health || criticalAlerts.length > 0) && (
         <ClientOperationalBanner health={health} issues={issues} criticalAlerts={criticalAlerts} />
+      )}
+
+      {sectionErrors.length > 0 && (
+        <div className="card section-block workspace-warning-banner">
+          <div className="section-heading">
+            <h2>Vista parcial del cliente</h2>
+          </div>
+          <p className="workspace-warning-copy">
+            Algunas secciones no cargaron correctamente. El resto del workspace sigue disponible.
+          </p>
+          <div className="workspace-warning-list">
+            {sectionErrors.map((entry, index) => (
+              <span key={`${entry.section}-${index}`} className="meta-chip">
+                {sectionLabel(entry.section)}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="kpi-strip">
@@ -433,38 +485,41 @@ function ClientOverview({
       </div>
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Histórico mensual</h2></div>
+        <div className="section-heading"><h2>Histórico mensual consolidado</h2></div>
         {monthlyRows.length === 0 ? (
           <p className="empty-note">Todavía no hay meses consolidados para este cliente.</p>
         ) : (
-          <div className="mini-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Mes</th>
-                  <th className="num-col">Ads</th>
-                  <th className="num-col">ROAS Ads</th>
-                  <th className="num-col">Ventas</th>
-                  <th className="num-col">ROAS Real</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyRows.map((row) => (
-                  <tr key={`${row.client_id}-${row.month}`}>
-                    <td>{getMonthLabel(row.month)}</td>
-                    <td className="num-col">{formatCop(row.spend)}</td>
-                    <td className={`num-col ${row.ad_roas >= 3 ? 'text-green' : row.ad_roas >= 2 ? 'text-amber' : 'text-red'}`}>
-                      {formatRoas(row.ad_roas)}
-                    </td>
-                    <td className="num-col">{formatCop(row.total_sales)}</td>
-                    <td className={`num-col ${row.real_roas >= 3 ? 'text-green' : row.real_roas >= 2 ? 'text-amber' : 'text-red'}`}>
-                      {formatRoas(row.real_roas)}
-                    </td>
+          <>
+            <p className="empty-note">Meses cerrados, del más reciente al más antiguo.</p>
+            <div className="mini-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mes</th>
+                    <th className="num-col">Ads</th>
+                    <th className="num-col">ROAS Ads</th>
+                    <th className="num-col">Ventas</th>
+                    <th className="num-col">ROAS Real</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {monthlyRows.map((row) => (
+                    <tr key={`${row.client_id}-${row.month}`}>
+                      <td>{getMonthLabel(row.month)}</td>
+                      <td className="num-col">{formatCop(row.spend)}</td>
+                      <td className={`num-col ${row.ad_roas >= 3 ? 'text-green' : row.ad_roas >= 2 ? 'text-amber' : 'text-red'}`}>
+                        {formatRoas(row.ad_roas)}
+                      </td>
+                      <td className="num-col">{formatCop(row.total_sales)}</td>
+                      <td className={`num-col ${row.real_roas >= 3 ? 'text-green' : row.real_roas >= 2 ? 'text-amber' : 'text-red'}`}>
+                        {formatRoas(row.real_roas)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -630,7 +685,7 @@ function MetricBox({
 }
 
 function ClientMetricsTab({ metrics }: { metrics: AdMetric[] }) {
-  const orderedMetrics = [...metrics].sort((a, b) => b.date.localeCompare(a.date));
+  const orderedMetrics = [...metrics].sort((a, b) => compareDesc(a.date, b.date));
 
   return (
     <div className="tab-content">
@@ -731,7 +786,7 @@ class ClientDetailRenderBoundary extends Component<
 }
 
 function ClientSalesTab({ sales }: { sales: DailySale[] }) {
-  const orderedSales = [...sales].sort((a, b) => b.date.localeCompare(a.date));
+  const orderedSales = [...sales].sort((a, b) => compareDesc(a.date, b.date));
 
   return (
     <div className="tab-content">
@@ -811,7 +866,9 @@ function ClientStrategiesTab({
                   {statusLabel(strategy.status)}
                 </span>
               </div>
-              {strategy.ai_summary && <p className="strategy-summary-preview">{strategy.ai_summary.slice(0, 160)}…</p>}
+              {typeof strategy.ai_summary === 'string' && strategy.ai_summary.trim() && (
+                <p className="strategy-summary-preview">{strategy.ai_summary.slice(0, 160)}…</p>
+              )}
               {strategy.monthly_budget && <span className="meta-chip">Presupuesto: {formatCop(strategy.monthly_budget)}</span>}
             </div>
           ))}

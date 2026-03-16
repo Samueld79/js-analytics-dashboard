@@ -259,6 +259,10 @@ export function AIAgentPage() {
       </div>
 
       <div className="card section-block ai-client-selector">
+        <div className="section-heading"><h2>Contexto del cliente</h2></div>
+        <p className="ai-helper-text">
+          Selecciona la empresa antes de estructurar una estrategia o consultar memoria.
+        </p>
         <label className="form-label">Selecciona el cliente</label>
         <select className="form-select" value={selectedClient} onChange={(event) => setClient(event.target.value)}>
           <option value="">— Seleccionar cliente —</option>
@@ -306,6 +310,9 @@ export function AIAgentPage() {
         <div className="ai-workspace">
           <div className="ai-input-panel card section-block">
             <div className="section-heading"><h2>Texto libre del estratega</h2></div>
+            <p className="ai-helper-text">
+              Pega el brief, cambios del mes, ajustes de campañas o cualquier nota operativa del estratega.
+            </p>
             <textarea
               className="ai-textarea"
               rows={10}
@@ -538,6 +545,12 @@ export function AIAgentPage() {
 
       {mode === 'query' && (
         <div className="ai-chat card section-block">
+          <div className="ai-chat-header">
+            <div className="section-heading"><h2>Memoria del cliente</h2></div>
+            <p className="ai-helper-text">
+              Consulta aprendizajes, campañas usadas, públicos previos y decisiones recientes.
+            </p>
+          </div>
           <div className="chat-history">
             {chatHistory.length === 0 && (
               <div className="chat-placeholder">

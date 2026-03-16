@@ -31,6 +31,25 @@ import { buildOperationalSnapshot } from '../services/operationalChecks';
 import { listStrategies } from '../services/strategies';
 import { listTasks, updateTask } from '../services/tasks';
 
+type WorkspaceSection =
+  | 'client'
+  | 'metrics'
+  | 'dailyKpis'
+  | 'monthlyKpis'
+  | 'sales'
+  | 'strategies'
+  | 'tasks'
+  | 'alerts'
+  | 'files'
+  | 'activityLog'
+  | 'meta'
+  | 'operational';
+
+export type WorkspaceSectionError = {
+  section: WorkspaceSection;
+  message: string;
+};
+
 type WorkspaceState = {
   client: Client | null;
   metrics: import('../lib/supabase').AdMetric[];
@@ -68,30 +87,30 @@ export function useClientWorkspace(clientId?: string, days = 30) {
   const [data, setData] = useState<WorkspaceState>(EMPTY_WORKSPACE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sectionErrors, setSectionErrors] = useState<WorkspaceSectionError[]>([]);
 
   const load = useCallback(async () => {
     if (!clientId) {
       setData(EMPTY_WORKSPACE);
+      setError(null);
+      setSectionErrors([]);
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    setError(null);
+    setSectionErrors([]);
     try {
-      const [
-        client,
-        metrics,
-        dailyKpis,
-        monthlyKpis,
-        sales,
-        strategies,
-        tasks,
-        alerts,
-        files,
-        activityLog,
-        syncRows,
-      ] = await Promise.all([
-        getClientByIdOrSlug(clientId),
+      const client = await getClientByIdOrSlug(clientId);
+      if (!client) {
+        setData(EMPTY_WORKSPACE);
+        setError(null);
+        setSectionErrors([]);
+        return;
+      }
+
+      const results = await Promise.allSettled([
         listAdMetrics({ clientId, days }),
         listDailyOperatingKpis({ clientId, days }),
         listMonthlyOperatingKpis({ clientId, monthsBack: 6 }),
@@ -102,23 +121,66 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         listClientFiles({ clientId }),
         isInternal ? listActivityLog({ clientId, limit: 14 }) : Promise.resolve([]),
         listMetaAccountSyncRows({ clientId }),
-      ]);
+      ] as const);
 
-      const operationalSnapshot = buildOperationalSnapshot({
-        clients: client ? [client] : [],
-        dailySales: sales,
-        dailyKpis,
-        alerts,
-        tasks,
-      });
-      const health = client ? operationalSnapshot.healthByClient[client.id] ?? null : null;
-      const issues = client ? operationalSnapshot.issuesByClient[client.id] ?? [] : [];
-      const metaByClient = buildClientMetaOverviewByClient({
-        clientIds: client ? [client.id] : clientId ? [clientId] : [],
-        monthlyKpis,
-        syncRows,
-      });
-      const meta = client ? metaByClient[client.id] ?? null : metaByClient[clientId] ?? null;
+      const nextSectionErrors: WorkspaceSectionError[] = [];
+      const readResult = <T,>(
+        index: number,
+        section: WorkspaceSection,
+        fallback: T,
+      ): T => {
+        const result = results[index];
+        if (result.status === 'fulfilled') return result.value as T;
+
+        const message =
+          result.reason instanceof Error ? result.reason.message : `No se pudo cargar ${section}.`;
+        nextSectionErrors.push({ section, message });
+        return fallback;
+      };
+
+      const metrics = readResult(0, 'metrics', [] as WorkspaceState['metrics']);
+      const dailyKpis = readResult(1, 'dailyKpis', [] as WorkspaceState['dailyKpis']);
+      const monthlyKpis = readResult(2, 'monthlyKpis', [] as WorkspaceState['monthlyKpis']);
+      const sales = readResult(3, 'sales', [] as WorkspaceState['sales']);
+      const strategies = readResult(4, 'strategies', [] as WorkspaceState['strategies']);
+      const tasks = readResult(5, 'tasks', [] as WorkspaceState['tasks']);
+      const alerts = readResult(6, 'alerts', [] as WorkspaceState['alerts']);
+      const files = readResult(7, 'files', [] as WorkspaceState['files']);
+      const activityLog = readResult(8, 'activityLog', [] as WorkspaceState['activityLog']);
+      const syncRows = readResult(9, 'meta', []);
+
+      let health: ClientHealthScore | null = null;
+      let issues: OperationalIssue[] = [];
+
+      try {
+        const operationalSnapshot = buildOperationalSnapshot({
+          clients: [client],
+          dailySales: sales,
+          dailyKpis,
+          alerts,
+          tasks,
+        });
+        health = operationalSnapshot.healthByClient[client.id] ?? null;
+        issues = operationalSnapshot.issuesByClient[client.id] ?? [];
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'No se pudo construir la salud operativa.';
+        nextSectionErrors.push({ section: 'operational', message });
+      }
+
+      let meta: ClientMetaOverview | null = null;
+      try {
+        const metaByClient = buildClientMetaOverviewByClient({
+          clientIds: [client.id],
+          monthlyKpis,
+          syncRows,
+        });
+        meta = metaByClient[client.id] ?? null;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'No se pudo construir el estado Meta.';
+        nextSectionErrors.push({ section: 'meta', message });
+      }
 
       setData({
         client,
@@ -136,10 +198,12 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         meta,
       });
       setError(null);
+      setSectionErrors(nextSectionErrors);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo cargar el workspace.';
       setError(message);
       setData(EMPTY_WORKSPACE);
+      setSectionErrors([{ section: 'client', message }]);
     } finally {
       setLoading(false);
     }
@@ -229,6 +293,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
     ...data,
     loading,
     error,
+    sectionErrors,
     reload: load,
     addSale,
     addHistoricalAds,
