@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAdMetrics } from '../hooks/useData';
 import { useClients } from '../hooks/useClients';
-import { formatCop, formatNumber, formatRoas, sumMetrics } from '../lib/utils';
+import { formatCop, formatNumber, formatPct, formatRoas, sumMetrics } from '../lib/utils';
 import { BarChart2 } from 'lucide-react';
 
 export function MetricsPage() {
@@ -118,7 +118,7 @@ export function MetricsPage() {
                     <td className="num-col">{formatNumber(r.reach)}</td>
                     <td className="num-col">{formatNumber(r.impressions)}</td>
                     <td className="num-col">{formatNumber(r.clicks)}</td>
-                    <td className="num-col">{r.ctr.toFixed(2)}%</td>
+                    <td className="num-col">{formatPct(r.ctr)}</td>
                     <td className="num-col">{formatCop(r.cpm)}</td>
                     <td className="num-col">{formatNumber(r.messages)}</td>
                     <td className="num-col">{formatCop(r.cpr)}</td>

@@ -7,71 +7,105 @@ import type {
   MetaSyncStatus,
 } from '../lib/supabase';
 
-export const formatCop = (value: number): string => {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
-  return `$${Math.round(value).toLocaleString('es-CO')}`;
+export function toFiniteNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().replace(/,/g, '');
+    if (!normalized) return fallback;
+
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return fallback;
+}
+
+function toSafeInteger(value: unknown): number {
+  const parsed = toFiniteNumber(value);
+  if (parsed <= 0) return 0;
+  return Math.round(parsed);
+}
+
+export const formatCop = (value: unknown): string => {
+  const amount = toFiniteNumber(value);
+
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `$${Math.round(amount / 1_000)}K`;
+  return `$${Math.round(amount).toLocaleString('es-CO')}`;
 };
 
-export const formatNumber = (value: number): string => {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toLocaleString('es-CO');
+export const formatNumber = (value: unknown): string => {
+  const amount = toFiniteNumber(value);
+
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)}K`;
+  return amount.toLocaleString('es-CO');
 };
 
-export const formatPct = (value: number): string => `${value.toFixed(2)}%`;
-export const formatRoas = (value: number): string => `${value.toFixed(2)}x`;
+export const formatPct = (value: unknown): string => `${toFiniteNumber(value).toFixed(2)}%`;
+export const formatRoas = (value: unknown): string => `${toFiniteNumber(value).toFixed(2)}x`;
+
+export function getMonthEndDate(monthKey: string): string {
+  const [year, month] = monthKey.split('-').map(Number);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return '';
+  }
+
+  return new Date(year, month, 0).toISOString().split('T')[0];
+}
 
 export const sumMetrics = (metrics: AdMetric[]) => ({
-  spend: metrics.reduce((a, m) => a + m.spend, 0),
-  reach: metrics.reduce((a, m) => a + m.reach, 0),
-  impressions: metrics.reduce((a, m) => a + m.impressions, 0),
-  clicks: metrics.reduce((a, m) => a + m.clicks, 0),
-  messages: metrics.reduce((a, m) => a + m.messages, 0),
-  leads: metrics.reduce((a, m) => a + m.leads, 0),
-  purchases: metrics.reduce((a, m) => a + m.purchases, 0),
-  purchase_value: metrics.reduce((a, m) => a + m.purchase_value, 0),
+  spend: metrics.reduce((a, m) => a + toFiniteNumber(m.spend), 0),
+  reach: metrics.reduce((a, m) => a + toSafeInteger(m.reach), 0),
+  impressions: metrics.reduce((a, m) => a + toSafeInteger(m.impressions), 0),
+  clicks: metrics.reduce((a, m) => a + toSafeInteger(m.clicks), 0),
+  messages: metrics.reduce((a, m) => a + toSafeInteger(m.messages), 0),
+  leads: metrics.reduce((a, m) => a + toSafeInteger(m.leads), 0),
+  purchases: metrics.reduce((a, m) => a + toSafeInteger(m.purchases), 0),
+  purchase_value: metrics.reduce((a, m) => a + toFiniteNumber(m.purchase_value), 0),
   roas: (() => {
-    const total_spend = metrics.reduce((a, m) => a + m.spend, 0);
-    const total_value = metrics.reduce((a, m) => a + m.purchase_value, 0);
+    const total_spend = metrics.reduce((a, m) => a + toFiniteNumber(m.spend), 0);
+    const total_value = metrics.reduce((a, m) => a + toFiniteNumber(m.purchase_value), 0);
     return total_spend > 0 ? total_value / total_spend : 0;
   })(),
   cpr: (() => {
-    const spend = metrics.reduce((a, m) => a + m.spend, 0);
-    const msgs = metrics.reduce((a, m) => a + m.messages, 0);
+    const spend = metrics.reduce((a, m) => a + toFiniteNumber(m.spend), 0);
+    const msgs = metrics.reduce((a, m) => a + toSafeInteger(m.messages), 0);
     return msgs > 0 ? spend / msgs : 0;
   })(),
 });
 
 export const sumSales = (sales: DailySale[]) => ({
-  total: sales.reduce((a, s) => a + s.total_sales, 0),
-  newClient: sales.reduce((a, s) => a + s.new_client_sales, 0),
-  repeat: sales.reduce((a, s) => a + s.repeat_sales, 0),
-  physical: sales.reduce((a, s) => a + s.physical_store_sales, 0),
-  online: sales.reduce((a, s) => a + s.online_sales, 0),
+  total: sales.reduce((a, s) => a + toFiniteNumber(s.total_sales), 0),
+  newClient: sales.reduce((a, s) => a + toFiniteNumber(s.new_client_sales), 0),
+  repeat: sales.reduce((a, s) => a + toFiniteNumber(s.repeat_sales), 0),
+  physical: sales.reduce((a, s) => a + toFiniteNumber(s.physical_store_sales), 0),
+  online: sales.reduce((a, s) => a + toFiniteNumber(s.online_sales), 0),
 });
 
 type OperatingKpiRow = ClientDailyOperatingKpi | ClientMonthlyOperatingKpi;
 
 export const sumOperatingKpis = (rows: OperatingKpiRow[]) => {
-  const spend = rows.reduce((sum, row) => sum + row.spend, 0);
-  const purchaseValue = rows.reduce((sum, row) => sum + row.purchase_value, 0);
-  const totalSales = rows.reduce((sum, row) => sum + row.total_sales, 0);
+  const spend = rows.reduce((sum, row) => sum + toFiniteNumber(row.spend), 0);
+  const purchaseValue = rows.reduce((sum, row) => sum + toFiniteNumber(row.purchase_value), 0);
+  const totalSales = rows.reduce((sum, row) => sum + toFiniteNumber(row.total_sales), 0);
 
   return {
     spend,
-    reach: rows.reduce((sum, row) => sum + row.reach, 0),
-    impressions: rows.reduce((sum, row) => sum + row.impressions, 0),
-    clicks: rows.reduce((sum, row) => sum + row.clicks, 0),
-    messages: rows.reduce((sum, row) => sum + row.messages, 0),
-    leads: rows.reduce((sum, row) => sum + row.leads, 0),
-    purchases: rows.reduce((sum, row) => sum + row.purchases, 0),
+    reach: rows.reduce((sum, row) => sum + toSafeInteger(row.reach), 0),
+    impressions: rows.reduce((sum, row) => sum + toSafeInteger(row.impressions), 0),
+    clicks: rows.reduce((sum, row) => sum + toSafeInteger(row.clicks), 0),
+    messages: rows.reduce((sum, row) => sum + toSafeInteger(row.messages), 0),
+    leads: rows.reduce((sum, row) => sum + toSafeInteger(row.leads), 0),
+    purchases: rows.reduce((sum, row) => sum + toSafeInteger(row.purchases), 0),
     purchase_value: purchaseValue,
     total_sales: totalSales,
-    new_client_sales: rows.reduce((sum, row) => sum + row.new_client_sales, 0),
-    repeat_sales: rows.reduce((sum, row) => sum + row.repeat_sales, 0),
-    physical_store_sales: rows.reduce((sum, row) => sum + row.physical_store_sales, 0),
-    online_sales: rows.reduce((sum, row) => sum + row.online_sales, 0),
+    new_client_sales: rows.reduce((sum, row) => sum + toFiniteNumber(row.new_client_sales), 0),
+    repeat_sales: rows.reduce((sum, row) => sum + toFiniteNumber(row.repeat_sales), 0),
+    physical_store_sales: rows.reduce((sum, row) => sum + toFiniteNumber(row.physical_store_sales), 0),
+    online_sales: rows.reduce((sum, row) => sum + toFiniteNumber(row.online_sales), 0),
     ad_roas: spend > 0 ? purchaseValue / spend : 0,
     real_roas: spend > 0 ? totalSales / spend : 0,
   };

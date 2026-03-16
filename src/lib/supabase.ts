@@ -199,6 +199,41 @@ export type DailySale = {
 
 export type DailySaleInput = Omit<DailySale, 'id' | 'created_at' | 'updated_at'>;
 
+export type HistoricalMonthlyAdMetricInput = {
+  client_id: string;
+  month: string;
+  spend: number;
+  reach: number;
+  impressions: number;
+  clicks: number;
+  cpm: number;
+  cpc: number;
+  ctr: number;
+  messages: number;
+  leads: number;
+  purchases: number;
+  purchase_value: number;
+  roas: number;
+  cpr: number;
+  cpl: number;
+  cpa: number;
+  frequency?: number | null;
+  source?: string;
+};
+
+export type HistoricalMonthlySaleInput = {
+  client_id: string;
+  month: string;
+  total_sales: number;
+  new_client_sales: number;
+  repeat_sales: number;
+  physical_store_sales: number;
+  online_sales: number;
+  observations?: string | null;
+  status?: 'draft' | 'submitted' | 'validated';
+  registered_by?: string | null;
+};
+
 export type DailySaleValidation = {
   totalsMismatch: boolean;
   channelsMismatch: boolean;

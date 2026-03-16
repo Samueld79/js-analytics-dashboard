@@ -32,8 +32,8 @@ function AppContent() {
       <div className="auth-shell">
         <div className="page-bg" />
         <div className="auth-card card section-block">
-          <h1 className="page-title">Agency OS</h1>
-          <p className="page-subtitle">Validando sesion y permisos...</p>
+          <h1 className="page-title">Growth Strategy JS</h1>
+          <p className="page-subtitle">Validando acceso y contexto operativo...</p>
         </div>
       </div>
     );
@@ -197,7 +197,7 @@ function SettingsPage() {
         </div>
         <div className="setting-item">
           <div className="setting-label">Versión</div>
-          <div className="setting-value">Agency OS v1.6 · Internal Dashboard + Client Workspace</div>
+          <div className="setting-value">Growth Strategy JS · Dashboard interno y workspace cliente</div>
         </div>
       </div>
     </div>

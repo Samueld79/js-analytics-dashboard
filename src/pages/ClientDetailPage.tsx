@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   BarChart2,
@@ -11,6 +11,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { ClientFileModal } from '../components/ClientFileModal';
+import { HistoricalMonthlyModal } from '../components/HistoricalMonthlyModal';
 import { SalesModal } from '../components/SalesModal';
 import { useAuth } from '../hooks/useAuth';
 import { useClientWorkspace } from '../hooks/useClientWorkspace';
@@ -20,6 +21,7 @@ import {
   formatDate,
   formatDateTime,
   formatNumber,
+  formatPct,
   formatRoas,
   healthStatusLabel,
   metaSyncStatusClass,
@@ -27,6 +29,7 @@ import {
   statusLabel,
   sumOperatingKpis,
 } from '../lib/utils';
+import { getMonthLabel } from '../utils/monthLabel';
 import type {
   AdMetric,
   ActivityLog,
@@ -36,6 +39,7 @@ import type {
   ClientMetaOverview,
   ClientFile,
   ClientDailyOperatingKpi,
+  ClientMonthlyOperatingKpi,
   DailySale,
   OperationalIssue,
   Strategy,
@@ -51,6 +55,7 @@ export function ClientDetailPage() {
     client,
     metrics,
     dailyKpis,
+    monthlyKpis,
     sales,
     strategies,
     tasks,
@@ -62,20 +67,28 @@ export function ClientDetailPage() {
     meta,
     loading,
     addSale,
+    addHistoricalAds,
+    addHistoricalSales,
     addFile,
     updateTask,
   } = useClientWorkspace(id, 30);
-  const { isInternal, canWriteSales } = useAuth();
+  const { isInternal, canWriteSales, role } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
+  const [showHistoricalModal, setShowHistoricalModal] = useState(false);
 
   const recentOperatingKpis = useMemo(
     () => [...dailyKpis].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 7),
     [dailyKpis],
   );
+  const monthlyHistory = useMemo(
+    () => [...monthlyKpis].sort((a, b) => b.month.localeCompare(a.month)).slice(0, 6),
+    [monthlyKpis],
+  );
 
   const canRegisterSales = client ? canWriteSales(client.id) : false;
+  const canLoadHistory = role === 'admin';
 
   if (loading) {
     return (
@@ -151,11 +164,18 @@ export function ClientDetailPage() {
             {meta?.last_sync_at ? `Última sync ${formatDateTime(meta.last_sync_at)}` : 'Sin sincronización'}
           </span>
         </div>
-        {canRegisterSales && (
-          <button className="btn-primary" onClick={() => setShowSalesModal(true)}>
-            + Registrar Ventas
-          </button>
-        )}
+        <div className="header-actions">
+          {canLoadHistory && (
+            <button className="btn-secondary" onClick={() => setShowHistoricalModal(true)}>
+              + Cargar histórico
+            </button>
+          )}
+          {canRegisterSales && (
+            <button className="btn-primary" onClick={() => setShowSalesModal(true)}>
+              + Registrar Ventas
+            </button>
+          )}
+        </div>
       </div>
 
       {isInternal && (health || criticalAlerts.length > 0) && (
@@ -227,29 +247,32 @@ export function ClientDetailPage() {
         ))}
       </div>
 
-      {tab === 'overview' && (
-        <ClientOverview
-          client={client}
-          health={health}
-          issues={issues}
-          meta={meta}
-          operatingTotals={operatingTotals}
-          operatingRows={recentOperatingKpis}
-          activityLog={activityLog}
-          showOperational={isInternal}
-        />
-      )}
-      {tab === 'metrics' && <ClientMetricsTab metrics={metrics} />}
-      {tab === 'sales' && <ClientSalesTab sales={sales} />}
-      {tab === 'strategies' && <ClientStrategiesTab strategies={strategies} clientId={client.id} />}
-      {tab === 'tasks' && <ClientTasksTab tasks={tasks} updateTask={updateTask} />}
-      {tab === 'files' && (
-        <ClientFilesTab
-          files={files}
-          strategies={strategies}
-          onAddFile={isInternal ? () => setShowFileModal(true) : undefined}
-        />
-      )}
+      <ClientDetailRenderBoundary resetKey={`${client.id}-${tab}`}>
+        {tab === 'overview' && (
+          <ClientOverview
+            client={client}
+            health={health}
+            issues={issues}
+            meta={meta}
+            operatingTotals={operatingTotals}
+            operatingRows={recentOperatingKpis}
+            monthlyRows={monthlyHistory}
+            activityLog={activityLog}
+            showOperational={isInternal}
+          />
+        )}
+        {tab === 'metrics' && <ClientMetricsTab metrics={metrics} />}
+        {tab === 'sales' && <ClientSalesTab sales={sales} />}
+        {tab === 'strategies' && <ClientStrategiesTab strategies={strategies} clientId={client.id} />}
+        {tab === 'tasks' && <ClientTasksTab tasks={tasks} updateTask={updateTask} />}
+        {tab === 'files' && (
+          <ClientFilesTab
+            files={files}
+            strategies={strategies}
+            onAddFile={isInternal ? () => setShowFileModal(true) : undefined}
+          />
+        )}
+      </ClientDetailRenderBoundary>
 
       {showSalesModal && (
         <SalesModal
@@ -276,6 +299,15 @@ export function ClientDetailPage() {
           }}
         />
       )}
+
+      {canLoadHistory && showHistoricalModal && (
+        <HistoricalMonthlyModal
+          clientName={client.name}
+          onClose={() => setShowHistoricalModal(false)}
+          onSaveAds={addHistoricalAds}
+          onSaveSales={addHistoricalSales}
+        />
+      )}
     </div>
   );
 }
@@ -288,10 +320,12 @@ function ClientOverview({
   issues,
   meta,
   activityLog,
+  monthlyRows,
   showOperational,
 }: {
   operatingTotals: ReturnType<typeof sumOperatingKpis>;
   operatingRows: ClientDailyOperatingKpi[];
+  monthlyRows: ClientMonthlyOperatingKpi[];
   client: Client;
   health: ClientHealthScore | null;
   issues: OperationalIssue[];
@@ -395,6 +429,42 @@ function ClientOverview({
           </div>
         ) : (
           <p className="empty-note">No hay ventas registradas. Usa "Registrar Ventas" para comenzar.</p>
+        )}
+      </div>
+
+      <div className="card section-block">
+        <div className="section-heading"><h2>Histórico mensual</h2></div>
+        {monthlyRows.length === 0 ? (
+          <p className="empty-note">Todavía no hay meses consolidados para este cliente.</p>
+        ) : (
+          <div className="mini-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mes</th>
+                  <th className="num-col">Ads</th>
+                  <th className="num-col">ROAS Ads</th>
+                  <th className="num-col">Ventas</th>
+                  <th className="num-col">ROAS Real</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyRows.map((row) => (
+                  <tr key={`${row.client_id}-${row.month}`}>
+                    <td>{getMonthLabel(row.month)}</td>
+                    <td className="num-col">{formatCop(row.spend)}</td>
+                    <td className={`num-col ${row.ad_roas >= 3 ? 'text-green' : row.ad_roas >= 2 ? 'text-amber' : 'text-red'}`}>
+                      {formatRoas(row.ad_roas)}
+                    </td>
+                    <td className="num-col">{formatCop(row.total_sales)}</td>
+                    <td className={`num-col ${row.real_roas >= 3 ? 'text-green' : row.real_roas >= 2 ? 'text-amber' : 'text-red'}`}>
+                      {formatRoas(row.real_roas)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -599,7 +669,7 @@ function ClientMetricsTab({ metrics }: { metrics: AdMetric[] }) {
                     <td className="num-col">{formatNumber(row.clicks)}</td>
                     <td className="num-col">{formatCop(row.cpm)}</td>
                     <td className="num-col">{formatCop(row.cpc)}</td>
-                    <td className="num-col">{row.ctr.toFixed(2)}%</td>
+                    <td className="num-col">{formatPct(row.ctr)}</td>
                     <td className="num-col">{formatNumber(row.messages)}</td>
                     <td className="num-col">{formatNumber(row.leads)}</td>
                     <td className="num-col">{formatNumber(row.purchases)}</td>
@@ -615,6 +685,49 @@ function ClientMetricsTab({ metrics }: { metrics: AdMetric[] }) {
       </div>
     </div>
   );
+}
+
+class ClientDetailRenderBoundary extends Component<
+  {
+    children: ReactNode;
+    resetKey: string;
+  },
+  {
+    hasError: boolean;
+  }
+> {
+  state = {
+    hasError: false,
+  };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[client-detail] render', error, info);
+  }
+
+  componentDidUpdate(prevProps: Readonly<{ children: ReactNode; resetKey: string }>) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="card section-block">
+          <div className="section-heading"><h2>Sección no disponible</h2></div>
+          <p className="empty-note">
+            Una parte del detalle del cliente no pudo renderizarse. Cambia de pestaña o recarga la vista.
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function ClientSalesTab({ sales }: { sales: DailySale[] }) {

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Loader2, Lock, Mail, Shield } from 'lucide-react';
+import { Loader2, Lock, Mail, TrendingUp } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
@@ -28,11 +28,11 @@ export function LoginPage() {
       <div className="auth-card card section-block">
         <div className="auth-header">
           <div className="auth-logo">
-            <Shield size={18} />
+            <TrendingUp size={18} />
           </div>
           <div>
-            <h1 className="page-title">Agency OS</h1>
-            <p className="page-subtitle">Acceso seguro al sistema y workspace privado</p>
+            <h1 className="page-title">Growth Strategy JS</h1>
+            <p className="page-subtitle">Acceso al panel de crecimiento y workspace privado</p>
           </div>
         </div>
 

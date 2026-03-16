@@ -3,6 +3,8 @@ import { useAuth } from './useAuth';
 import type {
   ActivityLog,
   Alert,
+  HistoricalMonthlyAdMetricInput,
+  HistoricalMonthlySaleInput,
   Client,
   ClientHealthScore,
   ClientMetaOverview,
@@ -17,12 +19,12 @@ import type {
   Task,
 } from '../lib/supabase';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { listAdMetrics } from '../services/adMetrics';
+import { listAdMetrics, upsertHistoricalMonthlyAdMetric } from '../services/adMetrics';
 import { listActivityLog } from '../services/activityLog';
 import { listAlerts } from '../services/alerts';
 import { getClientByIdOrSlug } from '../services/clients';
 import { listDailyOperatingKpis, listMonthlyOperatingKpis } from '../services/dashboard';
-import { listDailySales, upsertDailySale } from '../services/dailySales';
+import { listDailySales, upsertDailySale, upsertHistoricalMonthlySale } from '../services/dailySales';
 import { createClientFile, listClientFiles } from '../services/files';
 import { buildClientMetaOverviewByClient, listMetaAccountSyncRows } from '../services/meta';
 import { buildOperationalSnapshot } from '../services/operationalChecks';
@@ -92,7 +94,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         getClientByIdOrSlug(clientId),
         listAdMetrics({ clientId, days }),
         listDailyOperatingKpis({ clientId, days }),
-        listMonthlyOperatingKpis({ clientId, monthsBack: 2 }),
+        listMonthlyOperatingKpis({ clientId, monthsBack: 6 }),
         listDailySales({ clientId, days }),
         isInternal ? listStrategies(clientId) : Promise.resolve([]),
         isInternal ? listTasks({ clientId }) : Promise.resolve([]),
@@ -158,6 +160,46 @@ export function useClientWorkspace(clientId?: string, days = 30) {
     [load],
   );
 
+  const addHistoricalAds = useCallback(
+    async (
+      input: Omit<HistoricalMonthlyAdMetricInput, 'client_id'>,
+    ): Promise<ServiceMutationResult<import('../lib/supabase').AdMetric>> => {
+      if (!clientId) {
+        return { data: null, error: 'Cliente inválido.' };
+      }
+
+      const result = await upsertHistoricalMonthlyAdMetric({
+        ...input,
+        client_id: clientId,
+      });
+      if (!result.error) {
+        await load();
+      }
+      return result;
+    },
+    [clientId, load],
+  );
+
+  const addHistoricalSales = useCallback(
+    async (
+      input: Omit<HistoricalMonthlySaleInput, 'client_id'>,
+    ): Promise<ServiceMutationResult<import('../lib/supabase').DailySale>> => {
+      if (!clientId) {
+        return { data: null, error: 'Cliente inválido.' };
+      }
+
+      const result = await upsertHistoricalMonthlySale({
+        ...input,
+        client_id: clientId,
+      });
+      if (!result.error) {
+        await load();
+      }
+      return result;
+    },
+    [clientId, load],
+  );
+
   const updateWorkspaceTask = useCallback(
     async (
       id: string,
@@ -189,6 +231,8 @@ export function useClientWorkspace(clientId?: string, days = 30) {
     error,
     reload: load,
     addSale,
+    addHistoricalAds,
+    addHistoricalSales,
     addFile,
     updateTask: updateWorkspaceTask,
     isConfigured: isSupabaseConfigured,

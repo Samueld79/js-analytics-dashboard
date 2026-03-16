@@ -15,6 +15,10 @@ type ListMetaAccountSyncRowsParams = {
   clientId?: string;
 };
 
+type GetPrimaryMetaAccountParams = {
+  clientId: string;
+};
+
 function getLatestSyncAt(rows: AdAccountSyncRow[]): string | null {
   const timestamps = rows
     .map((row) => row.last_sync_at)
@@ -60,6 +64,30 @@ export async function listMetaAccountSyncRows({
   }
 
   return (data ?? []) as AdAccountSyncRow[];
+}
+
+export async function getPrimaryActiveMetaAccount({
+  clientId,
+}: GetPrimaryMetaAccountParams): Promise<AdAccountSyncRow | null> {
+  if (!isSupabaseConfigured || !supabase || !clientId) return null;
+
+  const { data, error } = await supabase
+    .from('ad_accounts')
+    .select('id,client_id,name,meta_account_id,status,is_primary,last_sync_at')
+    .eq('client_id', clientId)
+    .eq('platform', 'meta')
+    .eq('status', 'active')
+    .order('is_primary', { ascending: false })
+    .order('name')
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[meta] getPrimaryActiveMetaAccount', error);
+    return null;
+  }
+
+  return (data ?? null) as AdAccountSyncRow | null;
 }
 
 export function buildClientMetaOverviewByClient(params: {

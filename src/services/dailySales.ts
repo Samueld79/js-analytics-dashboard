@@ -5,8 +5,10 @@ import {
   supabase,
   type DailySale,
   type DailySaleInput,
+  type HistoricalMonthlySaleInput,
   type ServiceMutationResult,
 } from '../lib/supabase';
+import { getMonthEndDate } from '../lib/utils';
 import { logActivitySafe } from './activityLog';
 
 type ListDailySalesParams = {
@@ -123,4 +125,27 @@ export async function upsertDailySale(
   }
 
   return { data: (data ?? null) as DailySale | null, error: null };
+}
+
+export async function upsertHistoricalMonthlySale(
+  sale: HistoricalMonthlySaleInput,
+): Promise<ServiceMutationResult<DailySale>> {
+  const snapshotDate = getMonthEndDate(sale.month);
+
+  if (!snapshotDate) {
+    return { data: null, error: 'Mes inválido. Usa formato YYYY-MM.' };
+  }
+
+  return upsertDailySale({
+    client_id: sale.client_id,
+    date: snapshotDate,
+    total_sales: sale.total_sales,
+    new_client_sales: sale.new_client_sales,
+    repeat_sales: sale.repeat_sales,
+    physical_store_sales: sale.physical_store_sales,
+    online_sales: sale.online_sales,
+    observations: sale.observations ?? `Histórico mensual ${sale.month}`,
+    status: sale.status ?? 'submitted',
+    registered_by: sale.registered_by ?? null,
+  });
 }
