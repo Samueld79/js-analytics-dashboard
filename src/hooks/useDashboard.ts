@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getDashboardSnapshot, type DashboardSnapshot } from '../services/dashboard';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { useAuth } from './useAuth';
 
 const EMPTY_DASHBOARD: DashboardSnapshot = {
   clients: [],
@@ -14,11 +15,23 @@ const EMPTY_DASHBOARD: DashboardSnapshot = {
 };
 
 export function useDashboard(days = 30) {
+  const { initialized, session } = useAuth();
   const [data, setData] = useState<DashboardSnapshot>(EMPTY_DASHBOARD);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (isSupabaseConfigured && !initialized) {
+      return;
+    }
+
+    if (isSupabaseConfigured && initialized && !session) {
+      setData(EMPTY_DASHBOARD);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const snapshot = await getDashboardSnapshot(days);
@@ -31,7 +44,7 @@ export function useDashboard(days = 30) {
     } finally {
       setLoading(false);
     }
-  }, [days]);
+  }, [days, initialized, session]);
 
   useEffect(() => {
     void load();

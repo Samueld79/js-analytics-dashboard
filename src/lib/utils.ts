@@ -5,7 +5,10 @@ import type {
   DailySale,
   DailySaleValidation,
   MetaSyncStatus,
+  SocialMonthlyMetric,
 } from '../lib/supabase';
+
+export type AdDataOrigin = 'automatic' | 'manual' | 'mixed' | 'unknown';
 
 export function toFiniteNumber(value: unknown, fallback = 0): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -211,6 +214,161 @@ export function metaSyncStatusClass(status: MetaSyncStatus): string {
   };
 
   return map[status];
+}
+
+export function getAdDataOriginFromSource(source?: string | null): Exclude<AdDataOrigin, 'mixed'> {
+  const normalized = source?.trim().toLowerCase() ?? '';
+
+  if (!normalized) return 'unknown';
+  if (normalized === 'manual_monthly_history') return 'manual';
+  return 'automatic';
+}
+
+export function summarizeAdDataOrigin(sources: Array<string | null | undefined>): AdDataOrigin {
+  const kinds = new Set(
+    sources
+      .map((source) => getAdDataOriginFromSource(source))
+      .filter((kind) => kind !== 'unknown'),
+  );
+
+  if (kinds.size === 0) return 'unknown';
+  if (kinds.size > 1) return 'mixed';
+
+  return [...kinds][0] ?? 'unknown';
+}
+
+export function adDataOriginLabel(origin: AdDataOrigin): string {
+  const map: Record<AdDataOrigin, string> = {
+    automatic: 'Sync automático',
+    manual: 'Histórico manual',
+    mixed: 'Mixto',
+    unknown: 'Sin fuente',
+  };
+
+  return map[origin];
+}
+
+export function adDataOriginClass(origin: AdDataOrigin): string {
+  const map: Record<AdDataOrigin, string> = {
+    automatic: 'source-automatic',
+    manual: 'source-manual',
+    mixed: 'source-mixed',
+    unknown: 'source-unknown',
+  };
+
+  return map[origin];
+}
+
+type RawActionEntry = {
+  action_type?: string;
+  value?: string | number | null;
+};
+
+const MARKETING_ACTION_TYPES = {
+  messagingStarted: ['onsite_conversion.messaging_conversation_started_7d'],
+  messagingFirstReply: ['onsite_conversion.messaging_first_reply'],
+  messagingConnections: ['onsite_conversion.total_messaging_connection'],
+  profileVisits: ['profile_visit_view', 'profile_visit'],
+  thruplays: ['video_thruplay_watched_actions', 'thruplay'],
+  videoViews: ['video_view', 'video_play'],
+  video25: ['video_p25_watched_actions', 'video_view_25', 'video_25_watched_actions'],
+  video50: ['video_p50_watched_actions', 'video_view_50', 'video_50_watched_actions'],
+  leads: [
+    'lead',
+    'onsite_conversion.lead',
+    'onsite_web_lead',
+    'onsite_conversion.lead_grouped',
+  ],
+} as const;
+
+function parseRawActions(rawActions: unknown): RawActionEntry[] {
+  if (!Array.isArray(rawActions)) return [];
+
+  return rawActions.filter((entry): entry is RawActionEntry => Boolean(entry) && typeof entry === 'object');
+}
+
+function sumMetricActionValues(metric: AdMetric, actionTypes: readonly string[]): number {
+  return parseRawActions(metric.raw_actions).reduce((total, action) => {
+    if (!action.action_type || !actionTypes.includes(action.action_type)) return total;
+    return total + toFiniteNumber(action.value);
+  }, 0);
+}
+
+function hasMetricActionType(metric: AdMetric, actionTypes: readonly string[]): boolean {
+  return parseRawActions(metric.raw_actions).some(
+    (action) => Boolean(action.action_type) && actionTypes.includes(action.action_type!),
+  );
+}
+
+function sumObservedActionValues(metrics: AdMetric[], actionTypes: readonly string[]): number | null {
+  const observed = metrics.some((metric) => hasMetricActionType(metric, actionTypes));
+  if (!observed) return null;
+
+  return metrics.reduce((total, metric) => total + sumMetricActionValues(metric, actionTypes), 0);
+}
+
+export type MarketingActionSummary = {
+  sourceOrigin: AdDataOrigin;
+  spend: number;
+  messagingStarted: number;
+  messagingConnections: number;
+  messagingFirstReply: number | null;
+  profileVisits: number | null;
+  thruplays: number | null;
+  videoViews: number | null;
+  video25: number | null;
+  video50: number | null;
+  leads: number | null;
+};
+
+export function buildMarketingActionSummary(metrics: AdMetric[]): MarketingActionSummary {
+  return {
+    sourceOrigin: summarizeAdDataOrigin(metrics.map((metric) => metric.source)),
+    spend: metrics.reduce((total, metric) => total + toFiniteNumber(metric.spend), 0),
+    messagingStarted:
+      sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.messagingStarted) ??
+      metrics.reduce((total, metric) => total + toFiniteNumber(metric.messages), 0),
+    messagingConnections: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.messagingConnections) ?? 0,
+    messagingFirstReply: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.messagingFirstReply),
+    profileVisits: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.profileVisits),
+    thruplays: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.thruplays),
+    videoViews: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.videoViews),
+    video25: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.video25),
+    video50: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.video50),
+    leads: sumObservedActionValues(metrics, MARKETING_ACTION_TYPES.leads),
+  };
+}
+
+export function resolveMonthlyProfileVisits(params: {
+  socialMetric?: SocialMonthlyMetric | null;
+  adMetrics?: AdMetric[];
+}): {
+  value: number | null;
+  sourceOrigin: AdDataOrigin;
+  sourceLabel: string;
+} {
+  if (params.socialMetric?.profile_visits != null) {
+    return {
+      value: toFiniteNumber(params.socialMetric.profile_visits),
+      sourceOrigin: 'manual',
+      sourceLabel: 'Fuente manual mensual',
+    };
+  }
+
+  const fallback = buildMarketingActionSummary(params.adMetrics ?? []).profileVisits;
+  if (fallback != null) {
+    return {
+      value: fallback,
+      sourceOrigin: 'automatic',
+      sourceLabel: 'Sync automático',
+    };
+  }
+
+  return {
+    value: null,
+    sourceOrigin: 'unknown',
+    sourceLabel: 'Sin dato',
+  };
 }
 
 export function statusLabel(status: string): string {

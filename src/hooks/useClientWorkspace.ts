@@ -5,6 +5,7 @@ import type {
   Alert,
   HistoricalMonthlyAdMetricInput,
   HistoricalMonthlySaleInput,
+  SocialMonthlyMetricInput,
   Client,
   ClientHealthScore,
   ClientMetaOverview,
@@ -28,6 +29,7 @@ import { listDailySales, upsertDailySale, upsertHistoricalMonthlySale } from '..
 import { createClientFile, listClientFiles } from '../services/files';
 import { buildClientMetaOverviewByClient, listMetaAccountSyncRows } from '../services/meta';
 import { buildOperationalSnapshot } from '../services/operationalChecks';
+import { listSocialMonthlyMetrics, upsertSocialMonthlyMetric } from '../services/socialMetrics';
 import { listStrategies } from '../services/strategies';
 import { listTasks, updateTask } from '../services/tasks';
 
@@ -43,6 +45,7 @@ type WorkspaceSection =
   | 'files'
   | 'activityLog'
   | 'meta'
+  | 'social'
   | 'operational';
 
 export type WorkspaceSectionError = {
@@ -56,6 +59,7 @@ type WorkspaceState = {
   dailyKpis: ClientDailyOperatingKpi[];
   monthlyKpis: ClientMonthlyOperatingKpi[];
   sales: import('../lib/supabase').DailySale[];
+  socialMonthlyMetrics: import('../lib/supabase').SocialMonthlyMetric[];
   strategies: Strategy[];
   tasks: Task[];
   alerts: Alert[];
@@ -72,6 +76,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   dailyKpis: [],
   monthlyKpis: [],
   sales: [],
+  socialMonthlyMetrics: [],
   strategies: [],
   tasks: [],
   alerts: [],
@@ -115,6 +120,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         listDailyOperatingKpis({ clientId, days }),
         listMonthlyOperatingKpis({ clientId, monthsBack: 6 }),
         listDailySales({ clientId, days }),
+        listSocialMonthlyMetrics({ clientId, monthsBack: 12 }),
         isInternal ? listStrategies(clientId) : Promise.resolve([]),
         isInternal ? listTasks({ clientId }) : Promise.resolve([]),
         isInternal ? listAlerts({ clientId }) : Promise.resolve([]),
@@ -142,12 +148,17 @@ export function useClientWorkspace(clientId?: string, days = 30) {
       const dailyKpis = readResult(1, 'dailyKpis', [] as WorkspaceState['dailyKpis']);
       const monthlyKpis = readResult(2, 'monthlyKpis', [] as WorkspaceState['monthlyKpis']);
       const sales = readResult(3, 'sales', [] as WorkspaceState['sales']);
-      const strategies = readResult(4, 'strategies', [] as WorkspaceState['strategies']);
-      const tasks = readResult(5, 'tasks', [] as WorkspaceState['tasks']);
-      const alerts = readResult(6, 'alerts', [] as WorkspaceState['alerts']);
-      const files = readResult(7, 'files', [] as WorkspaceState['files']);
-      const activityLog = readResult(8, 'activityLog', [] as WorkspaceState['activityLog']);
-      const syncRows = readResult(9, 'meta', []);
+      const socialMonthlyMetrics = readResult(
+        4,
+        'social',
+        [] as WorkspaceState['socialMonthlyMetrics'],
+      );
+      const strategies = readResult(5, 'strategies', [] as WorkspaceState['strategies']);
+      const tasks = readResult(6, 'tasks', [] as WorkspaceState['tasks']);
+      const alerts = readResult(7, 'alerts', [] as WorkspaceState['alerts']);
+      const files = readResult(8, 'files', [] as WorkspaceState['files']);
+      const activityLog = readResult(9, 'activityLog', [] as WorkspaceState['activityLog']);
+      const syncRows = readResult(10, 'meta', []);
 
       let health: ClientHealthScore | null = null;
       let issues: OperationalIssue[] = [];
@@ -188,6 +199,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
         dailyKpis,
         monthlyKpis,
         sales,
+        socialMonthlyMetrics,
         strategies,
         tasks,
         alerts,
@@ -264,6 +276,26 @@ export function useClientWorkspace(clientId?: string, days = 30) {
     [clientId, load],
   );
 
+  const addSocialMonthlyMetric = useCallback(
+    async (
+      input: Omit<SocialMonthlyMetricInput, 'client_id'>,
+    ): Promise<ServiceMutationResult<import('../lib/supabase').SocialMonthlyMetric>> => {
+      if (!clientId) {
+        return { data: null, error: 'Cliente inválido.' };
+      }
+
+      const result = await upsertSocialMonthlyMetric({
+        ...input,
+        client_id: clientId,
+      });
+      if (!result.error) {
+        await load();
+      }
+      return result;
+    },
+    [clientId, load],
+  );
+
   const updateWorkspaceTask = useCallback(
     async (
       id: string,
@@ -298,6 +330,7 @@ export function useClientWorkspace(clientId?: string, days = 30) {
     addSale,
     addHistoricalAds,
     addHistoricalSales,
+    addSocialMonthlyMetric,
     addFile,
     updateTask: updateWorkspaceTask,
     isConfigured: isSupabaseConfigured,

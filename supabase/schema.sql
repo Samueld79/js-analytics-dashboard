@@ -195,6 +195,22 @@ CREATE TABLE IF NOT EXISTS public.daily_sales (
   UNIQUE (client_id, date)
 );
 
+CREATE TABLE IF NOT EXISTS public.social_monthly_metrics (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id               UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  month                   DATE NOT NULL,
+  new_followers           INTEGER NOT NULL DEFAULT 0 CHECK (new_followers >= 0),
+  profile_visits          INTEGER CHECK (profile_visits IS NULL OR profile_visits >= 0),
+  source                  TEXT NOT NULL DEFAULT 'manual_monthly_followers'
+                          CHECK (btrim(source) <> ''),
+  notes                   TEXT,
+  created_by              UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (month = date_trunc('month', month)::DATE),
+  UNIQUE (client_id, month)
+);
+
 -- ============================================================
 -- STRATEGIES / VERSION HISTORY
 -- ============================================================
@@ -462,6 +478,21 @@ SELECT
 FROM public.v_client_daily_operating_kpis
 GROUP BY client_id, date_trunc('month', date);
 
+CREATE OR REPLACE VIEW public.v_client_monthly_social_metrics
+WITH (security_invoker = true) AS
+SELECT
+  id,
+  client_id,
+  to_char(month, 'YYYY-MM') AS month,
+  new_followers,
+  profile_visits,
+  source,
+  notes,
+  created_by,
+  created_at,
+  updated_at
+FROM public.social_monthly_metrics;
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
@@ -486,6 +517,11 @@ CREATE INDEX IF NOT EXISTS idx_ad_metrics_import_run ON public.ad_metrics(import
 
 CREATE INDEX IF NOT EXISTS idx_daily_sales_client_date ON public.daily_sales(client_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_daily_sales_status ON public.daily_sales(status);
+
+CREATE INDEX IF NOT EXISTS idx_social_monthly_metrics_client_month
+  ON public.social_monthly_metrics(client_id, month DESC);
+CREATE INDEX IF NOT EXISTS idx_social_monthly_metrics_month
+  ON public.social_monthly_metrics(month DESC);
 
 CREATE INDEX IF NOT EXISTS idx_strategies_client_month ON public.strategies(client_id, month DESC);
 CREATE INDEX IF NOT EXISTS idx_strategies_status ON public.strategies(status);
@@ -517,8 +553,10 @@ CREATE INDEX IF NOT EXISTS idx_memory_entries_tags ON public.memory_entries USIN
 CREATE INDEX IF NOT EXISTS idx_activity_log_client_created ON public.activity_log(client_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_log_entity ON public.activity_log(entity_type, entity_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.social_monthly_metrics TO authenticated;
 GRANT SELECT ON public.v_client_daily_operating_kpis TO authenticated;
 GRANT SELECT ON public.v_client_monthly_operating_kpis TO authenticated;
+GRANT SELECT ON public.v_client_monthly_social_metrics TO authenticated;
 
 -- ============================================================
 -- UPDATED_AT TRIGGERS
@@ -557,6 +595,12 @@ EXECUTE FUNCTION public.set_updated_at();
 DROP TRIGGER IF EXISTS set_updated_at_daily_sales ON public.daily_sales;
 CREATE TRIGGER set_updated_at_daily_sales
 BEFORE UPDATE ON public.daily_sales
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS set_updated_at_social_monthly_metrics ON public.social_monthly_metrics;
+CREATE TRIGGER set_updated_at_social_monthly_metrics
+BEFORE UPDATE ON public.social_monthly_metrics
 FOR EACH ROW
 EXECUTE FUNCTION public.set_updated_at();
 
@@ -671,6 +715,7 @@ ALTER TABLE public.ad_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ad_import_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ad_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.social_monthly_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.strategies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.strategy_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
@@ -806,6 +851,21 @@ ON public.daily_sales
 FOR DELETE
 TO authenticated
 USING (public.is_internal_user());
+
+DROP POLICY IF EXISTS social_monthly_metrics_select ON public.social_monthly_metrics;
+CREATE POLICY social_monthly_metrics_select
+ON public.social_monthly_metrics
+FOR SELECT
+TO authenticated
+USING (public.is_internal_user());
+
+DROP POLICY IF EXISTS social_monthly_metrics_write ON public.social_monthly_metrics;
+CREATE POLICY social_monthly_metrics_write
+ON public.social_monthly_metrics
+FOR ALL
+TO authenticated
+USING (public.is_internal_user())
+WITH CHECK (public.is_internal_user());
 
 DROP POLICY IF EXISTS strategies_select ON public.strategies;
 CREATE POLICY strategies_select

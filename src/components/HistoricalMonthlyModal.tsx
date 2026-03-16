@@ -5,18 +5,22 @@ import type {
   HistoricalMonthlyAdMetricInput,
   HistoricalMonthlySaleInput,
   ServiceMutationResult,
+  SocialMonthlyMetric,
+  SocialMonthlyMetricInput,
 } from '../lib/supabase';
 import { getMonthLabel } from '../utils/monthLabel';
 import { validateDailySale } from '../lib/utils';
 
 type HistoricalAdsInput = Omit<HistoricalMonthlyAdMetricInput, 'client_id'>;
 type HistoricalSalesInput = Omit<HistoricalMonthlySaleInput, 'client_id'>;
+type HistoricalSocialInput = Omit<SocialMonthlyMetricInput, 'client_id'>;
 
 interface Props {
   clientName: string;
   onClose: () => void;
   onSaveAds: (input: HistoricalAdsInput) => Promise<ServiceMutationResult<AdMetric>>;
   onSaveSales: (input: HistoricalSalesInput) => Promise<ServiceMutationResult<DailySale>>;
+  onSaveSocial: (input: HistoricalSocialInput) => Promise<ServiceMutationResult<SocialMonthlyMetric>>;
 }
 
 function parseDecimal(value: string): number {
@@ -28,15 +32,19 @@ export function HistoricalMonthlyModal({
   onClose,
   onSaveAds,
   onSaveSales,
+  onSaveSocial,
 }: Props) {
   const defaultMonth = new Date().toISOString().slice(0, 7);
   const [month, setMonth] = useState(defaultMonth);
   const [savingAds, setSavingAds] = useState(false);
   const [savingSales, setSavingSales] = useState(false);
+  const [savingSocial, setSavingSocial] = useState(false);
   const [adsError, setAdsError] = useState('');
   const [salesError, setSalesError] = useState('');
+  const [socialError, setSocialError] = useState('');
   const [adsSuccess, setAdsSuccess] = useState('');
   const [salesSuccess, setSalesSuccess] = useState('');
+  const [socialSuccess, setSocialSuccess] = useState('');
   const [adsForm, setAdsForm] = useState({
     spend: '',
     reach: '',
@@ -62,6 +70,12 @@ export function HistoricalMonthlyModal({
     physical_store_sales: '',
     online_sales: '',
     observations: '',
+  });
+  const [socialForm, setSocialForm] = useState({
+    new_followers: '',
+    profile_visits: '',
+    source: 'manual_monthly_followers',
+    notes: '',
   });
 
   const adsValues = useMemo(
@@ -103,6 +117,14 @@ export function HistoricalMonthlyModal({
     [adsValues, month],
   );
   const canSaveSales = useMemo(() => Boolean(month && salesValues.total_sales > 0), [month, salesValues.total_sales]);
+  const canSaveSocial = useMemo(
+    () =>
+      Boolean(
+        month &&
+          (socialForm.new_followers.trim() !== '' || socialForm.profile_visits.trim() !== ''),
+      ),
+    [month, socialForm.new_followers, socialForm.profile_visits],
+  );
 
   function setAdsField(field: keyof typeof adsForm, value: string) {
     setAdsSuccess('');
@@ -114,6 +136,12 @@ export function HistoricalMonthlyModal({
     setSalesSuccess('');
     setSalesError('');
     setSalesForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function setSocialField(field: keyof typeof socialForm, value: string) {
+    setSocialSuccess('');
+    setSocialError('');
+    setSocialForm((current) => ({ ...current, [field]: value }));
   }
 
   async function handleSaveAds() {
@@ -162,13 +190,38 @@ export function HistoricalMonthlyModal({
     setSavingSales(false);
   }
 
+  async function handleSaveSocial() {
+    if (!canSaveSocial) return;
+
+    setSavingSocial(true);
+    setSocialError('');
+    setSocialSuccess('');
+
+    const result = await onSaveSocial({
+      month,
+      new_followers: parseDecimal(socialForm.new_followers),
+      profile_visits: socialForm.profile_visits ? parseDecimal(socialForm.profile_visits) : null,
+      source: socialForm.source.trim() || 'manual_monthly_followers',
+      notes: socialForm.notes.trim() || null,
+    });
+
+    if (result.error) {
+      setSocialError(result.error);
+      setSavingSocial(false);
+      return;
+    }
+
+    setSocialSuccess(`Cierre social guardado para ${getMonthLabel(`${month}-01`)}.`);
+    setSavingSocial(false);
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box modal-large" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
             <h2 className="modal-title">Carga histórica mensual</h2>
-            <p className="modal-subtitle">{clientName} · Guardado manual de Ads y Ventas</p>
+            <p className="modal-subtitle">{clientName} · Guardado manual de Ads, Ventas y Seguidores</p>
           </div>
           <button className="modal-close" onClick={onClose}>
             ✕
@@ -186,8 +239,10 @@ export function HistoricalMonthlyModal({
                 setMonth(event.target.value);
                 setAdsError('');
                 setSalesError('');
+                setSocialError('');
                 setAdsSuccess('');
                 setSalesSuccess('');
+                setSocialSuccess('');
               }}
             />
           </div>
@@ -326,6 +381,50 @@ export function HistoricalMonthlyModal({
               <div className="history-actions">
                 <button className="btn-primary" onClick={() => void handleSaveSales()} disabled={!canSaveSales || savingSales}>
                   {savingSales ? 'Guardando ventas...' : 'Guardar ventas históricas'}
+                </button>
+              </div>
+            </section>
+
+            <section className="history-section">
+              <div className="section-heading">
+                <h2>Seguidores mensual</h2>
+              </div>
+
+              <div className="history-fields-grid">
+                <label className="form-field">
+                  <span className="form-label">Nuevos seguidores</span>
+                  <input className="form-input" type="number" min="0" step="1" value={socialForm.new_followers} onChange={(event) => setSocialField('new_followers', event.target.value)} />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Visitas al perfil</span>
+                  <input className="form-input" type="number" min="0" step="1" value={socialForm.profile_visits} onChange={(event) => setSocialField('profile_visits', event.target.value)} />
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Fuente</span>
+                  <input className="form-input" type="text" value={socialForm.source} onChange={(event) => setSocialField('source', event.target.value)} placeholder="manual_monthly_followers" />
+                </label>
+              </div>
+
+              <label className="form-field">
+                <span className="form-label">Notas</span>
+                <textarea
+                  className="form-textarea"
+                  rows={3}
+                  value={socialForm.notes}
+                  onChange={(event) => setSocialField('notes', event.target.value)}
+                  placeholder="Seguidores cargados al cierre mensual. No se infieren desde Ads."
+                />
+              </label>
+
+              {socialError && <p className="empty-note">{socialError}</p>}
+              {!socialError && socialSuccess && <p className="history-success">{socialSuccess}</p>}
+              {!socialError && !socialSuccess && (
+                <p className="empty-note">Usa cierre mensual manual. Los seguidores no se infieren desde Ads.</p>
+              )}
+
+              <div className="history-actions">
+                <button className="btn-primary" onClick={() => void handleSaveSocial()} disabled={!canSaveSocial || savingSocial}>
+                  {savingSocial ? 'Guardando social...' : 'Guardar cierre social'}
                 </button>
               </div>
             </section>

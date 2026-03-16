@@ -12,10 +12,13 @@ import {
 } from 'lucide-react';
 import { ClientFileModal } from '../components/ClientFileModal';
 import { HistoricalMonthlyModal } from '../components/HistoricalMonthlyModal';
+import { MonthSelector } from '../components/MonthSelector';
 import { SalesModal } from '../components/SalesModal';
 import { useAuth } from '../hooks/useAuth';
 import { useClientWorkspace } from '../hooks/useClientWorkspace';
 import {
+  adDataOriginClass,
+  adDataOriginLabel,
   activityActionLabel,
   formatCop,
   formatDate,
@@ -26,10 +29,14 @@ import {
   healthStatusLabel,
   metaSyncStatusClass,
   metaSyncStatusLabel,
+  resolveMonthlyProfileVisits,
   statusLabel,
+  sumMetrics,
   sumOperatingKpis,
+  sumSales,
+  summarizeAdDataOrigin,
 } from '../lib/utils';
-import { getMonthLabel } from '../utils/monthLabel';
+import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
 import type {
   AdMetric,
   ActivityLog,
@@ -42,6 +49,7 @@ import type {
   ClientMonthlyOperatingKpi,
   DailySale,
   OperationalIssue,
+  SocialMonthlyMetric,
   Strategy,
   Task,
   TaskUpdateInput,
@@ -70,6 +78,7 @@ function sectionLabel(section: string): string {
     files: 'archivos',
     activityLog: 'actividad',
     meta: 'estado Meta',
+    social: 'seguidores',
     operational: 'salud operativa',
   };
 
@@ -84,6 +93,7 @@ export function ClientDetailPage() {
     dailyKpis,
     monthlyKpis,
     sales,
+    socialMonthlyMetrics,
     strategies,
     tasks,
     alerts,
@@ -98,22 +108,126 @@ export function ClientDetailPage() {
     addSale,
     addHistoricalAds,
     addHistoricalSales,
+    addSocialMonthlyMetric,
     addFile,
     updateTask,
-  } = useClientWorkspace(id, 30);
+  } = useClientWorkspace(id, 400);
   const { isInternal, canWriteSales, role } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
   const [showHistoricalModal, setShowHistoricalModal] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState('');
 
   const recentOperatingKpis = useMemo(
     () => [...dailyKpis].sort((a, b) => compareDesc(a.date, b.date)).slice(0, 7),
     [dailyKpis],
   );
   const monthlyHistory = useMemo(
-    () => [...monthlyKpis].sort((a, b) => compareDesc(a.month, b.month)).slice(0, 6),
+    () => [...monthlyKpis].sort((a, b) => compareDesc(a.month, b.month)).slice(0, 8),
     [monthlyKpis],
+  );
+  const availableMonths = useMemo(
+    () =>
+      listAvailableMonthKeys([
+        ...monthlyKpis.map((row) => row.month),
+        ...metrics.map((row) => row.date),
+        ...sales.map((row) => row.date),
+        ...socialMonthlyMetrics.map((row) => row.month),
+      ]),
+    [metrics, monthlyKpis, sales, socialMonthlyMetrics],
+  );
+  const fallbackMonth = availableMonths[0] ?? new Date().toISOString().slice(0, 7);
+
+  useEffect(() => {
+    if (!selectedMonth) {
+      setSelectedMonth(fallbackMonth);
+      return;
+    }
+
+    if (availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
+      setSelectedMonth(availableMonths[0]);
+    }
+  }, [availableMonths, fallbackMonth, selectedMonth]);
+
+  const selectedMonthLabel = getMonthLabel(selectedMonth || fallbackMonth);
+  const selectedMonthMetrics = useMemo(
+    () => metrics.filter((row) => getMonthKey(row.date) === (selectedMonth || fallbackMonth)),
+    [fallbackMonth, metrics, selectedMonth],
+  );
+  const selectedMonthSales = useMemo(
+    () => sales.filter((row) => getMonthKey(row.date) === (selectedMonth || fallbackMonth)),
+    [fallbackMonth, sales, selectedMonth],
+  );
+  const selectedMonthRow = useMemo(
+    () =>
+      monthlyKpis.find((row) => getMonthKey(row.month) === (selectedMonth || fallbackMonth)) ?? null,
+    [fallbackMonth, monthlyKpis, selectedMonth],
+  );
+  const selectedSocialMetric = useMemo(
+    () =>
+      socialMonthlyMetrics.find(
+        (row) => getMonthKey(row.month) === (selectedMonth || fallbackMonth),
+      ) ?? null,
+    [fallbackMonth, selectedMonth, socialMonthlyMetrics],
+  );
+  const selectedMonthMetricTotals = useMemo(
+    () => sumMetrics(selectedMonthMetrics),
+    [selectedMonthMetrics],
+  );
+  const selectedMonthSalesTotals = useMemo(
+    () => sumSales(selectedMonthSales),
+    [selectedMonthSales],
+  );
+  const selectedPeriodTotals = useMemo(() => {
+    if (selectedMonthRow) return sumOperatingKpis([selectedMonthRow]);
+
+    const spend = selectedMonthMetricTotals.spend;
+    const totalSales = selectedMonthSalesTotals.total;
+
+    return {
+      ...selectedMonthMetricTotals,
+      total_sales: totalSales,
+      new_client_sales: selectedMonthSalesTotals.newClient,
+      repeat_sales: selectedMonthSalesTotals.repeat,
+      physical_store_sales: selectedMonthSalesTotals.physical,
+      online_sales: selectedMonthSalesTotals.online,
+      ad_roas: selectedMonthMetricTotals.roas,
+      real_roas: spend > 0 ? totalSales / spend : 0,
+    };
+  }, [selectedMonthMetricTotals, selectedMonthRow, selectedMonthSalesTotals]);
+  const selectedAdsOrigin = useMemo(
+    () => summarizeAdDataOrigin(selectedMonthMetrics.map((row) => row.source)),
+    [selectedMonthMetrics],
+  );
+  const selectedProfileVisits = useMemo(
+    () =>
+      resolveMonthlyProfileVisits({
+        socialMetric: selectedSocialMetric,
+        adMetrics: selectedMonthMetrics,
+      }),
+    [selectedMonthMetrics, selectedSocialMetric],
+  );
+  const selectedFollowerConversion =
+    selectedSocialMetric && selectedProfileVisits.value && selectedProfileVisits.value > 0
+      ? (selectedSocialMetric.new_followers / selectedProfileVisits.value) * 100
+      : null;
+  const selectedMonthHasData =
+    Boolean(selectedMonthRow) ||
+    selectedMonthMetrics.length > 0 ||
+    selectedMonthSales.length > 0 ||
+    Boolean(selectedSocialMetric);
+  const monthlyHistoryRows = useMemo(
+    () =>
+      monthlyHistory.map((row) => ({
+        ...row,
+        adsOrigin: summarizeAdDataOrigin(
+          metrics
+            .filter((metric) => getMonthKey(metric.date) === getMonthKey(row.month))
+            .map((metric) => metric.source),
+        ),
+      })),
+    [metrics, monthlyHistory],
   );
 
   const canRegisterSales = client ? canWriteSales(client.id) : false;
@@ -164,13 +278,11 @@ export function ClientDetailPage() {
   }
 
   const operatingTotals = sumOperatingKpis(dailyKpis);
-  const pendingTasks = tasks.filter((task) => task.status === 'pending');
   const criticalAlerts = alerts.filter(
     (alert) => alert.severity === 'critical' && ['unread', 'read'].includes(alert.status),
   );
   const metaStatus = meta?.sync_status ?? 'no_data';
-  const metaStatusValueClass =
-    metaStatus === 'ok' ? 'text-green' : metaStatus === 'stale' ? 'text-amber' : '';
+  const activeMonth = selectedMonth || fallbackMonth;
 
   return (
     <div className="page-content">
@@ -212,6 +324,97 @@ export function ClientDetailPage() {
         </div>
       </div>
 
+      <div className="card section-block period-toolbar-card">
+        <div className="period-toolbar">
+          <div className="period-toolbar-copy">
+            <div className="section-heading">
+              <h2>Periodo de lectura</h2>
+            </div>
+            <p className="source-note">
+              Resumen, Ads y Ventas usan el mes seleccionado. Estado Meta y salud operativa siguen
+              mostrando lectura actual.
+            </p>
+            <div className="period-chip-row">
+              <span className="meta-chip">{selectedMonthLabel}</span>
+              <span className={`meta-chip ${adDataOriginClass(selectedAdsOrigin)}`}>
+                Ads {adDataOriginLabel(selectedAdsOrigin)}
+              </span>
+              <span className="meta-chip">Ventas reportadas manualmente</span>
+              <span className="meta-chip">
+                Seguidores {selectedSocialMetric ? 'manual mensual' : 'sin cierre cargado'}
+              </span>
+              <span className="meta-chip">
+                {selectedMonthRow
+                  ? 'Mes consolidado en vistas SQL'
+                  : selectedMonthHasData
+                    ? 'Sin cierre consolidado; leyendo registros del mes'
+                    : 'Sin datos para el mes seleccionado'}
+              </span>
+            </div>
+          </div>
+          <MonthSelector
+            label="Mes visible"
+            value={activeMonth}
+            options={availableMonths.length > 0 ? availableMonths : [fallbackMonth]}
+            helper="Los meses disponibles salen de Ads automáticos, histórico manual y ventas reportadas."
+            onChange={setSelectedMonth}
+          />
+        </div>
+      </div>
+
+      <div className="kpi-strip">
+        <div className="kpi-strip-item">
+          <span className="kpi-strip-label">Periodo</span>
+          <span className="kpi-strip-value">{selectedMonthLabel}</span>
+        </div>
+        <div className="kpi-strip-item">
+          <span className="kpi-strip-label">Ads</span>
+          <span className="kpi-strip-value">
+            {selectedMonthHasData ? formatCop(selectedPeriodTotals.spend) : '—'}
+          </span>
+        </div>
+        <div className="kpi-strip-item">
+          <span className="kpi-strip-label">ROAS Ads</span>
+          <span
+            className={`kpi-strip-value roas-color-${
+              selectedPeriodTotals.ad_roas >= 3
+                ? 'good'
+                : selectedPeriodTotals.ad_roas >= 2
+                  ? 'ok'
+                  : 'low'
+            }`}
+          >
+            {selectedMonthHasData ? formatRoas(selectedPeriodTotals.ad_roas) : '—'}
+          </span>
+        </div>
+        <div className="kpi-strip-item">
+          <span className="kpi-strip-label">Mensajes</span>
+          <span className="kpi-strip-value">
+            {selectedMonthHasData ? formatNumber(selectedPeriodTotals.messages) : '—'}
+          </span>
+        </div>
+        <div className="kpi-strip-item">
+          <span className="kpi-strip-label">Ventas</span>
+          <span className="kpi-strip-value">
+            {selectedMonthHasData ? formatCop(selectedPeriodTotals.total_sales) : '—'}
+          </span>
+        </div>
+        <div className="kpi-strip-item">
+          <span className="kpi-strip-label">ROAS Real</span>
+          <span
+            className={`kpi-strip-value roas-color-${
+              selectedPeriodTotals.real_roas >= 3
+                ? 'good'
+                : selectedPeriodTotals.real_roas >= 2
+                  ? 'ok'
+                  : 'low'
+            }`}
+          >
+            {selectedMonthHasData ? formatRoas(selectedPeriodTotals.real_roas) : '—'}
+          </span>
+        </div>
+      </div>
+
       {isInternal && (health || criticalAlerts.length > 0) && (
         <ClientOperationalBanner health={health} issues={issues} criticalAlerts={criticalAlerts} />
       )}
@@ -234,58 +437,11 @@ export function ClientDetailPage() {
         </div>
       )}
 
-      <div className="kpi-strip">
-        {isInternal && (
-          <div className="kpi-strip-item">
-            <span className="kpi-strip-label">Salud</span>
-            <span className={`kpi-strip-value health-${health?.status ?? 'healthy'}`}>
-              {health ? `${health.score} · ${healthStatusLabel(health.status)}` : '—'}
-            </span>
-          </div>
-        )}
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">Estado Meta</span>
-          <span className={`kpi-strip-value ${metaStatusValueClass}`}>
-            {metaSyncStatusLabel(metaStatus)}
-          </span>
-        </div>
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">Ads MTD</span>
-          <span className="kpi-strip-value">
-            {meta?.has_mtd_data ? formatCop(meta.mtd_spend) : '—'}
-          </span>
-        </div>
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">Inversión 30d</span>
-          <span className="kpi-strip-value">{formatCop(operatingTotals.spend)}</span>
-        </div>
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">ROAS Ads</span>
-          <span className={`kpi-strip-value roas-color-${operatingTotals.ad_roas >= 3 ? 'good' : operatingTotals.ad_roas >= 2 ? 'ok' : 'low'}`}>
-            {formatRoas(operatingTotals.ad_roas)}
-          </span>
-        </div>
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">Mensajes</span>
-          <span className="kpi-strip-value">{formatNumber(operatingTotals.messages)}</span>
-        </div>
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">ROAS Real</span>
-          <span className={`kpi-strip-value roas-color-${operatingTotals.real_roas >= 3 ? 'good' : operatingTotals.real_roas >= 2 ? 'ok' : 'low'}`}>
-            {formatRoas(operatingTotals.real_roas)}
-          </span>
-        </div>
-        <div className="kpi-strip-item">
-          <span className="kpi-strip-label">Ventas 30d</span>
-          <span className="kpi-strip-value">{formatCop(operatingTotals.total_sales)}</span>
-        </div>
-        {isInternal && (
-          <div className="kpi-strip-item">
-            <span className="kpi-strip-label">Tareas</span>
-            <span className="kpi-strip-value">{pendingTasks.length} pendientes</span>
-          </div>
-        )}
-      </div>
+      <MonthlyHistoryCard
+        rows={monthlyHistoryRows}
+        selectedMonth={activeMonth}
+        selectedMonthLabel={selectedMonthLabel}
+      />
 
       <div className="tab-bar">
         {tabs.map((currentTab) => (
@@ -306,15 +462,32 @@ export function ClientDetailPage() {
             health={health}
             issues={issues}
             meta={meta}
-            operatingTotals={operatingTotals}
+            selectedMonthLabel={selectedMonthLabel}
+            selectedMonthHasData={selectedMonthHasData}
+            selectedMonthOrigin={selectedAdsOrigin}
+            socialMetric={selectedSocialMetric}
+            profileVisits={selectedProfileVisits}
+            followerConversion={selectedFollowerConversion}
+            operatingTotals={selectedPeriodTotals}
+            rollingTotals={operatingTotals}
             operatingRows={recentOperatingKpis}
-            monthlyRows={monthlyHistory}
             activityLog={activityLog}
             showOperational={isInternal}
           />
         )}
-        {tab === 'metrics' && <ClientMetricsTab metrics={metrics} />}
-        {tab === 'sales' && <ClientSalesTab sales={sales} />}
+        {tab === 'metrics' && (
+          <ClientMetricsTab
+            metrics={selectedMonthMetrics}
+            selectedMonthLabel={selectedMonthLabel}
+            origin={selectedAdsOrigin}
+          />
+        )}
+        {tab === 'sales' && (
+          <ClientSalesTab
+            sales={selectedMonthSales}
+            selectedMonthLabel={selectedMonthLabel}
+          />
+        )}
         {tab === 'strategies' && <ClientStrategiesTab strategies={strategies} clientId={client.id} />}
         {tab === 'tasks' && <ClientTasksTab tasks={tasks} updateTask={updateTask} />}
         {tab === 'files' && (
@@ -358,6 +531,7 @@ export function ClientDetailPage() {
           onClose={() => setShowHistoricalModal(false)}
           onSaveAds={addHistoricalAds}
           onSaveSales={addHistoricalSales}
+          onSaveSocial={addSocialMonthlyMetric}
         />
       )}
     </div>
@@ -366,23 +540,35 @@ export function ClientDetailPage() {
 
 function ClientOverview({
   operatingTotals,
+  rollingTotals,
   operatingRows,
   client,
   health,
   issues,
   meta,
   activityLog,
-  monthlyRows,
+  selectedMonthLabel,
+  selectedMonthHasData,
+  selectedMonthOrigin,
+  socialMetric,
+  profileVisits,
+  followerConversion,
   showOperational,
 }: {
   operatingTotals: ReturnType<typeof sumOperatingKpis>;
+  rollingTotals: ReturnType<typeof sumOperatingKpis>;
   operatingRows: ClientDailyOperatingKpi[];
-  monthlyRows: ClientMonthlyOperatingKpi[];
   client: Client;
   health: ClientHealthScore | null;
   issues: OperationalIssue[];
   meta: ClientMetaOverview | null;
   activityLog: ActivityLog[];
+  selectedMonthLabel: string;
+  selectedMonthHasData: boolean;
+  selectedMonthOrigin: ReturnType<typeof summarizeAdDataOrigin>;
+  socialMetric: SocialMonthlyMetric | null;
+  profileVisits: ReturnType<typeof resolveMonthlyProfileVisits>;
+  followerConversion: number | null;
   showOperational: boolean;
 }) {
   const metaStatus = meta?.sync_status ?? 'no_data';
@@ -391,7 +577,11 @@ function ClientOverview({
     <div className="tab-content overview-grid">
       {showOperational && health && (
         <div className="card section-block">
-          <div className="section-heading"><h2>Salud operativa</h2></div>
+          <div className="section-heading"><h2>Salud operativa actual</h2></div>
+          <p className="source-note">
+            Este bloque no cambia con el selector de mes. Resume alertas, tareas y estado operativo
+            reciente.
+          </p>
           <div className="metric-grid-4">
             <MetricBox label="Score" value={String(health.score)} highlight={health.status === 'healthy' ? 'green' : health.status === 'warning' ? 'amber' : 'red'} />
             <MetricBox label="Estado" value={healthStatusLabel(health.status)} highlight={health.status === 'healthy' ? 'green' : health.status === 'warning' ? 'amber' : 'red'} />
@@ -406,7 +596,11 @@ function ClientOverview({
       )}
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Salud Meta</h2></div>
+        <div className="section-heading"><h2>Estado Meta actual</h2></div>
+        <p className="source-note">
+          Sync real de Meta por cuenta activa. Este bloque siempre muestra el estado actual, no el
+          mes seleccionado.
+        </p>
         <div className="operational-summary-row">
           <span className={`status-pill ${metaSyncStatusClass(metaStatus)}`}>
             Meta {metaSyncStatusLabel(metaStatus)}
@@ -456,21 +650,38 @@ function ClientOverview({
       </div>
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Métricas Ads — Últimos 30 días</h2></div>
-        <div className="metric-grid-4">
-          <MetricBox label="Inversión" value={formatCop(operatingTotals.spend)} />
-          <MetricBox label="ROAS Ads" value={formatRoas(operatingTotals.ad_roas)} highlight={operatingTotals.ad_roas >= 3 ? 'green' : operatingTotals.ad_roas >= 2 ? 'amber' : 'red'} />
-          <MetricBox label="Compras" value={formatNumber(operatingTotals.purchases)} />
-          <MetricBox label="Valor compras" value={formatCop(operatingTotals.purchase_value)} />
-          <MetricBox label="Mensajes" value={formatNumber(operatingTotals.messages)} />
-          <MetricBox label="Leads" value={formatNumber(operatingTotals.leads)} />
-          <MetricBox label="Alcance" value={formatNumber(operatingTotals.reach)} />
-          <MetricBox label="Impresiones" value={formatNumber(operatingTotals.impressions)} />
+        <div className="section-heading"><h2>Ads — {selectedMonthLabel}</h2></div>
+        <div className="operational-summary-row">
+          <span className={`meta-chip ${adDataOriginClass(selectedMonthOrigin)}`}>
+            {adDataOriginLabel(selectedMonthOrigin)}
+          </span>
+          <span className="meta-chip">
+            {selectedMonthHasData
+              ? `Lectura mensual ${selectedMonthLabel.toLowerCase()}`
+              : `Sin Ads para ${selectedMonthLabel.toLowerCase()}`}
+          </span>
         </div>
+        {selectedMonthHasData ? (
+          <div className="metric-grid-4">
+            <MetricBox label="Inversión" value={formatCop(operatingTotals.spend)} />
+            <MetricBox label="ROAS Ads" value={formatRoas(operatingTotals.ad_roas)} highlight={operatingTotals.ad_roas >= 3 ? 'green' : operatingTotals.ad_roas >= 2 ? 'amber' : 'red'} />
+            <MetricBox label="Compras" value={formatNumber(operatingTotals.purchases)} />
+            <MetricBox label="Valor compras" value={formatCop(operatingTotals.purchase_value)} />
+            <MetricBox label="Mensajes" value={formatNumber(operatingTotals.messages)} />
+            <MetricBox label="Leads" value={formatNumber(operatingTotals.leads)} />
+            <MetricBox label="Alcance" value={formatNumber(operatingTotals.reach)} />
+            <MetricBox label="Impresiones" value={formatNumber(operatingTotals.impressions)} />
+          </div>
+        ) : (
+          <p className="empty-note">No hay métricas Ads para el mes seleccionado.</p>
+        )}
       </div>
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Ventas — Últimos 30 días</h2></div>
+        <div className="section-heading"><h2>Ventas reportadas — {selectedMonthLabel}</h2></div>
+        <p className="source-note">
+          Las ventas vienen de `daily_sales` y pueden ser carga diaria o histórico mensual manual.
+        </p>
         {operatingTotals.total_sales > 0 ? (
           <div className="metric-grid-4">
             <MetricBox label="Total ventas" value={formatCop(operatingTotals.total_sales)} />
@@ -480,51 +691,53 @@ function ClientOverview({
             <MetricBox label="Online" value={formatCop(operatingTotals.online_sales)} />
           </div>
         ) : (
-          <p className="empty-note">No hay ventas registradas. Usa "Registrar Ventas" para comenzar.</p>
+          <p className="empty-note">
+            No hay ventas reportadas para el mes seleccionado. Usa "Registrar Ventas" o "Cargar
+            histórico" para completarlo.
+          </p>
         )}
       </div>
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Histórico mensual consolidado</h2></div>
-        {monthlyRows.length === 0 ? (
-          <p className="empty-note">Todavía no hay meses consolidados para este cliente.</p>
-        ) : (
-          <>
-            <p className="empty-note">Meses cerrados, del más reciente al más antiguo.</p>
-            <div className="mini-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Mes</th>
-                    <th className="num-col">Ads</th>
-                    <th className="num-col">ROAS Ads</th>
-                    <th className="num-col">Ventas</th>
-                    <th className="num-col">ROAS Real</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthlyRows.map((row) => (
-                    <tr key={`${row.client_id}-${row.month}`}>
-                      <td>{getMonthLabel(row.month)}</td>
-                      <td className="num-col">{formatCop(row.spend)}</td>
-                      <td className={`num-col ${row.ad_roas >= 3 ? 'text-green' : row.ad_roas >= 2 ? 'text-amber' : 'text-red'}`}>
-                        {formatRoas(row.ad_roas)}
-                      </td>
-                      <td className="num-col">{formatCop(row.total_sales)}</td>
-                      <td className={`num-col ${row.real_roas >= 3 ? 'text-green' : row.real_roas >= 2 ? 'text-amber' : 'text-red'}`}>
-                        {formatRoas(row.real_roas)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
+        <div className="section-heading"><h2>Crecimiento social — {selectedMonthLabel}</h2></div>
+        <p className="source-note">
+          Seguidores cargados al cierre mensual. No se infieren desde Ads. Las visitas al perfil
+          usan cierre manual y, si falta, fallback desde Ads solo cuando el mes sí trae
+          `profile_visit_view`.
+        </p>
+        <div className="operational-summary-row">
+          <span
+            className={`meta-chip ${
+              socialMetric ? 'source-manual' : adDataOriginClass(profileVisits.sourceOrigin)
+            }`}
+          >
+            {socialMetric ? 'Fuente manual mensual' : profileVisits.sourceLabel}
+          </span>
+          <span className="meta-chip">Costo por seguidor: Pendiente de fuente</span>
+        </div>
+        <div className="metric-grid-4">
+          <MetricBox
+            label="Nuevos seguidores del mes"
+            value={socialMetric ? formatNumber(socialMetric.new_followers) : 'Sin dato'}
+          />
+          <MetricBox
+            label="Visitas al perfil del mes"
+            value={profileVisits.value != null ? formatNumber(profileVisits.value) : 'Sin dato'}
+          />
+          <MetricBox
+            label="Conversión visita → seguidor"
+            value={followerConversion != null ? `${followerConversion.toFixed(1)}%` : '—'}
+          />
+          <MetricBox label="Costo por seguidor" value="Pendiente de fuente" />
+        </div>
+        {socialMetric?.notes && <p className="empty-note">{socialMetric.notes}</p>}
       </div>
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Últimos 7 días — Ads</h2></div>
+        <div className="section-heading"><h2>Ads recientes — últimos 7 días</h2></div>
+        <p className="source-note">
+          Bloque rolling para leer tendencia reciente sin cambiar el consolidado mensual.
+        </p>
         {operatingRows.length === 0 ? (
           <p className="empty-note">Sin métricas recientes para este cliente.</p>
         ) : (
@@ -556,7 +769,11 @@ function ClientOverview({
       </div>
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Últimos 7 días — Ventas</h2></div>
+        <div className="section-heading"><h2>Ventas recientes — últimos 7 días</h2></div>
+        <p className="source-note">
+          Ventas reportadas recientes. El comparativo mensual se mantiene arriba en la lectura del
+          mes seleccionado.
+        </p>
         {operatingRows.length === 0 ? (
           <p className="empty-note">Todavía no hay ventas recientes registradas.</p>
         ) : (
@@ -581,6 +798,15 @@ function ClientOverview({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {rollingTotals.total_sales > 0 && (
+          <div className="operational-summary-row">
+            <span className="meta-chip">Rolling 30d {formatCop(rollingTotals.total_sales)}</span>
+            <span className="meta-chip">
+              ROAS real 30d {formatRoas(rollingTotals.real_roas)}
+            </span>
+            <span className="meta-chip">Mes seleccionado {selectedMonthLabel}</span>
           </div>
         )}
       </div>
@@ -612,6 +838,94 @@ function ClientOverview({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function MonthlyHistoryCard({
+  rows,
+  selectedMonth,
+  selectedMonthLabel,
+}: {
+  rows: Array<ClientMonthlyOperatingKpi & { adsOrigin: ReturnType<typeof summarizeAdDataOrigin> }>;
+  selectedMonth: string;
+  selectedMonthLabel: string;
+}) {
+  return (
+    <div className="card section-block">
+      <div className="section-heading">
+        <h2>Histórico mensual consolidado</h2>
+      </div>
+      <p className="source-note">
+        Meses cerrados del más reciente al más antiguo. Incluye datos sincronizados y/o histórico
+        manual según disponibilidad.
+      </p>
+      {rows.length === 0 ? (
+        <p className="empty-note">Todavía no hay meses consolidados para este cliente.</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Fuente Ads</th>
+                <th className="num-col">Ads</th>
+                <th className="num-col">ROAS Ads</th>
+                <th className="num-col">Ventas</th>
+                <th className="num-col">ROAS Real</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const isSelected = getMonthKey(row.month) === selectedMonth;
+
+                return (
+                  <tr
+                    key={`${row.client_id}-${row.month}`}
+                    className={isSelected ? 'is-selected-row' : undefined}
+                  >
+                    <td>
+                      <div className="table-primary-cell">
+                        <strong>{getMonthLabel(row.month)}</strong>
+                        {isSelected && <span className="table-secondary-note">Mes visible</span>}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`meta-chip ${adDataOriginClass(row.adsOrigin)}`}>
+                        {adDataOriginLabel(row.adsOrigin)}
+                      </span>
+                    </td>
+                    <td className="num-col">{formatCop(row.spend)}</td>
+                    <td
+                      className={`num-col ${
+                        row.ad_roas >= 3 ? 'text-green' : row.ad_roas >= 2 ? 'text-amber' : 'text-red'
+                      }`}
+                    >
+                      {formatRoas(row.ad_roas)}
+                    </td>
+                    <td className="num-col">{formatCop(row.total_sales)}</td>
+                    <td
+                      className={`num-col ${
+                        row.real_roas >= 3
+                          ? 'text-green'
+                          : row.real_roas >= 2
+                            ? 'text-amber'
+                            : 'text-red'
+                      }`}
+                    >
+                      {formatRoas(row.real_roas)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="operational-summary-row">
+        <span className="meta-chip">Mes visible: {selectedMonthLabel}</span>
+        <span className="meta-chip">ROAS Real = ventas reportadas / inversión Ads</span>
+      </div>
     </div>
   );
 }
@@ -684,21 +998,38 @@ function MetricBox({
   );
 }
 
-function ClientMetricsTab({ metrics }: { metrics: AdMetric[] }) {
+function ClientMetricsTab({
+  metrics,
+  selectedMonthLabel,
+  origin,
+}: {
+  metrics: AdMetric[];
+  selectedMonthLabel: string;
+  origin: ReturnType<typeof summarizeAdDataOrigin>;
+}) {
   const orderedMetrics = [...metrics].sort((a, b) => compareDesc(a.date, b.date));
 
   return (
     <div className="tab-content">
       <div className="card section-block">
-        <div className="section-heading"><h2>Métricas diarias — 30 días</h2></div>
+        <div className="section-heading"><h2>Detalle Ads — {selectedMonthLabel}</h2></div>
+        <div className="operational-summary-row">
+          <span className={`meta-chip ${adDataOriginClass(origin)}`}>
+            {adDataOriginLabel(origin)}
+          </span>
+          <span className="meta-chip">
+            {orderedMetrics.length} registro{orderedMetrics.length === 1 ? '' : 's'} del mes
+          </span>
+        </div>
         {orderedMetrics.length === 0 ? (
-          <p className="empty-note">No hay métricas cargadas para este cliente.</p>
+          <p className="empty-note">No hay métricas Ads para el mes seleccionado.</p>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>Fecha</th>
+                  <th>Fuente</th>
                   <th className="num-col">Inversión</th>
                   <th className="num-col">Alcance</th>
                   <th className="num-col">Impresiones</th>
@@ -718,6 +1049,15 @@ function ClientMetricsTab({ metrics }: { metrics: AdMetric[] }) {
                 {orderedMetrics.map((row) => (
                   <tr key={row.id}>
                     <td>{formatDate(row.date)}</td>
+                    <td>
+                      <span
+                        className={`meta-chip ${adDataOriginClass(
+                          summarizeAdDataOrigin([row.source]),
+                        )}`}
+                      >
+                        {adDataOriginLabel(summarizeAdDataOrigin([row.source]))}
+                      </span>
+                    </td>
                     <td className="num-col">{formatCop(row.spend)}</td>
                     <td className="num-col">{formatNumber(row.reach)}</td>
                     <td className="num-col">{formatNumber(row.impressions)}</td>
@@ -785,15 +1125,24 @@ class ClientDetailRenderBoundary extends Component<
   }
 }
 
-function ClientSalesTab({ sales }: { sales: DailySale[] }) {
+function ClientSalesTab({
+  sales,
+  selectedMonthLabel,
+}: {
+  sales: DailySale[];
+  selectedMonthLabel: string;
+}) {
   const orderedSales = [...sales].sort((a, b) => compareDesc(a.date, b.date));
 
   return (
     <div className="tab-content">
       <div className="card section-block">
-        <div className="section-heading"><h2>Ventas diarias — 30 días</h2></div>
+        <div className="section-heading"><h2>Ventas reportadas — {selectedMonthLabel}</h2></div>
+        <p className="source-note">
+          Esta tabla muestra ventas del mes seleccionado registradas en `daily_sales`.
+        </p>
         {orderedSales.length === 0 ? (
-          <p className="empty-note">No hay ventas cargadas para este cliente.</p>
+          <p className="empty-note">No hay ventas reportadas para el mes seleccionado.</p>
         ) : (
           <div className="table-wrap">
             <table>

@@ -234,6 +234,29 @@ export type HistoricalMonthlySaleInput = {
   registered_by?: string | null;
 };
 
+export type SocialMonthlyMetric = {
+  id: string;
+  client_id: string;
+  month: string;
+  new_followers: number;
+  profile_visits?: number | null;
+  source: string;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SocialMonthlyMetricInput = {
+  client_id: string;
+  month: string;
+  new_followers: number;
+  profile_visits?: number | null;
+  source: string;
+  notes?: string | null;
+  created_by?: string | null;
+};
+
 export type DailySaleValidation = {
   totalsMismatch: boolean;
   channelsMismatch: boolean;

@@ -1,17 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, TrendingUp } from 'lucide-react';
+import { MonthSelector } from '../components/MonthSelector';
 import { SalesModal } from '../components/SalesModal';
 import { useDashboard } from '../hooks/useDashboard';
 import { useDailySales } from '../hooks/useDailySales';
 import type { Client } from '../lib/supabase';
-import { formatCop, formatDate, sumOperatingKpis } from '../lib/utils';
+import { formatCop, formatDate, formatRoas, sumSales } from '../lib/utils';
+import { getMonthLabel, getMonthKey, listAvailableMonthKeys } from '../utils/monthLabel';
 
 export function SalesPage() {
   const { clients, dailyKpis, monthlyKpis, reload: reloadDashboard } = useDashboard(30);
-  const { sales, addSale, reload: reloadSales } = useDailySales(undefined, 90);
+  const { sales, addSale, reload: reloadSales } = useDailySales(undefined, 400);
   const [search, setSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState('');
 
   const yesterday = useMemo(() => {
     const date = new Date();
@@ -19,8 +22,30 @@ export function SalesPage() {
     return date.toISOString().split('T')[0];
   }, []);
 
-  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
-  const totals30d = sumOperatingKpis(dailyKpis);
+  const availableMonths = useMemo(
+    () => listAvailableMonthKeys([...sales.map((sale) => sale.date), ...monthlyKpis.map((row) => row.month)]),
+    [monthlyKpis, sales],
+  );
+  const fallbackMonth = availableMonths[0] ?? new Date().toISOString().slice(0, 7);
+
+  useEffect(() => {
+    if (!selectedMonth) {
+      setSelectedMonth(fallbackMonth);
+      return;
+    }
+
+    if (availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
+      setSelectedMonth(availableMonths[0]);
+    }
+  }, [availableMonths, fallbackMonth, selectedMonth]);
+
+  const activeMonth = selectedMonth || fallbackMonth;
+  const selectedMonthLabel = getMonthLabel(activeMonth);
+  const monthSales = useMemo(
+    () => sales.filter((sale) => getMonthKey(sale.date) === activeMonth),
+    [activeMonth, sales],
+  );
+  const monthTotals = sumSales(monthSales);
 
   const latestSalesByClient = useMemo(() => {
     const latest = new Map<string, (typeof sales)[number]>();
@@ -34,15 +59,18 @@ export function SalesPage() {
   }, [sales]);
 
   const rows = clients
-    .filter((client) =>
-      client.name.toLowerCase().includes(search.toLowerCase()) ||
-      (client.niche ?? '').toLowerCase().includes(search.toLowerCase()),
+    .filter(
+      (client) =>
+        client.name.toLowerCase().includes(search.toLowerCase()) ||
+        (client.niche ?? '').toLowerCase().includes(search.toLowerCase()),
     )
     .map((client) => {
-      const monthRow =
+      const monthlyRow =
         monthlyKpis.find(
-          (row) => row.client_id === client.id && row.month.startsWith(currentMonthPrefix),
+          (row) => row.client_id === client.id && getMonthKey(row.month) === activeMonth,
         ) ?? null;
+      const clientMonthSales = monthSales.filter((sale) => sale.client_id === client.id);
+      const salesTotals = sumSales(clientMonthSales);
       const yesterdayRow =
         dailyKpis.find((row) => row.client_id === client.id && row.date === yesterday) ?? null;
       const latestSale = latestSalesByClient.get(client.id) ?? null;
@@ -50,21 +78,60 @@ export function SalesPage() {
 
       return {
         client,
-        monthRow,
-        yesterdayRow,
         latestSale,
         pendingYesterday,
+        spend: monthlyRow?.spend ?? 0,
+        totalSales: salesTotals.total,
+        newClientSales: salesTotals.newClient,
+        repeatSales: salesTotals.repeat,
+        realRoas:
+          monthlyRow?.real_roas ?? ((monthlyRow?.spend ?? 0) > 0 ? salesTotals.total / (monthlyRow?.spend ?? 0) : 0),
       };
     });
 
   const pendingClients = rows.filter((row) => row.pendingYesterday).length;
+  const clientsWithSales = rows.filter((row) => row.totalSales > 0).length;
 
   return (
     <div className="page-content">
       <div className="page-header">
         <div>
-          <h1 className="page-title"><TrendingUp size={20} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} />Ventas</h1>
-          <p className="page-subtitle">Registro diario y seguimiento operativo por cliente</p>
+          <h1 className="page-title">
+            <TrendingUp
+              size={20}
+              style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }}
+            />
+            Ventas
+          </h1>
+          <p className="page-subtitle">
+            Ventas reportadas del mes seleccionado · {selectedMonthLabel}
+          </p>
+        </div>
+      </div>
+
+      <div className="card section-block period-toolbar-card">
+        <div className="period-toolbar">
+          <div className="period-toolbar-copy">
+            <div className="section-heading">
+              <h2>Periodo visible</h2>
+            </div>
+            <p className="source-note">
+              Esta vista usa ventas reportadas en `daily_sales` para el mes seleccionado. El estado
+              "pendiente ayer" sigue siendo operativo y actual.
+            </p>
+            <div className="period-chip-row">
+              <span className="meta-chip">{selectedMonthLabel}</span>
+              <span className="meta-chip">Ventas reportadas</span>
+              <span className="meta-chip">{clientsWithSales} clientes con ventas en el mes</span>
+            </div>
+          </div>
+          <MonthSelector
+            label="Mes visible"
+            value={activeMonth}
+            options={availableMonths.length > 0 ? availableMonths : [fallbackMonth]}
+            helper="Se listan meses con ventas reportadas o con consolidado mensual disponible."
+            onChange={setSelectedMonth}
+          />
         </div>
       </div>
 
@@ -78,9 +145,10 @@ export function SalesPage() {
       </div>
 
       <div className="kpi-row">
-        <SalesKpi label="Ventas 30d" value={formatCop(totals30d.total_sales)} />
-        <SalesKpi label="Nuevo cliente 30d" value={formatCop(totals30d.new_client_sales)} />
-        <SalesKpi label="Recompra 30d" value={formatCop(totals30d.repeat_sales)} />
+        <SalesKpi label="Ventas del mes" value={formatCop(monthTotals.total)} />
+        <SalesKpi label="Nuevo cliente" value={formatCop(monthTotals.newClient)} />
+        <SalesKpi label="Recompra" value={formatCop(monthTotals.repeat)} />
+        <SalesKpi label="Clientes con ventas" value={String(clientsWithSales)} />
         <SalesKpi
           label="Clientes pendientes ayer"
           value={String(pendingClients)}
@@ -89,7 +157,12 @@ export function SalesPage() {
       </div>
 
       <div className="card section-block">
-        <div className="section-heading"><h2>Seguimiento diario</h2></div>
+        <div className="section-heading">
+          <h2>Seguimiento por cliente</h2>
+        </div>
+        <p className="source-note">
+          Ventas del mes seleccionado con referencia a Ads del mismo mes cuando existan métricas.
+        </p>
         {rows.length === 0 ? (
           <p className="empty-note">No hay clientes o ventas registradas todavía.</p>
         ) : (
@@ -100,40 +173,54 @@ export function SalesPage() {
                   <th>Cliente</th>
                   <th>Última carga</th>
                   <th className="num-col">Ventas mes</th>
-                  <th className="num-col">Ventas ayer</th>
-                  <th>Estado</th>
+                  <th className="num-col">Nuevo</th>
+                  <th className="num-col">Recompra</th>
+                  <th className="num-col">Ads mes</th>
+                  <th className="num-col">ROAS Real</th>
+                  <th>Estado reciente</th>
                   <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ client, latestSale, monthRow, yesterdayRow, pendingYesterday }) => (
-                  <tr key={client.id}>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <strong>{client.name}</strong>
-                        <span className="text-muted">{client.niche ?? 'Sin nicho'}</span>
-                      </div>
-                    </td>
-                    <td>{latestSale ? formatDate(latestSale.date) : '—'}</td>
-                    <td className="num-col">{formatCop(monthRow?.total_sales ?? 0)}</td>
-                    <td className="num-col">{formatCop(yesterdayRow?.total_sales ?? 0)}</td>
-                    <td>
-                      <span className={`status-pill status-${pendingYesterday ? 'amber' : 'green'}`}>
-                        {pendingYesterday ? 'Pendiente' : 'Al día'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button className="btn-secondary" onClick={() => setSelectedClient(client)}>
-                          <Plus size={14} /> Registrar
-                        </button>
-                        <Link to={`/clients/${client.id}`} className="btn-ghost">
-                          Ver cliente
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {rows.map(
+                  ({ client, latestSale, totalSales, newClientSales, repeatSales, spend, realRoas, pendingYesterday }) => (
+                    <tr key={client.id}>
+                      <td>
+                        <div className="table-primary-cell">
+                          <strong>{client.name}</strong>
+                          <span className="table-secondary-note">{client.niche ?? 'Sin nicho'}</span>
+                        </div>
+                      </td>
+                      <td>{latestSale ? formatDate(latestSale.date) : '—'}</td>
+                      <td className="num-col">{formatCop(totalSales)}</td>
+                      <td className="num-col">{formatCop(newClientSales)}</td>
+                      <td className="num-col">{formatCop(repeatSales)}</td>
+                      <td className="num-col">{formatCop(spend)}</td>
+                      <td
+                        className={`num-col ${
+                          realRoas >= 3 ? 'text-green' : realRoas >= 2 ? 'text-amber' : 'text-red'
+                        }`}
+                      >
+                        {spend > 0 ? formatRoas(realRoas) : '—'}
+                      </td>
+                      <td>
+                        <span className={`status-pill status-${pendingYesterday ? 'amber' : 'green'}`}>
+                          {pendingYesterday ? 'Pendiente ayer' : 'Al día'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button className="btn-secondary" onClick={() => setSelectedClient(client)}>
+                            <Plus size={14} /> Registrar
+                          </button>
+                          <Link to={`/clients/${client.id}`} className="btn-ghost">
+                            Ver cliente
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           </div>
