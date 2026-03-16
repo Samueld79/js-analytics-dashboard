@@ -93,20 +93,21 @@ npm run preview
 
 ## SQL relevante
 
-- [supabase/schema.sql](/Users/samueldiaz/js-analytics-dashboard/supabase/schema.sql)
-- [supabase/phase-1-operating-views.sql](/Users/samueldiaz/js-analytics-dashboard/supabase/phase-1-operating-views.sql)
+- [supabase/schema.sql](./supabase/schema.sql)
+- [supabase/phase-1-operating-views.sql](./supabase/phase-1-operating-views.sql)
 
 ## Documentacion operativa
 
-- [docs/meta-ads-operating-runbook.md](/Users/samueldiaz/js-analytics-dashboard/docs/meta-ads-operating-runbook.md)
-- [docs/n8n-meta-daily-import-contract.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-daily-import-contract.md)
-- [docs/n8n-meta-ads-sync-all-active-accounts-spec.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-all-active-accounts-spec.md)
-- [docs/n8n-meta-ads-sync-incremental-hardening-plan.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan.md)
-- [docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md)
+- [docs/meta-ads-operating-runbook.md](./docs/meta-ads-operating-runbook.md)
+- [docs/n8n-meta-daily-import-contract.md](./docs/n8n-meta-daily-import-contract.md)
+- [docs/n8n-meta-ads-sync-all-active-accounts-spec.md](./docs/n8n-meta-ads-sync-all-active-accounts-spec.md)
+- [docs/n8n-meta-ads-sync-incremental-hardening-plan.md](./docs/n8n-meta-ads-sync-incremental-hardening-plan.md)
+- [docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md](./docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md)
 
 Nota:
 - los docs de `hardening` describen endurecimiento pendiente de n8n
 - no deben leerse como si `ad_import_runs` y `ad_import_errors` ya fueran obligatorios en el flujo activo actual
+- el flujo Meta activo hoy sigue apoyandose en `ad_accounts`, `ad_metrics` y `last_sync_at`
 
 ## Vercel
 

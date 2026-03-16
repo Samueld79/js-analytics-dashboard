@@ -1,6 +1,6 @@
 # Meta Ads Sync - Incremental Hardening Plan Delta
 
-Delta corregido sobre [docs/n8n-meta-ads-sync-incremental-hardening-plan.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan.md).
+Delta corregido sobre [docs/n8n-meta-ads-sync-incremental-hardening-plan.md](./n8n-meta-ads-sync-incremental-hardening-plan.md).
 
 Estado:
 - este delta aplica solo si decides implementar el endurecimiento pendiente

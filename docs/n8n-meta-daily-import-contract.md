@@ -118,6 +118,6 @@ Si luego activas trazabilidad por corrida:
 - `ad_import_errors`
 
 Eso se documenta en:
-- [docs/n8n-meta-ads-sync-all-active-accounts-spec.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-all-active-accounts-spec.md)
-- [docs/n8n-meta-ads-sync-incremental-hardening-plan.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan.md)
-- [docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md)
+- [docs/n8n-meta-ads-sync-all-active-accounts-spec.md](./n8n-meta-ads-sync-all-active-accounts-spec.md)
+- [docs/n8n-meta-ads-sync-incremental-hardening-plan.md](./n8n-meta-ads-sync-incremental-hardening-plan.md)
+- [docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md](./n8n-meta-ads-sync-incremental-hardening-plan-delta.md)

@@ -5,7 +5,7 @@ Especificación endurecida para n8n Cloud. Mantiene la lógica ya validada y agr
 Estado:
 - este documento describe endurecimiento pendiente
 - no describe el flujo base activo actual
-- antes de implementarlo, revisar también [docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md](/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md)
+- antes de implementarlo, revisar también [docs/n8n-meta-ads-sync-incremental-hardening-plan-delta.md](./n8n-meta-ads-sync-incremental-hardening-plan-delta.md)
 
 Nota de esquema:
 - `public.ad_metrics` se mantiene sin cambios.
@@ -1028,7 +1028,7 @@ return [
 
 ## Referencias usadas
 
-- Contrato del repo: `/Users/samueldiaz/js-analytics-dashboard/docs/n8n-meta-daily-import-contract.md`
+- Contrato del repo: `./n8n-meta-daily-import-contract.md`
 - n8n Loop Over Items: https://docs.n8n.io/flow-logic/looping/
 - n8n Code node: https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.code/
 - n8n Merge node: https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.merge/

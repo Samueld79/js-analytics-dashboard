@@ -9,7 +9,7 @@ Blueprint operativo sobre el repo actual para pasar de dashboard demo a sistema 
 
 ## 1. Schema SQL Final
 
-Fuente de verdad: [supabase/schema.sql](/Users/samueldiaz/js-analytics-dashboard/supabase/schema.sql)
+Fuente de verdad: [supabase/schema.sql](../supabase/schema.sql)
 
 Decisiones aplicadas:
 - Se conservaron nombres ya usados por el frontend actual: `clients`, `ad_metrics`, `daily_sales`, `strategies`, `tasks`, `alerts`, `client_memory`.
@@ -81,21 +81,21 @@ Decisiones aplicadas:
 ### Mapa sobre archivos actuales
 
 - Reutilizar como shell:
-  - [src/App.tsx](/Users/samueldiaz/js-analytics-dashboard/src/App.tsx)
-  - [src/components/Sidebar.tsx](/Users/samueldiaz/js-analytics-dashboard/src/components/Sidebar.tsx)
-  - [src/pages/DashboardPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/DashboardPage.tsx)
-  - [src/pages/ClientsPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/ClientsPage.tsx)
-  - [src/pages/ClientDetailPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/ClientDetailPage.tsx)
-  - [src/pages/MetricsPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/MetricsPage.tsx)
-  - [src/pages/AlertsPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/AlertsPage.tsx)
-  - [src/components/SalesModal.tsx](/Users/samueldiaz/js-analytics-dashboard/src/components/SalesModal.tsx)
+  - [src/App.tsx](../src/App.tsx)
+  - [src/components/Sidebar.tsx](../src/components/Sidebar.tsx)
+  - [src/pages/DashboardPage.tsx](../src/pages/DashboardPage.tsx)
+  - [src/pages/ClientsPage.tsx](../src/pages/ClientsPage.tsx)
+  - [src/pages/ClientDetailPage.tsx](../src/pages/ClientDetailPage.tsx)
+  - [src/pages/MetricsPage.tsx](../src/pages/MetricsPage.tsx)
+  - [src/pages/AlertsPage.tsx](../src/pages/AlertsPage.tsx)
+  - [src/components/SalesModal.tsx](../src/components/SalesModal.tsx)
 
 - Reemplazar funcionalmente:
-  - [src/hooks/useData.ts](/Users/samueldiaz/js-analytics-dashboard/src/hooks/useData.ts)
-  - [src/lib/mockData.ts](/Users/samueldiaz/js-analytics-dashboard/src/lib/mockData.ts)
-  - [src/pages/StrategiesPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/StrategiesPage.tsx)
-  - [src/pages/AIAgentPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/AIAgentPage.tsx)
-  - [src/lib/supabase.ts](/Users/samueldiaz/js-analytics-dashboard/src/lib/supabase.ts)
+  - [src/hooks/useData.ts](../src/hooks/useData.ts)
+  - `src/lib/mockData.ts` (historico, ya no existe en el repo actual)
+  - [src/pages/StrategiesPage.tsx](../src/pages/StrategiesPage.tsx)
+  - [src/pages/AIAgentPage.tsx](../src/pages/AIAgentPage.tsx)
+  - [src/lib/supabase.ts](../src/lib/supabase.ts)
 
 ## 3. Backlog Técnico por Fases
 
@@ -174,39 +174,39 @@ No meter IA ni archivos antes de cerrar esto.
 
 ### Qué archivos reutilizar
 
-- [src/pages/DashboardPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/DashboardPage.tsx)
+- [src/pages/DashboardPage.tsx](../src/pages/DashboardPage.tsx)
   Reutilizar layout y jerarquía visual. Cambiar queries a vistas SQL y servicios.
 
-- [src/pages/ClientDetailPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/ClientDetailPage.tsx)
+- [src/pages/ClientDetailPage.tsx](../src/pages/ClientDetailPage.tsx)
   Reutilizar como shell del workspace cliente. Extender tabs y mover la obtención de datos a servicios.
 
-- [src/components/SalesModal.tsx](/Users/samueldiaz/js-analytics-dashboard/src/components/SalesModal.tsx)
+- [src/components/SalesModal.tsx](../src/components/SalesModal.tsx)
   Reutilizar como base del registro diario. Agregar validación suave y estado de envío.
 
-- [src/pages/MetricsPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/MetricsPage.tsx)
+- [src/pages/MetricsPage.tsx](../src/pages/MetricsPage.tsx)
   Reutilizar como consolidado de ads.
 
-- [src/pages/AlertsPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/AlertsPage.tsx)
+- [src/pages/AlertsPage.tsx](../src/pages/AlertsPage.tsx)
   Reutilizar como inbox operativo.
 
-- [src/components/Sidebar.tsx](/Users/samueldiaz/js-analytics-dashboard/src/components/Sidebar.tsx)
+- [src/components/Sidebar.tsx](../src/components/Sidebar.tsx)
   Reutilizar navegación general.
 
 ### Qué archivos reemplazar
 
-- [src/hooks/useData.ts](/Users/samueldiaz/js-analytics-dashboard/src/hooks/useData.ts)
+- [src/hooks/useData.ts](../src/hooks/useData.ts)
   Reemplazar por hooks delgados que llamen una capa `src/services/*`.
 
-- [src/lib/mockData.ts](/Users/samueldiaz/js-analytics-dashboard/src/lib/mockData.ts)
+- `src/lib/mockData.ts` (historico, ya no existe en el repo actual)
   Mantener solo para fallback temporal local; dejar de ser fuente principal.
 
-- [src/lib/supabase.ts](/Users/samueldiaz/js-analytics-dashboard/src/lib/supabase.ts)
+- [src/lib/supabase.ts](../src/lib/supabase.ts)
   Expandir tipos para nuevas tablas y vistas.
 
-- [src/pages/StrategiesPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/StrategiesPage.tsx)
+- [src/pages/StrategiesPage.tsx](../src/pages/StrategiesPage.tsx)
   Mantener UI general pero pasar a CRUD real.
 
-- [src/pages/AIAgentPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/AIAgentPage.tsx)
+- [src/pages/AIAgentPage.tsx](../src/pages/AIAgentPage.tsx)
   Dejar solo como shell visual en MVP; sin lógica real hasta fase 3.
 
 ### Qué módulos dejar en espera
@@ -461,7 +461,7 @@ Regla operativa:
 ### Cómo se conecta con estrategias
 
 Flujo:
-1. Usuario entra a [src/pages/AIAgentPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/AIAgentPage.tsx) o al tab `IA` del cliente.
+1. Usuario entra a [src/pages/AIAgentPage.tsx](../src/pages/AIAgentPage.tsx) o al tab `IA` del cliente.
 2. Selecciona cliente.
 3. Pega texto libre.
 4. Frontend llama `ai-structure-strategy`.
@@ -475,14 +475,14 @@ Flujo:
 
 ### Conexión exacta con el repo actual
 
-- Mantener [src/pages/AIAgentPage.tsx](/Users/samueldiaz/js-analytics-dashboard/src/pages/AIAgentPage.tsx) como interfaz.
+- Mantener [src/pages/AIAgentPage.tsx](../src/pages/AIAgentPage.tsx) como interfaz.
 - Quitar mocks locales y reemplazar por llamadas a Edge Functions.
 - En `StrategiesPage`, agregar acción `Crear con IA`.
 - En `ClientDetailPage`, agregar tab `IA` y tab `Archivos`.
 
 ## Secuencia de Ejecución Recomendada
 
-1. Aplicar [supabase/schema.sql](/Users/samueldiaz/js-analytics-dashboard/supabase/schema.sql)
+1. Aplicar [supabase/schema.sql](../supabase/schema.sql)
 2. Reemplazar `useData.ts` por capa `services + hooks`
 3. Conectar ventas reales
 4. Conectar dashboard y workspace
