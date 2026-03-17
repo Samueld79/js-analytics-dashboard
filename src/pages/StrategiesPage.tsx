@@ -3,21 +3,43 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { StrategyDetailModal } from '../components/StrategyDetailModal';
 import { StrategyFormModal } from '../components/StrategyFormModal';
+import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { useStrategies } from '../hooks/useStrategies';
 import { formatCop, statusLabel } from '../lib/utils';
 import type { Strategy } from '../lib/supabase';
 
 const OPERATING_STATUSES: Strategy['status'][] = ['pending', 'mounted', 'reviewed', 'approved'];
+const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
 export function StrategiesPage() {
   const { clients } = useClients();
+  const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
+  const visibleClients = useMemo(
+    () =>
+      isInternal
+        ? clients
+        : clients.filter((client) => accessibleClientIds.includes(client.id)),
+    [accessibleClientIds, clients, isInternal],
+  );
+  const visibleClientIds = useMemo(
+    () => new Set(visibleClients.map((client) => client.id)),
+    [visibleClients],
+  );
+  const canSelectAllClients = isInternal || visibleClients.length > 1;
   const [searchParams, setSearchParams] = useSearchParams();
   const clientParam = searchParams.get('client');
-  const [selectedClient, setSelectedClient] = useState(clientParam ?? 'all');
+  const [selectedClient, setSelectedClient] = useState(
+    !isInternal && defaultClientId ? defaultClientId : clientParam ?? 'all',
+  );
   const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;
+  const queryClientId =
+    !isInternal && !canSelectAllClients
+      ? defaultClientId ?? EMPTY_CLIENT_SCOPE
+      : selectedClientId;
 
   const {
     strategies,
@@ -32,26 +54,50 @@ export function StrategiesPage() {
     generateTasks,
     loadingHistoryIds,
     generatingTaskIds,
-  } = useStrategies(selectedClient === 'all' ? undefined : selectedClient);
+  } = useStrategies(queryClientId);
 
   useEffect(() => {
+    if (!isInternal) {
+      if (defaultClientId && !canSelectAllClients) {
+        setSelectedClient(defaultClientId);
+        return;
+      }
+
+      if (clientParam && visibleClientIds.has(clientParam)) {
+        setSelectedClient(clientParam);
+        return;
+      }
+
+      setSelectedClient(defaultClientId ?? 'all');
+      return;
+    }
+
     setSelectedClient(clientParam ?? 'all');
-  }, [clientParam]);
+  }, [canSelectAllClients, clientParam, defaultClientId, isInternal, visibleClientIds]);
+
+  const visibleStrategies = useMemo(
+    () =>
+      isInternal
+        ? strategies
+        : strategies.filter((strategy) => visibleClientIds.has(strategy.client_id)),
+    [isInternal, strategies, visibleClientIds],
+  );
 
   const selectedStrategy = useMemo(
-    () => strategies.find((strategy) => strategy.id === selectedStrategyId) ?? null,
-    [selectedStrategyId, strategies],
+    () => visibleStrategies.find((strategy) => strategy.id === selectedStrategyId) ?? null,
+    [selectedStrategyId, visibleStrategies],
   );
 
   const editingStrategy = formMode === 'edit' ? selectedStrategy : null;
 
   function getClient(id: string) {
-    return clients.find((client) => client.id === id);
+    return visibleClients.find((client) => client.id === id);
   }
 
   function handleClientFilter(value: string) {
-    setSelectedClient(value);
-    setSearchParams(value === 'all' ? {} : { client: value });
+    const nextValue = value === 'all' && !canSelectAllClients ? defaultClientId ?? 'all' : value;
+    setSelectedClient(nextValue);
+    setSearchParams(nextValue === 'all' ? {} : { client: nextValue });
   }
 
   async function openStrategyDetail(strategyId: string) {
@@ -110,36 +156,48 @@ export function StrategiesPage() {
         <div>
           <h1 className="page-title">Estrategias</h1>
           <p className="page-subtitle">
-            {loading ? 'Cargando estrategias...' : `${strategies.length} estrategia${strategies.length !== 1 ? 's' : ''}`}
+            {loading
+              ? 'Cargando estrategias...'
+              : `${visibleStrategies.length} estrategia${visibleStrategies.length !== 1 ? 's' : ''}${
+                  !isInternal ? ' visibles para tu empresa' : ''
+                }`}
           </p>
         </div>
         <div className="header-actions">
-          <Link
-            to={selectedClient === 'all' ? '/ai' : `/ai?client=${selectedClient}`}
-            className="btn-secondary"
-          >
-            Crear con IA
-          </Link>
-          <button
-            className="btn-primary"
-            onClick={() => {
-              setSelectedStrategyId(null);
-              setFormMode('create');
-            }}
-          >
-            <Plus size={16} /> Nueva Estrategia
-          </button>
+          {isInternal ? (
+            <>
+              <Link
+                to={selectedClient === 'all' ? '/ai' : `/ai?client=${selectedClient}`}
+                className="btn-secondary"
+              >
+                Crear con IA
+              </Link>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setSelectedStrategyId(null);
+                  setFormMode('create');
+                }}
+              >
+                <Plus size={16} /> Nueva Estrategia
+              </button>
+            </>
+          ) : (
+            <span className="meta-chip">Solo lectura</span>
+          )}
         </div>
       </div>
 
       <div className="filter-row">
-        <button
-          onClick={() => handleClientFilter('all')}
-          className={`filter-chip ${selectedClient === 'all' ? 'active' : ''}`}
-        >
-          Todos
-        </button>
-        {clients.map((client) => (
+        {canSelectAllClients && (
+          <button
+            onClick={() => handleClientFilter('all')}
+            className={`filter-chip ${selectedClient === 'all' ? 'active' : ''}`}
+          >
+            {isInternal ? 'Todos' : 'Mis empresas'}
+          </button>
+        )}
+        {visibleClients.map((client) => (
           <button
             key={client.id}
             onClick={() => handleClientFilter(client.id)}
@@ -165,7 +223,7 @@ export function StrategiesPage() {
       ) : (
         <div className="status-lanes">
           {OPERATING_STATUSES.map((status) => {
-            const group = strategies.filter((strategy) => strategy.status === status);
+            const group = visibleStrategies.filter((strategy) => strategy.status === status);
             return (
               <div key={status} className="status-lane">
                 <div className="lane-header">
@@ -225,23 +283,27 @@ export function StrategiesPage() {
                             <span className="mini-chip">v{strategy.latest_version ?? strategy.version ?? 1}</span>
                           </div>
                           <div className="strategy-status-actions">
-                            <select
-                              className="status-select"
-                              value={strategy.status}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(event) => {
-                                event.stopPropagation();
-                                void handleStatusChange(
-                                  strategy.id,
-                                  event.target.value as Strategy['status'],
-                                );
-                              }}
-                            >
-                              <option value="pending">Pendiente</option>
-                              <option value="mounted">Montada</option>
-                              <option value="reviewed">Revisada</option>
-                              <option value="approved">Aprobada</option>
-                            </select>
+                            {isInternal ? (
+                              <select
+                                className="status-select"
+                                value={strategy.status}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) => {
+                                  event.stopPropagation();
+                                  void handleStatusChange(
+                                    strategy.id,
+                                    event.target.value as Strategy['status'],
+                                  );
+                                }}
+                              >
+                                <option value="pending">Pendiente</option>
+                                <option value="mounted">Montada</option>
+                                <option value="reviewed">Revisada</option>
+                                <option value="approved">Aprobada</option>
+                              </select>
+                            ) : (
+                              <span className="mini-chip">{statusLabel(strategy.status)}</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -263,17 +325,22 @@ export function StrategiesPage() {
           historyLoading={Boolean(loadingHistoryIds[selectedStrategy.id])}
           generatingTasks={Boolean(generatingTaskIds[selectedStrategy.id])}
           onClose={() => setSelectedStrategyId(null)}
-          onEdit={() => setFormMode('edit')}
-          onGenerateTasks={() => void handleGenerateTasks(selectedStrategy.id)}
-          onStatusChange={(status) => {
-            void handleStatusChange(selectedStrategy.id, status);
-          }}
+          readOnly={!isInternal}
+          onEdit={isInternal ? () => setFormMode('edit') : undefined}
+          onGenerateTasks={isInternal ? () => void handleGenerateTasks(selectedStrategy.id) : undefined}
+          onStatusChange={
+            isInternal
+              ? (status) => {
+                  void handleStatusChange(selectedStrategy.id, status);
+                }
+              : undefined
+          }
         />
       )}
 
-      {formMode && (formMode === 'create' || editingStrategy) && (
+      {isInternal && formMode && (formMode === 'create' || editingStrategy) && (
         <StrategyFormModal
-          clients={clients}
+          clients={visibleClients}
           strategy={editingStrategy}
           defaultClientId={selectedClient === 'all' ? undefined : selectedClient}
           saving={saving}

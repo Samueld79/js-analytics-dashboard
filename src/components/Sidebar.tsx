@@ -22,7 +22,14 @@ import { useAlerts } from '../hooks/useAlerts';
 import { useAuth } from '../hooks/useAuth';
 import { roleLabel } from '../lib/utils';
 
-const INTERNAL_NAV = [
+type NavItem = {
+  to: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+  badge?: boolean;
+};
+
+const INTERNAL_NAV: NavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Clientes' },
   { to: '/metrics', icon: BarChart2, label: 'Métricas Ads' },
@@ -30,6 +37,15 @@ const INTERNAL_NAV = [
   { to: '/strategies', icon: ClipboardList, label: 'Estrategias' },
   { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
   { to: '/ai', icon: Bot, label: 'IA' },
+];
+
+const CLIENT_NAV: NavItem[] = [
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/metrics', icon: BarChart2, label: 'Métricas Ads' },
+  { to: '/sales', icon: TrendingUp, label: 'Ventas' },
+  { to: '/strategies', icon: ClipboardList, label: 'Estrategias' },
+  { to: '/mi-espacio', icon: LockKeyhole, label: 'Mi empresa' },
+  { to: '/settings', icon: Settings, label: 'Configuración' },
 ];
 
 export function Sidebar() {
@@ -52,8 +68,8 @@ export function Sidebar() {
 
   const nav = isInternal
     ? INTERNAL_NAV
-      : defaultClientId
-      ? [{ to: '/mi-espacio', icon: LockKeyhole, label: 'Mi espacio' }]
+    : defaultClientId
+      ? CLIENT_NAV
       : [];
   const sidebarCollapsed = collapsed && !isMobileViewport;
   const activeLabel = useMemo(() => {

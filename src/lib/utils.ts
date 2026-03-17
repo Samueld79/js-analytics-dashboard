@@ -551,6 +551,7 @@ export function roleLabel(role: string): string {
     operator: 'Operador',
     partner: 'Socio',
     client: 'Cliente',
+    client_viewer: 'Cliente',
     anonymous: 'Anonimo',
   };
   return map[role] ?? role;

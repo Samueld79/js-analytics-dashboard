@@ -50,6 +50,10 @@ function isMembershipWritable(membership: ClientMembership): boolean {
   return membership.status === 'active' && ['manager', 'client'].includes(membership.access_level);
 }
 
+function isPortalRole(role: UserRole): boolean {
+  return role === 'client' || role === 'client_viewer';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [initialized, setInitialized] = useState(!isSupabaseConfigured);
   const [loading, setLoading] = useState(isSupabaseConfigured);
@@ -105,14 +109,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [memberships],
   );
   const role: UserRole = profile?.role ?? (session ? 'operator' : 'anonymous');
-  const isClient = role === 'client';
+  const isClient = isPortalRole(role);
   const accessibleClientIds = useMemo(
     () =>
       [
         ...new Set(
-          (isClient ? activeMemberships.slice(0, 1) : activeMemberships).map(
-            (membership) => membership.client_id,
-          ),
+          activeMemberships.map((membership) => membership.client_id),
         ),
       ],
     [activeMemberships, isClient],
@@ -120,8 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const primaryClientId = accessibleClientIds[0] ?? null;
   const defaultClientId = primaryClientId;
   const clientWorkspacePath = '/mi-espacio';
-  const isInternal = role !== 'client' && role !== 'anonymous';
-  const scopedMemberships = isClient ? activeMemberships.slice(0, 1) : activeMemberships;
+  const isInternal = !isPortalRole(role) && role !== 'anonymous';
+  const scopedMemberships = activeMemberships;
 
   const handleSignIn = useCallback<AuthContextValue['signIn']>(async (params) => {
     const result = await signInWithPassword(params);
@@ -164,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       canAccessClient: (clientId?: string | null) => {
         if (!clientId) return false;
-        return isInternal || clientId === primaryClientId;
+        return isInternal || accessibleClientIds.includes(clientId);
       },
       canWriteSales: (clientId?: string | null) => {
         if (!clientId) return false;

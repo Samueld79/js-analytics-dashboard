@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { BrandSignature } from './components/BrandSignature';
 import { Sidebar } from './components/Sidebar';
+import { useMetaSyncRows } from './hooks/useData';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { isSupabaseConfigured } from './lib/supabase';
-import { roleLabel } from './lib/utils';
+import { formatDateTime, roleLabel } from './lib/utils';
 import { LoginPage } from './pages/LoginPage';
 import { AIAgentPage } from './pages/AIAgentPage';
 import { AlertsPage } from './pages/AlertsPage';
@@ -56,12 +57,12 @@ function AppContent() {
           <Route path="/mi-espacio" element={<ClientWorkspaceEntry />} />
           <Route path="/clients" element={<RequireInternal><ClientsPage /></RequireInternal>} />
           <Route path="/clients/:id" element={<RequireClientAccess><ClientDetailPage /></RequireClientAccess>} />
-          <Route path="/metrics" element={<RequireInternal><MetricsPage /></RequireInternal>} />
-          <Route path="/sales" element={<RequireInternal><SalesPage /></RequireInternal>} />
-          <Route path="/strategies" element={<RequireInternal><StrategiesPage /></RequireInternal>} />
+          <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
+          <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />
+          <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
           <Route path="/ai" element={<RequireInternal><AIAgentPage /></RequireInternal>} />
           <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} />
-          <Route path="/settings" element={<RequireInternal><SettingsPage /></RequireInternal>} />
+          <Route path="/settings" element={<RequireSignedIn><SettingsPage /></RequireSignedIn>} />
           <Route path="*" element={<RoleAwareFallback />} />
         </Routes>
       </main>
@@ -70,23 +71,28 @@ function AppContent() {
 }
 
 function RoleAwareHome() {
-  const { isInternal, clientWorkspacePath } = useAuth();
+  const { isInternal, defaultClientId } = useAuth();
 
-  if (isInternal || !isSupabaseConfigured) {
-    return <DashboardPage />;
+  if (!isInternal && !defaultClientId) {
+    return (
+      <AccessDeniedPage
+        title="Sin empresa asignada"
+        body="Tu usuario cliente no tiene una empresa activa asociada."
+      />
+    );
   }
 
-  return <Navigate to={clientWorkspacePath} replace />;
+  return <DashboardPage />;
 }
 
 function RoleAwareFallback() {
-  const { isInternal, clientWorkspacePath } = useAuth();
+  const { clientWorkspacePath } = useAuth();
 
-  if (isInternal || !isSupabaseConfigured) {
+  if (!isSupabaseConfigured) {
     return <Navigate to="/" replace />;
   }
 
-  return <Navigate to={clientWorkspacePath} replace />;
+  return <Navigate to={clientWorkspacePath === '/mi-espacio' ? '/' : clientWorkspacePath} replace />;
 }
 
 function ClientWorkspaceEntry() {
@@ -104,13 +110,23 @@ function ClientWorkspaceEntry() {
 }
 
 function RequireInternal({ children }: { children: ReactNode }) {
-  const { isInternal, clientWorkspacePath } = useAuth();
+  const { isInternal } = useAuth();
 
   if (isInternal || !isSupabaseConfigured) {
     return <>{children}</>;
   }
 
-  return <Navigate to={clientWorkspacePath} replace />;
+  return <Navigate to="/" replace />;
+}
+
+function RequireSignedIn({ children }: { children: ReactNode }) {
+  const { session } = useAuth();
+
+  if (session || !isSupabaseConfigured) {
+    return <>{children}</>;
+  }
+
+  return <Navigate to="/" replace />;
 }
 
 function RequireClientAccess({ children }: { children: ReactNode }) {
@@ -146,8 +162,16 @@ function AccessDeniedPage({
 }
 
 function SettingsPage() {
-  const { authEnabled, profile, role, memberships, accessibleClientIds } = useAuth();
+  const { authEnabled, profile, role, memberships, accessibleClientIds, isInternal } = useAuth();
   const activeMemberships = memberships.filter((membership) => membership.status === 'active');
+  const { syncRows } = useMetaSyncRows();
+  const visibleSyncRows = isInternal
+    ? syncRows
+    : syncRows.filter((row) => accessibleClientIds.includes(row.client_id));
+  const latestSyncAt = [...visibleSyncRows]
+    .map((row) => row.last_sync_at)
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? null;
 
   return (
     <div className="page-content">
@@ -216,7 +240,13 @@ function SettingsPage() {
           <div className="setting-item">
             <div className="setting-label">Portal cliente</div>
             <div className="setting-value">
-              Cada cliente ve solo su empresa desde /mi-espacio
+              Cada cliente ve solo sus empresas asignadas por membresía activa
+            </div>
+          </div>
+          <div className="setting-item">
+            <div className="setting-label">Último sync Meta visible</div>
+            <div className="setting-value">
+              {latestSyncAt ? formatDateTime(latestSyncAt) : 'Sin sincronización registrada'}
             </div>
           </div>
           <div className="setting-item">

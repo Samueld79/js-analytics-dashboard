@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
+import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import {
@@ -43,40 +44,113 @@ import {
 import { buildClientMetaOverviewByClient } from '../services/meta';
 import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
 
+const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
+
 export function DashboardPage() {
   const { clients } = useClients();
+  const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
   const { alerts, unreadCount } = useAlerts();
   const { tasks } = useTasks();
-  const { monthlyKpis } = useMonthlyOperatingKpis(undefined, 6);
-  const { metrics: rawAdMetrics } = useAdMetrics(undefined, 180);
-  const { sales } = useDailySales({ days: 180 });
-  const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(undefined, 12);
-  const { syncRows } = useMetaSyncRows();
+  const scopedClientId =
+    !isInternal && accessibleClientIds.length <= 1
+      ? defaultClientId ?? EMPTY_CLIENT_SCOPE
+      : undefined;
+  const { monthlyKpis } = useMonthlyOperatingKpis(scopedClientId, 6);
+  const { metrics: rawAdMetrics } = useAdMetrics(scopedClientId, 180);
+  const { sales } = useDailySales({ clientId: scopedClientId, days: 180 });
+  const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(scopedClientId, 12);
+  const { syncRows } = useMetaSyncRows(scopedClientId);
+  const visibleClientIds = useMemo(
+    () => new Set(isInternal ? clients.map((client) => client.id) : accessibleClientIds),
+    [accessibleClientIds, clients, isInternal],
+  );
+  const visibleClients = useMemo(
+    () =>
+      isInternal
+        ? clients
+        : clients.filter((client) => visibleClientIds.has(client.id)),
+    [clients, isInternal, visibleClientIds],
+  );
+  const scopedMonthlyKpis = useMemo(
+    () =>
+      isInternal
+        ? monthlyKpis
+        : monthlyKpis.filter((row) => visibleClientIds.has(row.client_id)),
+    [isInternal, monthlyKpis, visibleClientIds],
+  );
+  const scopedAdMetrics = useMemo(
+    () =>
+      isInternal
+        ? rawAdMetrics
+        : rawAdMetrics.filter((row) => visibleClientIds.has(row.client_id)),
+    [isInternal, rawAdMetrics, visibleClientIds],
+  );
+  const scopedSales = useMemo(
+    () =>
+      isInternal
+        ? sales
+        : sales.filter((row) => visibleClientIds.has(row.client_id)),
+    [isInternal, sales, visibleClientIds],
+  );
+  const scopedSocialMonthlyMetrics = useMemo(
+    () =>
+      isInternal
+        ? socialMonthlyMetrics
+        : socialMonthlyMetrics.filter((row) => visibleClientIds.has(row.client_id)),
+    [isInternal, socialMonthlyMetrics, visibleClientIds],
+  );
+  const scopedSyncRows = useMemo(
+    () =>
+      isInternal
+        ? syncRows
+        : syncRows.filter((row) => visibleClientIds.has(row.client_id)),
+    [isInternal, syncRows, visibleClientIds],
+  );
+  const scopedAlerts = useMemo(
+    () =>
+      isInternal
+        ? alerts
+        : alerts.filter((alert) => alert.client_id && visibleClientIds.has(alert.client_id)),
+    [alerts, isInternal, visibleClientIds],
+  );
+  const scopedTasks = useMemo(
+    () =>
+      isInternal
+        ? tasks
+        : tasks.filter((task) => task.client_id && visibleClientIds.has(task.client_id)),
+    [isInternal, tasks, visibleClientIds],
+  );
 
   const executiveMonth =
     listAvailableMonthKeys([
-      ...monthlyKpis.map((row) => row.month),
-      ...rawAdMetrics.map((row) => row.date),
-      ...sales.map((row) => row.date),
-      ...socialMonthlyMetrics.map((row) => row.month),
+      ...scopedMonthlyKpis.map((row) => row.month),
+      ...scopedAdMetrics.map((row) => row.date),
+      ...scopedSales.map((row) => row.date),
+      ...scopedSocialMonthlyMetrics.map((row) => row.month),
     ])[0] ?? new Date().toISOString().slice(0, 7);
   const executiveMonthLabel = getMonthLabel(executiveMonth);
+  const latestSyncAt = [...scopedSyncRows]
+    .map((row) => row.last_sync_at)
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? null;
+  const portalClientName =
+    !isInternal && visibleClients.length === 1 ? visibleClients[0]?.name ?? 'Mi empresa' : null;
 
-  const executiveRows = monthlyKpis.filter((row) => getMonthKey(row.month) === executiveMonth);
-  const executiveAdMetrics = rawAdMetrics.filter((row) => getMonthKey(row.date) === executiveMonth);
-  const executiveSales = sales.filter((row) => getMonthKey(row.date) === executiveMonth);
-  const executiveSocialMetrics = socialMonthlyMetrics.filter(
+  const executiveRows = scopedMonthlyKpis.filter((row) => getMonthKey(row.month) === executiveMonth);
+  const executiveAdMetrics = scopedAdMetrics.filter((row) => getMonthKey(row.date) === executiveMonth);
+  const executiveSales = scopedSales.filter((row) => getMonthKey(row.date) === executiveMonth);
+  const executiveSocialMetrics = scopedSocialMonthlyMetrics.filter(
     (row) => getMonthKey(row.month) === executiveMonth,
   );
 
   const metaByClient = useMemo(
     () =>
       buildClientMetaOverviewByClient({
-        clientIds: clients.map((client) => client.id),
-        monthlyKpis,
-        syncRows,
+        clientIds: visibleClients.map((client) => client.id),
+        monthlyKpis: scopedMonthlyKpis,
+        syncRows: scopedSyncRows,
       }),
-    [clients, monthlyKpis, syncRows],
+    [scopedMonthlyKpis, scopedSyncRows, visibleClients],
   );
 
   const overall = executiveRows.length
@@ -86,22 +160,22 @@ export function DashboardPage() {
   const specialSummary = buildMonthlySpecialMetricsSummary(executiveSocialMetrics);
 
   const clientNameById = useMemo(
-    () => new Map(clients.map((client) => [client.id, client.name])),
-    [clients],
+    () => new Map(visibleClients.map((client) => [client.id, client.name])),
+    [visibleClients],
   );
 
-  const openAlerts = useMemo(
+  const visibleOpenAlerts = useMemo(
     () =>
-      alerts.filter(
+      scopedAlerts.filter(
         (alert) => ['unread', 'read'].includes(alert.status) && !isAlertSnoozed(alert),
       ),
-    [alerts],
+    [scopedAlerts],
   );
 
   const clientAlertCount = new Map<string, number>();
   const clientCriticalAlertCount = new Map<string, number>();
 
-  openAlerts.forEach((alert) => {
+  visibleOpenAlerts.forEach((alert) => {
     if (!alert.client_id) return;
     clientAlertCount.set(alert.client_id, (clientAlertCount.get(alert.client_id) ?? 0) + 1);
 
@@ -113,12 +187,12 @@ export function DashboardPage() {
     }
   });
 
-  const recentAlerts = [...openAlerts].sort(sortAlertsBySeverity).slice(0, 5);
-  const criticalAlerts = openAlerts.filter((alert) => alert.severity === 'critical');
-  const clientsWithAlerts = new Set(openAlerts.map((alert) => alert.client_id).filter(Boolean)).size;
-  const pendingTasks = tasks.filter((task) => task.status === 'pending').length;
+  const recentAlerts = [...visibleOpenAlerts].sort(sortAlertsBySeverity).slice(0, 5);
+  const criticalAlerts = visibleOpenAlerts.filter((alert) => alert.severity === 'critical');
+  const clientsWithAlerts = new Set(visibleOpenAlerts.map((alert) => alert.client_id).filter(Boolean)).size;
+  const pendingTasks = scopedTasks.filter((task) => task.status === 'pending').length;
 
-  const socialRows = clients
+  const socialRows = visibleClients
     .map((client) => {
       const socialMetric =
         executiveSocialMetrics.find((metric) => metric.client_id === client.id) ?? null;
@@ -164,8 +238,8 @@ export function DashboardPage() {
   const specialClickSignals = specialSummary.whatsappClicks + specialSummary.linkClicks;
   const commercialSignalRows = [
     {
-      label: 'Seguidores del mes',
-      value: socialFollowersTotal > 0 ? formatNumber(socialFollowersTotal) : 'Sin cierres',
+      label: 'Seguidores nuevos',
+      value: socialFollowersTotal > 0 ? formatNumber(socialFollowersTotal) : 'Sin dato',
       muted: socialFollowersTotal <= 0,
     },
     {
@@ -186,7 +260,7 @@ export function DashboardPage() {
     },
   ];
 
-  const clientExecutiveRows = clients
+  const clientExecutiveRows = visibleClients
     .map((client) => {
       const monthRow = executiveRows.find((row) => row.client_id === client.id) ?? null;
       const monthTotals =
@@ -350,11 +424,14 @@ export function DashboardPage() {
     <div className="page-content reporting-page executive-dashboard-page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Dashboard General</h1>
-          <p className="page-subtitle">Tablero ejecutivo del mes visible · {executiveMonthLabel}</p>
+          <h1 className="page-title">{portalClientName ? `Dashboard de ${portalClientName}` : 'Dashboard General'}</h1>
+          <p className="page-subtitle">
+            Tablero ejecutivo del mes visible · {executiveMonthLabel}
+            {!isInternal ? ' · portal cliente filtrado por membresía' : ''}
+          </p>
         </div>
         <div className="header-actions">
-          {unreadCount > 0 && (
+          {isInternal && unreadCount > 0 && (
             <Link to="/alerts" className="alert-banner">
               <AlertTriangle size={14} />
               {unreadCount} alerta{unreadCount !== 1 ? 's' : ''} sin revisar
@@ -382,6 +459,9 @@ export function DashboardPage() {
               <span className="meta-chip">KPIs: mensual</span>
               <span className="meta-chip">Riesgo y Meta: actual</span>
               <span className="meta-chip">ROAS operativo = ventas manuales / inversión</span>
+              <span className="meta-chip">
+                {latestSyncAt ? `Último sync Meta ${formatDateTime(latestSyncAt)}` : 'Meta sin sync reciente'}
+              </span>
               <span className="meta-chip">Supabase real</span>
             </div>
           </div>
@@ -431,8 +511,8 @@ export function DashboardPage() {
         <section className="card section-block executive-spotlight-card">
           <div className="section-heading">
             <h2>Clientes destacados</h2>
-            <Link to="/clients" className="link-small">
-              Ver clientes <ArrowRight size={12} />
+            <Link to={isInternal ? '/clients' : '/mi-espacio'} className="link-small">
+              {isInternal ? 'Ver clientes' : 'Ver mi empresa'} <ArrowRight size={12} />
             </Link>
           </div>
           <p className="source-note">
@@ -608,7 +688,7 @@ export function DashboardPage() {
         <section className="card section-block">
           <div className="section-heading">
             <h2>Alertas recientes</h2>
-            <span className="badge-count">{openAlerts.length}</span>
+            <span className="badge-count">{visibleOpenAlerts.length}</span>
           </div>
           <p className="source-note">Alertas abiertas ordenadas por severidad y creación.</p>
           <div className="task-list-compact">

@@ -425,7 +425,7 @@ export function ClientDetailPage() {
           </span>
         </div>
         <div className="kpi-strip-item">
-          <span className="kpi-strip-label">ROAS Real</span>
+          <span className="kpi-strip-label">ROAS operativo</span>
           <span
             className={`kpi-strip-value roas-color-${
               selectedPeriodTotals.real_roas >= 3
@@ -631,7 +631,7 @@ function ClientOverview({
             <MetricBox label="Tareas vencidas" value={String(health.overdue_tasks)} highlight={health.overdue_tasks > 0 ? 'amber' : undefined} />
             <MetricBox label="Ventas ayer" value={health.missing_sales_yesterday ? 'Faltan' : 'OK'} highlight={health.missing_sales_yesterday ? 'red' : 'green'} />
             <MetricBox label="Optimización" value={health.optimize_overdue ? 'Pendiente' : 'Al día'} highlight={health.optimize_overdue ? 'amber' : 'green'} />
-            <MetricBox label="ROAS real" value={formatRoas(health.real_roas)} highlight={health.low_real_roas ? 'red' : 'green'} />
+            <MetricBox label="ROAS operativo" value={formatRoas(health.real_roas)} highlight={health.low_real_roas ? 'red' : 'green'} />
             <MetricBox label="Issues activos" value={String(issues.length)} highlight={issues.length > 0 ? 'amber' : 'green'} />
           </div>
         </div>
@@ -869,7 +869,7 @@ function ClientOverview({
                   <th className="num-col">Inversión</th>
                   <th className="num-col">ROAS</th>
                   <th className="num-col">Mensajes</th>
-                  <th className="num-col">ROAS Real</th>
+                  <th className="num-col">ROAS operativo</th>
                 </tr>
               </thead>
               <tbody>
@@ -949,7 +949,7 @@ function MonthlyHistoryCard({
                 <th className="num-col">Ads</th>
                 <th className="num-col">ROAS Ads</th>
                 <th className="num-col">Ventas</th>
-                <th className="num-col">ROAS Real</th>
+                <th className="num-col">ROAS operativo</th>
               </tr>
             </thead>
             <tbody>
@@ -983,7 +983,7 @@ function MonthlyHistoryCard({
                     </td>
                     <td className="num-col" data-label="Ventas">{formatCop(row.total_sales)}</td>
                     <td
-                      data-label="ROAS Real"
+                      data-label="ROAS operativo"
                       className={`num-col ${
                         row.real_roas >= 3
                           ? 'text-green'
@@ -1003,7 +1003,7 @@ function MonthlyHistoryCard({
       )}
       <div className="operational-summary-row">
         <span className="meta-chip">Mes visible: {selectedMonthLabel}</span>
-        <span className="meta-chip">ROAS Real = ventas reportadas / inversión Ads</span>
+        <span className="meta-chip">ROAS operativo = ventas reportadas / inversión Ads</span>
       </div>
     </div>
   );
@@ -1033,7 +1033,7 @@ function ClientOperationalBanner({
           {health.missing_sales_yesterday && <span className="meta-chip">Falta venta de ayer</span>}
           {health.optimize_overdue && <span className="meta-chip">Toca optimización</span>}
           {health.overdue_tasks > 0 && <span className="meta-chip">{health.overdue_tasks} tareas vencidas</span>}
-          {health.low_real_roas && <span className="meta-chip">ROAS real bajo</span>}
+          {health.low_real_roas && <span className="meta-chip">ROAS operativo bajo</span>}
         </div>
       )}
       {issues.length > 0 && (

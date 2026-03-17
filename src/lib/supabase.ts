@@ -39,6 +39,7 @@ export type UserRole =
   | 'operator'
   | 'partner'
   | 'client'
+  | 'client_viewer'
   | 'anonymous';
 export type ClientAccessLevel = 'manager' | 'operator' | 'viewer' | 'client';
 export type TaskType =

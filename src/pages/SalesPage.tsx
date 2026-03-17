@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, TrendingUp } from 'lucide-react';
 import { SalesModal } from '../components/SalesModal';
+import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import type { Client } from '../lib/supabase';
@@ -26,6 +27,8 @@ const FILTER_OPTIONS: Array<{ key: SalesFilterKey; label: string }> = [
   { key: 'year', label: 'Año actual' },
   { key: 'custom', label: 'Rango personalizado' },
 ];
+
+const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
 function sortByDateDesc(left: { date: string }, right: { date: string }) {
   return right.date.localeCompare(left.date);
@@ -61,7 +64,15 @@ function getRangeBounds(filter: SalesFilterKey, today: string, customFrom: strin
 
 export function SalesPage() {
   const { clients, loading: clientsLoading } = useClients();
-  const { sales, addSale, removeSale, loading: salesLoading } = useDailySales(undefined, 1200);
+  const { isInternal, accessibleClientIds, defaultClientId, canWriteSales } = useAuth();
+  const scopedClientId =
+    !isInternal && accessibleClientIds.length <= 1
+      ? defaultClientId ?? EMPTY_CLIENT_SCOPE
+      : undefined;
+  const { sales, addSale, removeSale, loading: salesLoading } = useDailySales(
+    { clientId: scopedClientId, days: 1200 },
+    1200,
+  );
   const [search, setSearch] = useState('');
   const [filterKey, setFilterKey] = useState<SalesFilterKey>('month');
   const [quickClientId, setQuickClientId] = useState('');
@@ -76,8 +87,27 @@ export function SalesPage() {
   const [customFrom, setCustomFrom] = useState(monthStart);
   const [customTo, setCustomTo] = useState(today);
 
-  const clientMap = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
-  const orderedSales = useMemo(() => [...sales].sort(sortByDateDesc), [sales]);
+  const visibleClients = useMemo(
+    () =>
+      isInternal
+        ? clients
+        : clients.filter((client) => accessibleClientIds.includes(client.id)),
+    [accessibleClientIds, clients, isInternal],
+  );
+  const visibleClientIds = useMemo(
+    () => new Set(visibleClients.map((client) => client.id)),
+    [visibleClients],
+  );
+  const clientMap = useMemo(
+    () => new Map(visibleClients.map((client) => [client.id, client])),
+    [visibleClients],
+  );
+  const scopedSales = useMemo(
+    () => (isInternal ? sales : sales.filter((sale) => visibleClientIds.has(sale.client_id))),
+    [isInternal, sales, visibleClientIds],
+  );
+  const orderedSales = useMemo(() => [...scopedSales].sort(sortByDateDesc), [scopedSales]);
+  const canManageVisibleSales = isInternal || visibleClients.some((client) => canWriteSales(client.id));
   const todaySales = useMemo(
     () => orderedSales.filter((sale) => isDateWithinRange(sale.date, today, today)),
     [orderedSales, today],
@@ -120,6 +150,13 @@ export function SalesPage() {
   const yearTotal = useMemo(() => sumSales(yearSales).total, [yearSales]);
   const currentMonthLabel = getMonthLabel(today);
   const registerClient = selectedClient;
+  const canRegisterSales = Boolean((quickClientId || defaultClientId) && canWriteSales(quickClientId || defaultClientId));
+
+  useEffect(() => {
+    if (!isInternal && defaultClientId && !quickClientId) {
+      setQuickClientId(defaultClientId);
+    }
+  }, [defaultClientId, isInternal, quickClientId]);
 
   async function handleDeleteSale(saleId: string) {
     const sale = filteredSales.find((entry) => entry.id === saleId);
@@ -177,36 +214,54 @@ export function SalesPage() {
               <span className="meta-chip">Mes actual · {currentMonthLabel}</span>
               <span className="meta-chip">Año actual · {today.slice(0, 4)}</span>
               <span className="meta-chip">Fuente oficial · ventas diarias</span>
+              {!isInternal && (
+                <span className="meta-chip">
+                  {visibleClients[0]?.name ?? 'Empresa asignada'}
+                </span>
+              )}
             </div>
           </div>
 
           <div className="sales-quick-actions">
-            <label className="form-field">
-              <span className="form-label">Cliente para registrar</span>
-              <select
-                className="form-input"
-                value={quickClientId}
-                onChange={(event) => setQuickClientId(event.target.value)}
+            {visibleClients.length > 1 || isInternal ? (
+              <label className="form-field">
+                <span className="form-label">Cliente para registrar</span>
+                <select
+                  className="form-input"
+                  value={quickClientId}
+                  onChange={(event) => setQuickClientId(event.target.value)}
+                >
+                  <option value="">Selecciona un cliente</option>
+                  {visibleClients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="metric-box">
+                <span className="metric-box-label">Cliente visible</span>
+                <span className="metric-box-value">
+                  {visibleClients[0]?.name ?? 'Sin empresa asignada'}
+                </span>
+              </div>
+            )}
+            {canRegisterSales ? (
+              <button
+                className="btn-primary"
+                disabled={!quickClientId || clientsLoading}
+                onClick={() => {
+                  const nextClient = visibleClients.find((client) => client.id === quickClientId) ?? null;
+                  setSelectedClient(nextClient);
+                }}
               >
-                <option value="">Selecciona un cliente</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="btn-primary"
-              disabled={!quickClientId || clientsLoading}
-              onClick={() => {
-                const nextClient = clients.find((client) => client.id === quickClientId) ?? null;
-                setSelectedClient(nextClient);
-              }}
-            >
-              <Plus size={14} />
-              Registrar venta
-            </button>
+                <Plus size={14} />
+                Registrar venta
+              </button>
+            ) : (
+              <span className="meta-chip">Solo lectura</span>
+            )}
           </div>
         </div>
       </div>
@@ -302,7 +357,7 @@ export function SalesPage() {
                   <th>Fecha</th>
                   <th>Cliente</th>
                   <th className="num-col">Venta</th>
-                  <th className="actions-col">Acciones</th>
+                  {canManageVisibleSales && <th className="actions-col">Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -321,17 +376,23 @@ export function SalesPage() {
                       <td className="num-col" data-label="Venta">
                         {formatCop(sale.total_sales)}
                       </td>
-                      <td className="actions-col" data-label="Acciones">
-                        <button
-                          type="button"
-                          className="table-action-button danger"
-                          disabled={deletingSaleId === sale.id}
-                          onClick={() => void handleDeleteSale(sale.id)}
-                        >
-                          <Trash2 size={14} />
-                          {deletingSaleId === sale.id ? 'Eliminando...' : 'Eliminar'}
-                        </button>
-                      </td>
+                      {canManageVisibleSales && (
+                        <td className="actions-col" data-label="Acciones">
+                          {canWriteSales(sale.client_id) ? (
+                            <button
+                              type="button"
+                              className="table-action-button danger"
+                              disabled={deletingSaleId === sale.id}
+                              onClick={() => void handleDeleteSale(sale.id)}
+                            >
+                              <Trash2 size={14} />
+                              {deletingSaleId === sale.id ? 'Eliminando...' : 'Eliminar'}
+                            </button>
+                          ) : (
+                            <span className="table-action-muted">Sin permiso</span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

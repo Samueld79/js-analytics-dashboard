@@ -4960,6 +4960,14 @@ tbody tr:hover td {
   border-color: rgba(248, 113, 113, 0.32);
 }
 
+.table-action-muted {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  color: var(--gs-text-soft);
+  font-size: 0.78rem;
+}
+
 .sales-feedback-error {
   margin: 0 0 8px;
   color: #ffb7b7;

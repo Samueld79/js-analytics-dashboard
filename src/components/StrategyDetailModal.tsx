@@ -17,9 +17,10 @@ interface Props {
   historyLoading?: boolean;
   generatingTasks?: boolean;
   onClose: () => void;
-  onStatusChange: (status: Strategy['status']) => void;
+  onStatusChange?: (status: Strategy['status']) => void;
   onEdit?: () => void;
   onGenerateTasks?: () => void;
+  readOnly?: boolean;
 }
 
 export function StrategyDetailModal({
@@ -32,6 +33,7 @@ export function StrategyDetailModal({
   onStatusChange,
   onEdit,
   onGenerateTasks,
+  readOnly = false,
 }: Props) {
   const checklist = strategy.ai_checklist as ChecklistItem[];
   const campaignsNew = strategy.campaigns_new as CampaignEntry[];
@@ -58,16 +60,20 @@ export function StrategyDetailModal({
             </p>
           </div>
           <div className="modal-header-actions">
-            <select
-              className="status-select"
-              value={strategy.status}
-              onChange={(event) => onStatusChange(event.target.value as Strategy['status'])}
-            >
-              <option value="pending">Pendiente</option>
-              <option value="mounted">Montada</option>
-              <option value="reviewed">Revisada</option>
-              <option value="approved">Aprobada</option>
-            </select>
+            {onStatusChange && !readOnly ? (
+              <select
+                className="status-select"
+                value={strategy.status}
+                onChange={(event) => onStatusChange(event.target.value as Strategy['status'])}
+              >
+                <option value="pending">Pendiente</option>
+                <option value="mounted">Montada</option>
+                <option value="reviewed">Revisada</option>
+                <option value="approved">Aprobada</option>
+              </select>
+            ) : (
+              <span className="meta-chip">{statusLabel(strategy.status)}</span>
+            )}
             <button className="modal-close" onClick={onClose}>
               <X size={18} />
             </button>
@@ -75,7 +81,7 @@ export function StrategyDetailModal({
         </div>
 
         <div className="modal-body modal-scroll">
-          {(onEdit || onGenerateTasks) && (
+          {!readOnly && (onEdit || onGenerateTasks) && (
             <div className="strategy-detail-actions">
               {onEdit && (
                 <button className="btn-secondary" onClick={onEdit}>

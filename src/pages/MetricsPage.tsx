@@ -12,6 +12,7 @@ import {
 import { BarChart } from '../components/charts/BarChart';
 import { LineChart } from '../components/charts/LineChart';
 import { MonthSelector } from '../components/MonthSelector';
+import { useAuth } from '../hooks/useAuth';
 import { useMonthlyOperatingKpis, useAdMetrics } from '../hooks/useData';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
@@ -42,30 +43,93 @@ import {
 } from '../lib/utils';
 import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
 
+const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
+
 export function MetricsPage() {
   const { clients } = useClients();
-  const [selectedClient, setSelectedClient] = useState('all');
+  const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
+  const visibleClients = useMemo(
+    () =>
+      isInternal
+        ? clients
+        : clients.filter((client) => accessibleClientIds.includes(client.id)),
+    [accessibleClientIds, clients, isInternal],
+  );
+  const visibleClientIds = useMemo(
+    () => new Set(visibleClients.map((client) => client.id)),
+    [visibleClients],
+  );
+  const [selectedClient, setSelectedClient] = useState(
+    !isInternal && defaultClientId ? defaultClientId : 'all',
+  );
   const [selectedMonth, setSelectedMonth] = useState('');
   const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;
+  const canSelectAllClients = isInternal || visibleClients.length > 1;
+  const queryClientId =
+    !isInternal && !canSelectAllClients
+      ? defaultClientId ?? EMPTY_CLIENT_SCOPE
+      : selectedClientId;
 
-  const { metrics } = useAdMetrics(selectedClientId, 450);
-  const { monthlyKpis } = useMonthlyOperatingKpis(selectedClientId, 11);
-  const { sales } = useDailySales({ clientId: selectedClientId, days: 450 });
-  const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(selectedClientId, 12);
-  const { strategies } = useStrategies(selectedClientId);
-
+  const { metrics } = useAdMetrics(queryClientId, 450);
+  const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, 11);
+  const { sales } = useDailySales({ clientId: queryClientId, days: 450 });
+  const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(queryClientId, 12);
+  const { strategies } = useStrategies(queryClientId);
+  const scopedMetrics = useMemo(
+    () =>
+      isInternal ? metrics : metrics.filter((metric) => visibleClientIds.has(metric.client_id)),
+    [isInternal, metrics, visibleClientIds],
+  );
+  const scopedMonthlyKpis = useMemo(
+    () =>
+      isInternal
+        ? monthlyKpis
+        : monthlyKpis.filter((row) => visibleClientIds.has(row.client_id)),
+    [isInternal, monthlyKpis, visibleClientIds],
+  );
+  const scopedSales = useMemo(
+    () => (isInternal ? sales : sales.filter((row) => visibleClientIds.has(row.client_id))),
+    [isInternal, sales, visibleClientIds],
+  );
+  const scopedSocialMonthlyMetrics = useMemo(
+    () =>
+      isInternal
+        ? socialMonthlyMetrics
+        : socialMonthlyMetrics.filter((row) => visibleClientIds.has(row.client_id)),
+    [isInternal, socialMonthlyMetrics, visibleClientIds],
+  );
+  const scopedStrategies = useMemo(
+    () =>
+      isInternal
+        ? strategies
+        : strategies.filter((strategy) => visibleClientIds.has(strategy.client_id)),
+    [isInternal, strategies, visibleClientIds],
+  );
   const availableMonths = useMemo(
     () =>
       listAvailableMonthKeys([
-        ...monthlyKpis.map((row) => row.month),
-        ...metrics.map((row) => row.date),
-        ...sales.map((row) => row.date),
-        ...socialMonthlyMetrics.map((row) => row.month),
-        ...strategies.map((row) => row.month),
+        ...scopedMonthlyKpis.map((row) => row.month),
+        ...scopedMetrics.map((row) => row.date),
+        ...scopedSales.map((row) => row.date),
+        ...scopedSocialMonthlyMetrics.map((row) => row.month),
+        ...scopedStrategies.map((row) => row.month),
       ]),
-    [metrics, monthlyKpis, sales, socialMonthlyMetrics, strategies],
+    [scopedMetrics, scopedMonthlyKpis, scopedSales, scopedSocialMonthlyMetrics, scopedStrategies],
   );
   const fallbackMonth = availableMonths[0] ?? new Date().toISOString().slice(0, 7);
+
+  useEffect(() => {
+    if (!isInternal) {
+      if (defaultClientId && !canSelectAllClients) {
+        setSelectedClient(defaultClientId);
+        return;
+      }
+
+      if (selectedClient !== 'all' && !visibleClientIds.has(selectedClient)) {
+        setSelectedClient(defaultClientId ?? 'all');
+      }
+    }
+  }, [canSelectAllClients, defaultClientId, isInternal, selectedClient, visibleClientIds]);
 
   useEffect(() => {
     if (!selectedMonth) {
@@ -82,32 +146,32 @@ export function MetricsPage() {
   const activeMonthLabel = getMonthLabel(activeMonth);
   const selectedClientName =
     selectedClient === 'all'
-      ? 'Todos los clientes'
-      : clients.find((client) => client.id === selectedClient)?.name ?? 'Cliente';
+      ? (isInternal ? 'Todos los clientes' : visibleClients.length > 0 ? 'Mis empresas' : 'Sin empresa asignada')
+      : visibleClients.find((client) => client.id === selectedClient)?.name ?? 'Cliente';
 
   const monthMetrics = useMemo(
-    () => metrics.filter((metric) => getMonthKey(metric.date) === activeMonth),
-    [activeMonth, metrics],
+    () => scopedMetrics.filter((metric) => getMonthKey(metric.date) === activeMonth),
+    [activeMonth, scopedMetrics],
   );
   const monthOperatingRows = useMemo(
-    () => monthlyKpis.filter((row) => getMonthKey(row.month) === activeMonth),
-    [activeMonth, monthlyKpis],
+    () => scopedMonthlyKpis.filter((row) => getMonthKey(row.month) === activeMonth),
+    [activeMonth, scopedMonthlyKpis],
   );
   const monthSales = useMemo(
-    () => sales.filter((row) => getMonthKey(row.date) === activeMonth),
-    [activeMonth, sales],
+    () => scopedSales.filter((row) => getMonthKey(row.date) === activeMonth),
+    [activeMonth, scopedSales],
   );
   const monthSocialMetrics = useMemo(
-    () => socialMonthlyMetrics.filter((row) => getMonthKey(row.month) === activeMonth),
-    [activeMonth, socialMonthlyMetrics],
+    () => scopedSocialMonthlyMetrics.filter((row) => getMonthKey(row.month) === activeMonth),
+    [activeMonth, scopedSocialMonthlyMetrics],
   );
   const monthStrategies = useMemo(
     () =>
-      strategies.filter(
+      scopedStrategies.filter(
         (strategy) =>
           getMonthKey(strategy.month ?? '') === activeMonth && strategy.status !== 'archived',
       ),
-    [activeMonth, strategies],
+    [activeMonth, scopedStrategies],
   );
 
   const operatingTotals = monthOperatingRows.length
@@ -119,7 +183,7 @@ export function MetricsPage() {
   const specialSummary = buildMonthlySpecialMetricsSummary(monthSocialMetrics);
   const profileVisitsSummary = buildProfileVisitsSummary({
     selectedClient,
-    clients,
+    clients: visibleClients,
     monthMetrics,
     monthSocialMetrics,
   });
@@ -142,54 +206,54 @@ export function MetricsPage() {
   const historyMonths = useMemo(
     () =>
       listAvailableMonthKeys([
-        ...monthlyKpis.map((row) => row.month),
-        ...metrics.map((row) => row.date),
-        ...sales.map((row) => row.date),
-        ...socialMonthlyMetrics.map((row) => row.month),
-        ...strategies.map((row) => row.month),
+        ...scopedMonthlyKpis.map((row) => row.month),
+        ...scopedMetrics.map((row) => row.date),
+        ...scopedSales.map((row) => row.date),
+        ...scopedSocialMonthlyMetrics.map((row) => row.month),
+        ...scopedStrategies.map((row) => row.month),
       ])
         .slice(0, 6)
         .reverse(),
-    [metrics, monthlyKpis, sales, socialMonthlyMetrics, strategies],
+    [scopedMetrics, scopedMonthlyKpis, scopedSales, scopedSocialMonthlyMetrics, scopedStrategies],
   );
   const historySalesPoints = historyMonths.map((monthKey) => ({
     month: monthKey,
     value: getMonthOperatingTotals({
       monthKey,
-      monthlyKpis,
-      metrics,
-      sales,
+      monthlyKpis: scopedMonthlyKpis,
+      metrics: scopedMetrics,
+      sales: scopedSales,
     }).total_sales,
   }));
   const historyRoasPoints = historyMonths.map((monthKey) => ({
     month: monthKey,
     value: getMonthOperatingTotals({
       monthKey,
-      monthlyKpis,
-      metrics,
-      sales,
+      monthlyKpis: scopedMonthlyKpis,
+      metrics: scopedMetrics,
+      sales: scopedSales,
     }).real_roas,
   }));
   const historyConversationPoints = historyMonths.map((monthKey) => ({
     month: monthKey,
     value: buildMarketingActionSummary(
-      metrics.filter((row) => getMonthKey(row.date) === monthKey),
+      scopedMetrics.filter((row) => getMonthKey(row.date) === monthKey),
     ).messagingStarted,
   }));
   const historyProfileVisitPoints = historyMonths.map((monthKey) => ({
     month: monthKey,
     value: buildProfileVisitsSummary({
       selectedClient,
-      clients,
-      monthMetrics: metrics.filter((row) => getMonthKey(row.date) === monthKey),
-      monthSocialMetrics: socialMonthlyMetrics.filter((row) => getMonthKey(row.month) === monthKey),
+      clients: visibleClients,
+      monthMetrics: scopedMetrics.filter((row) => getMonthKey(row.date) === monthKey),
+      monthSocialMetrics: scopedSocialMonthlyMetrics.filter((row) => getMonthKey(row.month) === monthKey),
     }).value,
   }));
   const dailySalesRows = buildDailySalesRows(monthSales);
 
   const clientComparison = useMemo(
     () =>
-      clients
+      visibleClients
         .map((client) => {
           const clientMonthMetrics = monthMetrics.filter((row) => row.client_id === client.id);
           const clientMonthSales = monthSales.filter((row) => row.client_id === client.id);
@@ -200,7 +264,7 @@ export function MetricsPage() {
           );
           const profileVisits = buildProfileVisitsSummary({
             selectedClient: client.id,
-            clients,
+            clients: visibleClients,
             monthMetrics: clientMonthMetrics,
             monthSocialMetrics: monthSocialMetrics.filter((row) => row.client_id === client.id),
           });
@@ -233,7 +297,7 @@ export function MetricsPage() {
           }
           return right.totals.spend - left.totals.spend;
         }),
-    [activeMonth, clients, monthMetrics, monthOperatingRows, monthSales, monthSocialMetrics, monthStrategies],
+    [activeMonth, monthMetrics, monthOperatingRows, monthSales, monthSocialMetrics, monthStrategies, visibleClients],
   );
   const activeClientsThisMonth = clientComparison.length;
   const comparisonLeaderBySales =
@@ -366,7 +430,7 @@ export function MetricsPage() {
       note:
         operatingTotals.total_sales > 0
           ? `${formatCop(operatingTotals.total_sales)} en ventas reales`
-          : 'ROAS real usa ventas reales reportadas',
+          : 'ROAS operativo usa ventas reales reportadas',
       className: operatingTotals.total_sales > 0 ? 'source-automatic' : 'source-unknown',
     }
       : null,
@@ -411,7 +475,7 @@ export function MetricsPage() {
             Desempeño mensual de campañas
           </h1>
           <p className="page-subtitle">
-            Reporte mensual para revisar inversión, ventas reales y señales observadas del mes seleccionado.
+            Reporte mensual para revisar pauta a WhatsApp, ventas manuales y señales observadas del mes seleccionado.
           </p>
         </div>
         {selectedClient !== 'all' && (
@@ -423,21 +487,30 @@ export function MetricsPage() {
 
       <div className="card section-block period-toolbar-card">
         <div className="report-filter-grid">
-          <label className="form-field">
-            <span className="form-label">Cliente</span>
-            <select
-              className="form-input"
-              value={selectedClient}
-              onChange={(event) => setSelectedClient(event.target.value)}
-            >
-              <option value="all">Todos los clientes</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {canSelectAllClients ? (
+            <label className="form-field">
+              <span className="form-label">Cliente</span>
+              <select
+                className="form-input"
+                value={selectedClient}
+                onChange={(event) => setSelectedClient(event.target.value)}
+              >
+                <option value="all">{isInternal ? 'Todos los clientes' : 'Mis empresas'}</option>
+                {visibleClients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <div className="card section-block metric-box">
+              <span className="metric-box-label">Cliente</span>
+              <span className="metric-box-value">
+                {visibleClients[0]?.name ?? 'Sin empresa asignada'}
+              </span>
+            </div>
+          )}
           <MonthSelector
             label="Mes visible"
             value={activeMonth}
@@ -452,7 +525,7 @@ export function MetricsPage() {
           <span className={`meta-chip ${adDataOriginClass(adSourceOrigin)}`}>
             {adDataOriginLabel(adSourceOrigin)}
           </span>
-          <span className="meta-chip">ROAS real = ventas reportadas / inversión</span>
+          <span className="meta-chip">ROAS operativo = ventas manuales / inversión</span>
         </div>
       </div>
 
@@ -572,9 +645,9 @@ export function MetricsPage() {
               valueFormatter={(value) => formatCop(value)}
             />
             <LineChart
-              title="Histórico de ROAS real por mes"
+              title="Histórico de ROAS operativo por mes"
               points={historyRoasPoints}
-              emptyMessage="Aún no hay histórico mensual de ROAS suficiente."
+              emptyMessage="Aún no hay histórico mensual suficiente de ventas / inversión."
               valueFormatter={(value) => formatRoas(value)}
             />
           </div>
@@ -788,11 +861,11 @@ export function MetricsPage() {
                           <th>Fecha</th>
                           <th>Fuente</th>
                           <th className="num-col">Inversión</th>
-                          <th className="num-col">Mensajes</th>
+                          <th className="num-col">Conversaciones</th>
                           <th className="num-col">Leads</th>
-                          <th className="num-col">Compras</th>
-                          <th className="num-col">Valor</th>
-                          <th className="num-col">ROAS Ads</th>
+                          <th className="num-col">Clicks</th>
+                          <th className="num-col">CTR</th>
+                          <th className="num-col">CPC</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -811,20 +884,20 @@ export function MetricsPage() {
                                 <td className="num-col" data-label="Inversión">
                                   {formatCop(row.spend)}
                                 </td>
-                                <td className="num-col" data-label="Mensajes">
+                                <td className="num-col" data-label="Conversaciones">
                                   {formatNumber(row.messages)}
                                 </td>
                                 <td className="num-col" data-label="Leads">
                                   {formatNumber(row.leads)}
                                 </td>
-                                <td className="num-col" data-label="Compras">
-                                  {formatNumber(row.purchases)}
+                                <td className="num-col" data-label="Clicks">
+                                  {formatNumber(row.clicks)}
                                 </td>
-                                <td className="num-col" data-label="Valor">
-                                  {formatCop(row.purchase_value)}
+                                <td className="num-col" data-label="CTR">
+                                  {formatPct(row.ctr)}
                                 </td>
-                                <td className="num-col" data-label="ROAS Ads">
-                                  <span className={roasClass(row.roas)}>{formatRoas(row.roas)}</span>
+                                <td className="num-col" data-label="CPC">
+                                  {formatCop(row.cpc)}
                                 </td>
                               </tr>
                             );
