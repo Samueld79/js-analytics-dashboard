@@ -50,7 +50,17 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   email               TEXT,
   full_name           TEXT,
   role                TEXT NOT NULL DEFAULT 'operator'
-                      CHECK (role IN ('admin', 'team', 'strategist', 'operator', 'partner', 'client')),
+                      CHECK (
+                        role IN (
+                          'admin',
+                          'team',
+                          'strategist',
+                          'operator',
+                          'partner',
+                          'client',
+                          'client_viewer'
+                        )
+                      ),
   avatar_url          TEXT,
   active              BOOLEAN NOT NULL DEFAULT true,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
