@@ -179,6 +179,184 @@ export type AdMetric = {
   updated_at?: string;
 };
 
+export type MetaActionItem = {
+  action_type?: string;
+  value?: string | number | null;
+};
+
+export type AdCampaignMetric = {
+  id: string;
+  client_id: string;
+  ad_account_id: string;
+  campaign_id: string;
+  campaign_name: string;
+  objective?: string | null;
+  effective_status?: string | null;
+  date: string;
+  spend: number;
+  reach: number;
+  impressions: number;
+  clicks: number;
+  cpm: number;
+  cpc: number;
+  ctr: number;
+  frequency?: number | null;
+  messages: number;
+  messaging_started: number;
+  messaging_connections: number;
+  messaging_first_reply: number;
+  leads: number;
+  purchases: number;
+  purchase_value: number;
+  link_clicks: number;
+  page_engagement: number;
+  post_engagement: number;
+  video_views: number;
+  thruplays: number;
+  profile_visits: number;
+  raw_actions?: MetaActionItem[];
+  raw_action_values?: MetaActionItem[];
+  metadata?: Record<string, unknown> | null;
+  source: string;
+  created_at: string;
+  updated_at?: string;
+};
+
+export type RawAdCampaignImportRow = {
+  client_id: string;
+  ad_account_id: string;
+  campaign_id: string | number;
+  campaign_name: string;
+  date: string;
+  objective?: string | null;
+  effective_status?: string | null;
+  spend?: string | number | null;
+  reach?: string | number | null;
+  impressions?: string | number | null;
+  clicks?: string | number | null;
+  cpm?: string | number | null;
+  cpc?: string | number | null;
+  ctr?: string | number | null;
+  frequency?: string | number | null;
+  actions?: MetaActionItem[] | unknown;
+  action_values?: MetaActionItem[] | unknown;
+  raw_actions?: MetaActionItem[] | unknown;
+  raw_action_values?: MetaActionItem[] | unknown;
+  source?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type CampaignActionMetrics = {
+  messages: number;
+  messaging_started: number;
+  messaging_connections: number;
+  messaging_first_reply: number;
+  leads: number;
+  purchases: number;
+  purchase_value: number;
+  link_clicks: number;
+  page_engagement: number;
+  post_engagement: number;
+  video_views: number;
+  thruplays: number;
+  profile_visits: number;
+};
+
+export type NormalizedAdCampaignImportRow = Omit<
+  AdCampaignMetric,
+  'id' | 'created_at' | 'updated_at'
+>;
+
+export type CampaignAggregateByCampaign = {
+  campaignId: string;
+  campaignName: string;
+  objective: string | null;
+  effectiveStatus: string | null;
+  spend: number;
+  reach: number;
+  impressions: number;
+  clicks: number;
+  messages: number;
+  messagingStarted: number;
+  messagingConnections: number;
+  messagingFirstReply: number;
+  leads: number;
+  purchases: number;
+  purchaseValue: number;
+  linkClicks: number;
+  pageEngagement: number;
+  postEngagement: number;
+  videoViews: number;
+  thruplays: number;
+  profileVisits: number;
+  adRoas: number;
+  costPerConversation: number | null;
+  costPerProfileVisit: number | null;
+  days: number;
+};
+
+export type CampaignAggregateByObjective = {
+  objective: string;
+  spend: number;
+  messages: number;
+  profileVisits: number;
+  leads: number;
+  purchases: number;
+  purchaseValue: number;
+  linkClicks: number;
+  pageEngagement: number;
+  postEngagement: number;
+  videoViews: number;
+  thruplays: number;
+  campaignCount: number;
+  adRoas: number;
+  costPerConversation: number | null;
+  costPerProfileVisit: number | null;
+  shareOfSpend: number;
+};
+
+export type CampaignAggregateByMonth = {
+  month: string;
+  spend: number;
+  messages: number;
+  profileVisits: number;
+  leads: number;
+  purchases: number;
+  purchaseValue: number;
+  linkClicks: number;
+  pageEngagement: number;
+  postEngagement: number;
+  videoViews: number;
+  thruplays: number;
+  campaignCount: number;
+  adRoas: number;
+  costPerConversation: number | null;
+  costPerProfileVisit: number | null;
+};
+
+export type CampaignPerformanceSummary = {
+  rowCount: number;
+  campaignCount: number;
+  spend: number;
+  messages: number;
+  profileVisits: number;
+  leads: number;
+  purchases: number;
+  purchaseValue: number;
+  adRoas: number;
+  costPerConversation: number | null;
+  costPerProfileVisit: number | null;
+  topCampaignsBySpend: CampaignAggregateByCampaign[];
+  topCampaignsByConversations: CampaignAggregateByCampaign[];
+  spendByObjective: CampaignAggregateByObjective[];
+  mixRealByObjective: Array<{
+    objective: string;
+    spend: number;
+    shareOfSpend: number;
+  }>;
+  byMonth: CampaignAggregateByMonth[];
+};
+
 export type DailySale = {
   id: string;
   client_id: string;

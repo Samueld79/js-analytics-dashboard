@@ -171,6 +171,45 @@ CREATE TABLE IF NOT EXISTS public.ad_metrics (
   UNIQUE (client_id, ad_account_id, date)
 );
 
+CREATE TABLE IF NOT EXISTS public.ad_campaign_metrics (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id               UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  ad_account_id           UUID NOT NULL REFERENCES public.ad_accounts(id) ON DELETE CASCADE,
+  campaign_id             TEXT NOT NULL CHECK (btrim(campaign_id) <> ''),
+  campaign_name           TEXT NOT NULL CHECK (btrim(campaign_name) <> ''),
+  objective               TEXT,
+  effective_status        TEXT,
+  date                    DATE NOT NULL,
+  spend                   NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (spend >= 0),
+  reach                   INTEGER NOT NULL DEFAULT 0 CHECK (reach >= 0),
+  impressions             INTEGER NOT NULL DEFAULT 0 CHECK (impressions >= 0),
+  clicks                  INTEGER NOT NULL DEFAULT 0 CHECK (clicks >= 0),
+  cpm                     NUMERIC(12,4) NOT NULL DEFAULT 0 CHECK (cpm >= 0),
+  cpc                     NUMERIC(12,4) NOT NULL DEFAULT 0 CHECK (cpc >= 0),
+  ctr                     NUMERIC(8,4) NOT NULL DEFAULT 0 CHECK (ctr >= 0),
+  frequency               NUMERIC(10,4) CHECK (frequency >= 0),
+  messages                INTEGER NOT NULL DEFAULT 0 CHECK (messages >= 0),
+  messaging_started       INTEGER NOT NULL DEFAULT 0 CHECK (messaging_started >= 0),
+  messaging_connections   INTEGER NOT NULL DEFAULT 0 CHECK (messaging_connections >= 0),
+  messaging_first_reply   INTEGER NOT NULL DEFAULT 0 CHECK (messaging_first_reply >= 0),
+  leads                   INTEGER NOT NULL DEFAULT 0 CHECK (leads >= 0),
+  purchases               INTEGER NOT NULL DEFAULT 0 CHECK (purchases >= 0),
+  purchase_value          NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (purchase_value >= 0),
+  link_clicks             INTEGER NOT NULL DEFAULT 0 CHECK (link_clicks >= 0),
+  page_engagement         INTEGER NOT NULL DEFAULT 0 CHECK (page_engagement >= 0),
+  post_engagement         INTEGER NOT NULL DEFAULT 0 CHECK (post_engagement >= 0),
+  video_views             INTEGER NOT NULL DEFAULT 0 CHECK (video_views >= 0),
+  thruplays               INTEGER NOT NULL DEFAULT 0 CHECK (thruplays >= 0),
+  profile_visits          INTEGER NOT NULL DEFAULT 0 CHECK (profile_visits >= 0),
+  raw_actions             JSONB NOT NULL DEFAULT '[]'::jsonb,
+  raw_action_values       JSONB NOT NULL DEFAULT '[]'::jsonb,
+  metadata                JSONB,
+  source                  TEXT NOT NULL DEFAULT 'meta_api_campaign' CHECK (btrim(source) <> ''),
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (client_id, ad_account_id, campaign_id, date)
+);
+
 -- ============================================================
 -- SALES
 -- ============================================================
@@ -524,6 +563,16 @@ CREATE INDEX IF NOT EXISTS idx_ad_import_runs_status ON public.ad_import_runs(st
 CREATE INDEX IF NOT EXISTS idx_ad_metrics_client_date ON public.ad_metrics(client_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_ad_metrics_account_date ON public.ad_metrics(ad_account_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_ad_metrics_import_run ON public.ad_metrics(import_run_id);
+CREATE INDEX IF NOT EXISTS idx_ad_campaign_metrics_client_date
+  ON public.ad_campaign_metrics(client_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_ad_campaign_metrics_account_date
+  ON public.ad_campaign_metrics(ad_account_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_ad_campaign_metrics_campaign_date
+  ON public.ad_campaign_metrics(campaign_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_ad_campaign_metrics_client_objective_date
+  ON public.ad_campaign_metrics(client_id, objective, date DESC);
+CREATE INDEX IF NOT EXISTS idx_ad_campaign_metrics_date
+  ON public.ad_campaign_metrics(date DESC);
 
 CREATE INDEX IF NOT EXISTS idx_daily_sales_client_date ON public.daily_sales(client_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_daily_sales_status ON public.daily_sales(status);
@@ -564,6 +613,7 @@ CREATE INDEX IF NOT EXISTS idx_activity_log_client_created ON public.activity_lo
 CREATE INDEX IF NOT EXISTS idx_activity_log_entity ON public.activity_log(entity_type, entity_id);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.social_monthly_metrics TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ad_campaign_metrics TO authenticated;
 GRANT SELECT ON public.v_client_daily_operating_kpis TO authenticated;
 GRANT SELECT ON public.v_client_monthly_operating_kpis TO authenticated;
 GRANT SELECT ON public.v_client_monthly_social_metrics TO authenticated;
@@ -599,6 +649,12 @@ EXECUTE FUNCTION public.set_updated_at();
 DROP TRIGGER IF EXISTS set_updated_at_ad_metrics ON public.ad_metrics;
 CREATE TRIGGER set_updated_at_ad_metrics
 BEFORE UPDATE ON public.ad_metrics
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS set_updated_at_ad_campaign_metrics ON public.ad_campaign_metrics;
+CREATE TRIGGER set_updated_at_ad_campaign_metrics
+BEFORE UPDATE ON public.ad_campaign_metrics
 FOR EACH ROW
 EXECUTE FUNCTION public.set_updated_at();
 
@@ -724,6 +780,7 @@ ALTER TABLE public.client_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ad_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ad_import_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ad_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ad_campaign_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.social_monthly_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.strategies ENABLE ROW LEVEL SECURITY;
@@ -828,6 +885,21 @@ USING (public.user_has_client_access(client_id));
 DROP POLICY IF EXISTS ad_metrics_write ON public.ad_metrics;
 CREATE POLICY ad_metrics_write
 ON public.ad_metrics
+FOR ALL
+TO authenticated
+USING (public.is_internal_user())
+WITH CHECK (public.is_internal_user());
+
+DROP POLICY IF EXISTS ad_campaign_metrics_select ON public.ad_campaign_metrics;
+CREATE POLICY ad_campaign_metrics_select
+ON public.ad_campaign_metrics
+FOR SELECT
+TO authenticated
+USING (public.is_internal_user());
+
+DROP POLICY IF EXISTS ad_campaign_metrics_write ON public.ad_campaign_metrics;
+CREATE POLICY ad_campaign_metrics_write
+ON public.ad_campaign_metrics
 FOR ALL
 TO authenticated
 USING (public.is_internal_user())
