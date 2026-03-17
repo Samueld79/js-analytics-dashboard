@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Calendar, RefreshCw, Plus } from 'lucide-react';
-import { CalendarWidget } from '../components/CalendarWidget';
 
 type CalEvent = {
   id: string;
