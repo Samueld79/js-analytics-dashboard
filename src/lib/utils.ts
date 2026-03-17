@@ -559,6 +559,7 @@ export function roleLabel(role: string): string {
 export function activityActionLabel(action: string): string {
   const map: Record<string, string> = {
     sales_upserted: 'Ventas registradas',
+    sales_deleted: 'Venta eliminada',
     strategy_created: 'Estrategia creada',
     strategy_updated: 'Estrategia actualizada',
     strategy_status_changed: 'Estado de estrategia actualizado',

@@ -130,6 +130,14 @@ export function MetricsPage() {
   });
   const averageSalePerRecord =
     monthSales.length > 0 ? operatingTotals.total_sales / monthSales.length : null;
+  const costPerConversation =
+    marketingSummary.messagingStarted > 0
+      ? operatingTotals.spend / marketingSummary.messagingStarted
+      : null;
+  const estimatedCloseRate =
+    marketingSummary.messagingStarted > 0 && monthSales.length > 0
+      ? (monthSales.length / marketingSummary.messagingStarted) * 100
+      : null;
 
   const historyMonths = useMemo(
     () =>
@@ -265,6 +273,66 @@ export function MetricsPage() {
     hasProfileVisitCost: false,
     hasConversationCost: false,
   });
+  const primaryMetricCards = [
+    {
+      icon: <DollarSign size={18} />,
+      label: 'Inversión del mes',
+      value: formatCop(operatingTotals.spend),
+      note: 'Inversión real del mes seleccionado',
+    },
+    {
+      icon: <MessageSquare size={18} />,
+      label: 'Conversaciones',
+      value: formatNumber(marketingSummary.messagingStarted),
+      note: 'Mensajes / conversaciones detectadas en Ads',
+    },
+    {
+      icon: <Target size={18} />,
+      label: 'Costo por conversación',
+      value: costPerConversation != null ? formatCop(costPerConversation) : 'Sin dato',
+      note:
+        costPerConversation != null
+          ? 'Inversión / conversaciones detectadas'
+          : 'Requiere conversaciones reales en el mes',
+      tone: costPerConversation != null ? undefined : ('muted' as const),
+    },
+    ...(profileVisitsSummary.value != null
+      ? [
+          {
+            icon: <Eye size={18} />,
+            label: 'Visitas al perfil',
+            value: formatNumber(profileVisitsSummary.value),
+            note: profileVisitsSummary.sourceLabel,
+          },
+        ]
+      : []),
+    {
+      icon: <TrendingUp size={18} />,
+      label: 'Ventas manuales reportadas',
+      value: formatCop(operatingTotals.total_sales),
+      note: `${monthSales.length} registro(s) cargados manualmente`,
+    },
+    {
+      icon: <CircleDollarSign size={18} />,
+      label: 'Ticket promedio',
+      value: averageSalePerRecord != null ? formatCop(averageSalePerRecord) : 'Sin dato',
+      note:
+        averageSalePerRecord != null
+          ? 'Ventas reales / registros del mes'
+          : 'Requiere ventas manuales reportadas',
+      tone: averageSalePerRecord != null ? undefined : ('muted' as const),
+    },
+    {
+      icon: <BarChart3 size={18} />,
+      label: 'Tasa de cierre estimada',
+      value: estimatedCloseRate != null ? formatPct(estimatedCloseRate) : 'Sin dato',
+      note:
+        estimatedCloseRate != null
+          ? 'Registros de venta / conversaciones'
+          : 'Requiere ventas reportadas y conversaciones',
+      tone: estimatedCloseRate != null ? undefined : ('muted' as const),
+    },
+  ];
   const reportCoverage = [
     operatingTotals.spend > 0 || monthMetrics.length > 0
       ? {
@@ -398,63 +466,16 @@ export function MetricsPage() {
       ) : (
         <>
           <div className="report-kpi-grid report-kpi-primary-grid">
-            <ReportKpiCard
-              icon={<CircleDollarSign size={18} />}
-              label="Presupuesto mensual"
-              value={
-                budgetSummary.totalBudget != null
-                  ? formatCop(budgetSummary.totalBudget)
-                  : 'Sin presupuesto'
-              }
-              note={budgetSummary.sourceLabel}
-              tone={budgetSummary.totalBudget != null ? undefined : 'muted'}
-            />
-            <ReportKpiCard
-              icon={<DollarSign size={18} />}
-              label="Presupuesto gastado"
-              value={formatCop(operatingTotals.spend)}
-              note="Inversión real del mes seleccionado"
-            />
-            <ReportKpiCard
-              icon={<Target size={18} />}
-              label="% ejecución"
-              value={budgetExecution != null ? formatPct(budgetExecution) : 'Pendiente'}
-              note={
-                budgetExecution != null
-                  ? 'Gasto / presupuesto mensual'
-                  : 'Requiere estrategia con presupuesto cargado'
-              }
-              tone={budgetExecution != null ? undefined : 'muted'}
-            />
-            <ReportKpiCard
-              icon={<TrendingUp size={18} />}
-              label="Ventas del mes"
-              value={formatCop(operatingTotals.total_sales)}
-              note={`${monthSales.length} registro(s) de venta reportados`}
-            />
-            <ReportKpiCard
-              icon={<BarChart3 size={18} />}
-              label="ROAS del mes"
-              value={formatRoas(operatingTotals.real_roas)}
-              note="Ventas reales / inversión"
-            />
-            <ReportKpiCard
-              icon={<MessageSquare size={18} />}
-              label="Conversaciones"
-              value={formatNumber(marketingSummary.messagingStarted)}
-              note="Mensajes detectados en Ads del mes"
-            />
-            <ReportKpiCard
-              icon={<Eye size={18} />}
-              label="Visitas al perfil"
-              value={
-                profileVisitsSummary.value != null
-                  ? formatNumber(profileVisitsSummary.value)
-                  : 'Sin dato'
-              }
-              note={profileVisitsSummary.sourceLabel}
-              tone={profileVisitsSummary.value != null ? undefined : 'muted'}
-            />
+            {primaryMetricCards.map((card) => (
+              <ReportKpiCard
+                key={card.label}
+                icon={card.icon}
+                label={card.label}
+                value={card.value}
+                note={card.note}
+                tone={card.tone}
+              />
+            ))}
           </div>
 
           <div className="report-main-grid report-overview-grid">
@@ -463,7 +484,8 @@ export function MetricsPage() {
                 <h2>Lectura comercial del mes</h2>
               </div>
               <p className="source-note">
-                Esta capa prioriza solo lo que hoy es confiable: inversión, ventas reales, presupuesto visible y cierres mensuales con data real.
+                Este reporte separa claramente Meta Ads, ventas manuales y métricas operativas del
+                mes visible.
               </p>
               {reportCoverage.length > 0 && (
                 <div className="report-coverage-list">
@@ -479,6 +501,24 @@ export function MetricsPage() {
                 </div>
               )}
               <div className="report-inline-summary">
+                <MetricBoxInline
+                  label="Presupuesto mensual"
+                  value={
+                    budgetSummary.totalBudget != null
+                      ? formatCop(budgetSummary.totalBudget)
+                      : 'Sin presupuesto'
+                  }
+                  muted={budgetSummary.totalBudget == null}
+                />
+                <MetricBoxInline
+                  label="% de ejecución"
+                  value={budgetExecution != null ? formatPct(budgetExecution) : 'Sin dato'}
+                  muted={budgetExecution == null}
+                />
+                <MetricBoxInline
+                  label="ROAS operativo manual"
+                  value={formatRoas(operatingTotals.real_roas)}
+                />
                 <MetricBoxInline
                   label="Clicks WhatsApp + link"
                   value={formatNumber(specialSummary.whatsappClicks + specialSummary.linkClicks)}
@@ -510,7 +550,8 @@ export function MetricsPage() {
                 <h2>Mix del mes</h2>
               </div>
               <p className="source-note">
-                Resultados observados del mes visible. La distribución real de presupuesto por objetivo sigue pendiente hasta tener spend por campaña.
+                Distribución de resultados observados del mes visible. No representa gasto por
+                objetivo; solo resultados que hoy sí tienen fuente real.
               </p>
               <div className="report-distribution-grid">
                 <DistributionDonutCard
@@ -608,8 +649,7 @@ export function MetricsPage() {
                 <h2>Ventas del mes</h2>
               </div>
               <p className="source-note">
-                Ventas reportadas por día. El objetivo comercial sigue pendiente si no existe una
-                meta manual cargada.
+                Ventas manuales reportadas por día. Esta vista no asume ventas web desde Meta.
               </p>
               <div className="report-sales-grid">
                 <MetricBoxInline label="Ventas del mes" value={formatCop(operatingTotals.total_sales)} />
@@ -646,7 +686,8 @@ export function MetricsPage() {
                   <h2>Comparativa por cliente</h2>
                 </div>
                 <p className="source-note">
-                  Comparativa agregada del mes visible para detectar líderes de ventas, eficiencia y volumen comercial.
+                  Comparativa agregada del mes visible para detectar líderes de ventas, eficiencia
+                  operativa y volumen comercial.
                 </p>
                 <div className="report-inline-summary comparison-summary-grid">
                   <MetricBoxInline label="Clientes con data" value={String(activeClientsThisMonth)} muted={activeClientsThisMonth === 0} />
@@ -660,7 +701,7 @@ export function MetricsPage() {
                     muted={!comparisonLeaderBySales}
                   />
                   <MetricBoxInline
-                    label="Mejor ROAS"
+                    label="Mejor ROAS operativo"
                     value={
                       comparisonLeaderByRoas
                         ? `${comparisonLeaderByRoas.client.name} · ${formatRoas(comparisonLeaderByRoas.totals.real_roas)}`
@@ -681,7 +722,7 @@ export function MetricsPage() {
                           <th className="num-col">Presupuesto</th>
                           <th className="num-col">Inversión</th>
                           <th className="num-col">Ventas</th>
-                          <th className="num-col">ROAS</th>
+                          <th className="num-col">ROAS operativo</th>
                           <th className="num-col">Conversaciones</th>
                           <th className="num-col">Perfil</th>
                         </tr>
@@ -711,7 +752,7 @@ export function MetricsPage() {
                             <td className="num-col" data-label="Ventas">
                               {formatCop(row.totals.total_sales)}
                             </td>
-                            <td className="num-col" data-label="ROAS">
+                            <td className="num-col" data-label="ROAS operativo">
                               <span className={roasClass(row.totals.real_roas)}>
                                 {formatRoas(row.totals.real_roas)}
                               </span>
@@ -798,7 +839,7 @@ export function MetricsPage() {
 
           {pendingMetrics.length > 0 && (
             <details className="card section-block dashboard-collapsible">
-              <summary>Cobertura pendiente del reporte mensual</summary>
+              <summary>Cobertura avanzada pendiente</summary>
               <div className="special-metrics-list">
                 {pendingMetrics.map((item) => (
                   <div key={item.title} className="special-metric-row">
@@ -1162,16 +1203,17 @@ function DistributionDonutCard({
             const share = total > 0 ? (item.value / total) * 100 : 0;
             return (
               <div key={item.label} className="distribution-legend-row">
-                <div className="distribution-legend-copy">
-                  <span
-                    className="distribution-legend-dot"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <strong>{item.label}</strong>
+                <div className="distribution-legend-main">
+                  <div className="distribution-legend-copy">
+                    <span
+                      className="distribution-legend-dot"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <strong>{item.label}</strong>
+                  </div>
+                  <span className="distribution-legend-value">{formatNumber(item.value)}</span>
                 </div>
-                <span>
-                  {formatNumber(item.value)} · {share.toFixed(1)}%
-                </span>
+                <span className="distribution-legend-share">{share.toFixed(1)}%</span>
               </div>
             );
           })}

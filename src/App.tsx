@@ -147,62 +147,109 @@ function AccessDeniedPage({
 
 function SettingsPage() {
   const { authEnabled, profile, role, memberships, accessibleClientIds } = useAuth();
+  const activeMemberships = memberships.filter((membership) => membership.status === 'active');
 
   return (
     <div className="page-content">
       <div className="page-header">
         <div>
           <h1 className="page-title">Configuración</h1>
-          <p className="page-subtitle">Sistema, acceso y preferencias</p>
+          <p className="page-subtitle">Acceso, operación y estado del sistema</p>
         </div>
       </div>
-      <div className="card section-block" style={{ maxWidth: 700, padding: '24px' }}>
-        <div className="section-heading"><h2>Conexión Supabase</h2></div>
-        <p style={{ color: '#a9b6cf', fontSize: '0.88rem' }}>
-          El sistema opera sobre Supabase. Si no está configurado, las vistas cargarán vacías.
-        </p>
-        <ol style={{ color: '#c8d5ef', fontSize: '0.88rem', lineHeight: 1.8 }}>
-          <li>Crea un proyecto en <a href="https://supabase.com" target="_blank" rel="noreferrer" style={{ color: '#7ab1ff' }}>supabase.com</a></li>
-          <li>Corre el schema en <code>/supabase/schema.sql</code></li>
-          <li>Aplica las vistas de <code>/supabase/phase-1-operating-views.sql</code> si las ajustas</li>
-          <li>Configura <code>.env</code> con <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code></li>
-          <li>Crea usuarios en Supabase Auth y asigna perfil/rol</li>
-        </ol>
-        <div className="setting-item">
-          <div className="setting-label">Modo de datos</div>
-          <div className="setting-value" style={{ color: isSupabaseConfigured ? '#00e676' : '#ffc107' }}>
-            {isSupabaseConfigured ? 'Supabase configurado' : 'Supabase no configurado'}
+      <div className="settings-grid">
+        <section className="card section-block settings-card">
+          <div className="section-heading">
+            <h2>Cuenta actual</h2>
           </div>
-        </div>
-        <div className="setting-item">
-          <div className="setting-label">Autenticación</div>
-          <div className="setting-value">{authEnabled ? 'Supabase Auth activo' : 'Desactivada por entorno local'}</div>
-        </div>
-        <div className="setting-item">
-          <div className="setting-label">Usuario actual</div>
-          <div className="setting-value">
-            {profile?.full_name ?? profile?.email ?? 'Sesion local sin usuario'}
+          <p className="source-note">
+            Estado del acceso actual y alcance operativo dentro del sistema.
+          </p>
+          <div className="setting-item">
+            <div className="setting-label">Usuario actual</div>
+            <div className="setting-value">
+              {profile?.full_name ?? profile?.email ?? 'Sesion local sin usuario'}
+            </div>
           </div>
-        </div>
-        <div className="setting-item">
-          <div className="setting-label">Rol</div>
-          <div className="setting-value">{roleLabel(role)}</div>
-        </div>
-        <div className="setting-item">
-          <div className="setting-label">Clientes accesibles</div>
-          <div className="setting-value">
-            {accessibleClientIds.length > 0 ? accessibleClientIds.length : 'Acceso interno total o sin asignaciones'}
+          <div className="setting-item">
+            <div className="setting-label">Rol</div>
+            <div className="setting-value">{roleLabel(role)}</div>
           </div>
-        </div>
-        <div className="setting-item">
-          <div className="setting-label">Membresías activas</div>
-          <div className="setting-value">{memberships.filter((membership) => membership.status === 'active').length}</div>
-        </div>
-        <div className="setting-item">
-          <div className="setting-label">Versión</div>
-          <div className="setting-value">Growth Strategy JS · Dashboard interno y workspace cliente</div>
-        </div>
+          <div className="setting-item">
+            <div className="setting-label">Clientes accesibles</div>
+            <div className="setting-value">
+              {accessibleClientIds.length > 0
+                ? accessibleClientIds.length
+                : 'Acceso interno total o sin asignaciones'}
+            </div>
+          </div>
+          <div className="setting-item">
+            <div className="setting-label">Membresías activas</div>
+            <div className="setting-value">{activeMemberships.length}</div>
+          </div>
+        </section>
+
+        <section className="card section-block settings-card">
+          <div className="section-heading">
+            <h2>Operación del sistema</h2>
+          </div>
+          <p className="source-note">
+            Resumen claro de cómo opera hoy la plataforma para el equipo y el portal cliente.
+          </p>
+          <div className="period-chip-row">
+            <span className="meta-chip">Meta Ads: sync diario</span>
+            <span className="meta-chip">Ventas: carga manual</span>
+            <span className="meta-chip">Portal cliente: por membresía</span>
+          </div>
+          <div className="setting-item">
+            <div className="setting-label">Modo de datos</div>
+            <div className="setting-value settings-status-value">
+              {isSupabaseConfigured ? 'Supabase configurado' : 'Supabase no configurado'}
+            </div>
+          </div>
+          <div className="setting-item">
+            <div className="setting-label">Autenticación</div>
+            <div className="setting-value">
+              {authEnabled ? 'Supabase Auth activo' : 'Desactivada por entorno local'}
+            </div>
+          </div>
+          <div className="setting-item">
+            <div className="setting-label">Portal cliente</div>
+            <div className="setting-value">
+              Cada cliente ve solo su empresa desde /mi-espacio
+            </div>
+          </div>
+          <div className="setting-item">
+            <div className="setting-label">Versión</div>
+            <div className="setting-value">
+              Growth Strategy JS · Dashboard interno y workspace cliente
+            </div>
+          </div>
+        </section>
       </div>
+
+      <details className="card section-block dashboard-collapsible settings-advanced-card">
+        <summary>Sistema avanzado</summary>
+        <div className="settings-advanced-content">
+          <p className="source-note">
+            Bloque técnico para instalación o revisión manual. No afecta la operación diaria.
+          </p>
+          <ol className="settings-advanced-list">
+            <li>
+              Crea un proyecto en{' '}
+              <a href="https://supabase.com" target="_blank" rel="noreferrer">
+                supabase.com
+              </a>
+            </li>
+            <li>Ejecuta el schema en <code>/supabase/schema.sql</code></li>
+            <li>Aplica las vistas de <code>/supabase/phase-1-operating-views.sql</code></li>
+            <li>
+              Configura <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code>
+            </li>
+            <li>Crea usuarios en Supabase Auth y asigna perfil/rol</li>
+          </ol>
+        </div>
+      </details>
     </div>
   );
 }

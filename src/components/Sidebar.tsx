@@ -28,8 +28,8 @@ const INTERNAL_NAV = [
   { to: '/metrics', icon: BarChart2, label: 'Métricas Ads' },
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
   { to: '/strategies', icon: ClipboardList, label: 'Estrategias' },
-  { to: '/ai', icon: Bot, label: 'Agente IA' },
   { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
+  { to: '/ai', icon: Bot, label: 'IA' },
 ];
 
 export function Sidebar() {

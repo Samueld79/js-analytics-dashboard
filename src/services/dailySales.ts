@@ -18,6 +18,8 @@ type ListDailySalesParams = {
   endDate?: string;
 };
 
+type DailySaleDeleteInput = Pick<DailySale, 'id' | 'client_id' | 'date' | 'total_sales'>;
+
 function getSinceDate(days: number): string {
   const since = new Date();
   since.setDate(since.getDate() - days);
@@ -35,6 +37,33 @@ async function getRegisteredUserId(): Promise<string | null> {
 function normalizeMoney(value: number): number {
   if (!Number.isFinite(value) || value < 0) return 0;
   return Math.round(value * 100) / 100;
+}
+
+async function syncClientLastSalesEntryAt(clientId: string): Promise<void> {
+  if (!supabase) return;
+
+  const { data, error } = await supabase
+    .from('daily_sales')
+    .select('date')
+    .eq('client_id', clientId)
+    .order('date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[dailySales] sync client last_sales_entry_at select', error);
+    return;
+  }
+
+  const lastSalesEntryAt = data?.date ? `${data.date}T23:59:59` : null;
+  const { error: updateError } = await supabase
+    .from('clients')
+    .update({ last_sales_entry_at: lastSalesEntryAt })
+    .eq('id', clientId);
+
+  if (updateError) {
+    console.error('[dailySales] sync client last_sales_entry_at update', updateError);
+  }
 }
 
 export async function listDailySales({
@@ -106,16 +135,7 @@ export async function upsertDailySale(
     return { data: null, error: getErrorMessage(error, 'No se pudo guardar la venta.') };
   }
 
-  const lastSalesEntryAt = `${sale.date}T23:59:59`;
-  void supabase
-    .from('clients')
-    .update({ last_sales_entry_at: lastSalesEntryAt })
-    .eq('id', sale.client_id)
-    .then(({ error: clientUpdateError }) => {
-      if (clientUpdateError) {
-        console.error('[dailySales] update client last_sales_entry_at', clientUpdateError);
-      }
-    });
+  void syncClientLastSalesEntryAt(sale.client_id);
 
   if (data) {
     void logActivitySafe({
@@ -136,6 +156,43 @@ export async function upsertDailySale(
   }
 
   return { data: (data ?? null) as DailySale | null, error: null };
+}
+
+export async function deleteDailySale(
+  sale: DailySaleDeleteInput,
+): Promise<ServiceMutationResult<null>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  if (!sale.id || !sale.client_id) {
+    return { data: null, error: 'No se pudo identificar el registro de venta a eliminar.' };
+  }
+
+  const { error } = await supabase.from('daily_sales').delete().eq('id', sale.id);
+
+  if (error) {
+    console.error('[dailySales] deleteDailySale', error);
+    return {
+      data: null,
+      error: getErrorMessage(error, 'No se pudo eliminar el registro de venta.'),
+    };
+  }
+
+  void syncClientLastSalesEntryAt(sale.client_id);
+  void logActivitySafe({
+    client_id: sale.client_id,
+    entity_type: 'daily_sale',
+    entity_id: sale.id,
+    action: 'sales_deleted',
+    description: `Registro de ventas eliminado para ${sale.date} por ${normalizeMoney(sale.total_sales).toLocaleString('es-CO')}.`,
+    metadata: {
+      date: sale.date,
+      total_sales: normalizeMoney(sale.total_sales),
+    },
+  });
+
+  return { data: null, error: null };
 }
 
 export async function upsertHistoricalMonthlySale(

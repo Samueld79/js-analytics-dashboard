@@ -5,7 +5,7 @@ import {
   type DailySaleInput,
   type ServiceMutationResult,
 } from '../lib/supabase';
-import { listDailySales, upsertDailySale } from '../services/dailySales';
+import { deleteDailySale, listDailySales, upsertDailySale } from '../services/dailySales';
 
 type UseDailySalesParams = {
   clientId?: string;
@@ -56,12 +56,24 @@ export function useDailySales(clientIdOrParams?: string | UseDailySalesParams, d
     [load],
   );
 
+  const removeSale = useCallback(
+    async (sale: Pick<DailySale, 'id' | 'client_id' | 'date' | 'total_sales'>): Promise<ServiceMutationResult<null>> => {
+      const result = await deleteDailySale(sale);
+      if (!result.error) {
+        void load();
+      }
+      return result;
+    },
+    [load],
+  );
+
   return {
     sales,
     loading,
     error,
     reload: load,
     addSale,
+    removeSale,
     isConfigured: isSupabaseConfigured,
   };
 }

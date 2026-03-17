@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, TrendingUp } from 'lucide-react';
 import { SalesModal } from '../components/SalesModal';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
@@ -61,11 +61,14 @@ function getRangeBounds(filter: SalesFilterKey, today: string, customFrom: strin
 
 export function SalesPage() {
   const { clients, loading: clientsLoading } = useClients();
-  const { sales, addSale, loading: salesLoading } = useDailySales(undefined, 1200);
+  const { sales, addSale, removeSale, loading: salesLoading } = useDailySales(undefined, 1200);
   const [search, setSearch] = useState('');
   const [filterKey, setFilterKey] = useState<SalesFilterKey>('month');
   const [quickClientId, setQuickClientId] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [deletingSaleId, setDeletingSaleId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const today = getDateKey();
   const monthStart = getMonthStartKey();
@@ -117,6 +120,31 @@ export function SalesPage() {
   const yearTotal = useMemo(() => sumSales(yearSales).total, [yearSales]);
   const currentMonthLabel = getMonthLabel(today);
   const registerClient = selectedClient;
+
+  async function handleDeleteSale(saleId: string) {
+    const sale = filteredSales.find((entry) => entry.id === saleId);
+    if (!sale) return;
+
+    const client = clientMap.get(sale.client_id);
+    const confirmed = window.confirm(
+      `Eliminar el registro de ventas del ${formatDate(sale.date)} para ${client?.name ?? 'este cliente'}? Esta acción recalcula los KPIs del periodo.`,
+    );
+
+    if (!confirmed) return;
+
+    setDeletingSaleId(sale.id);
+    setActionFeedback(null);
+    setActionError(null);
+
+    const result = await removeSale(sale);
+    if (result.error) {
+      setActionError(result.error);
+    } else {
+      setActionFeedback('Registro eliminado. Los KPIs y listados ya se recalcularon.');
+    }
+
+    setDeletingSaleId(null);
+  }
 
   return (
     <div className="page-content">
@@ -260,6 +288,8 @@ export function SalesPage() {
           Vista simple del rango seleccionado. En desktop se muestra como tabla y en móvil baja a
           cards responsivas.
         </p>
+        {!actionError && actionFeedback && <p className="history-success">{actionFeedback}</p>}
+        {actionError && <p className="sales-feedback-error">{actionError}</p>}
         {salesLoading ? (
           <p className="empty-note">Cargando ventas...</p>
         ) : filteredSales.length === 0 ? (
@@ -272,6 +302,7 @@ export function SalesPage() {
                   <th>Fecha</th>
                   <th>Cliente</th>
                   <th className="num-col">Venta</th>
+                  <th className="actions-col">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -289,6 +320,17 @@ export function SalesPage() {
                       </td>
                       <td className="num-col" data-label="Venta">
                         {formatCop(sale.total_sales)}
+                      </td>
+                      <td className="actions-col" data-label="Acciones">
+                        <button
+                          type="button"
+                          className="table-action-button danger"
+                          disabled={deletingSaleId === sale.id}
+                          onClick={() => void handleDeleteSale(sale.id)}
+                        >
+                          <Trash2 size={14} />
+                          {deletingSaleId === sale.id ? 'Eliminando...' : 'Eliminar'}
+                        </button>
                       </td>
                     </tr>
                   );

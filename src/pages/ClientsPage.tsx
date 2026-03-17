@@ -20,7 +20,12 @@ export function ClientsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Clientes</h1>
-          <p className="page-subtitle">{clients.length} clientes registrados</p>
+          <p className="page-subtitle">Base operativa de empresas y portal cliente por membresías activas</p>
+          <div className="period-chip-row">
+            <span className="meta-chip">{clients.length} clientes registrados</span>
+            <span className="meta-chip">Admins: vista global</span>
+            <span className="meta-chip">Clientes: solo su empresa</span>
+          </div>
         </div>
         <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
           <Plus size={16} /> Nuevo Cliente

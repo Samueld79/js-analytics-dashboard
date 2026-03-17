@@ -157,6 +157,10 @@ export function DashboardPage() {
       ? (socialFollowersTotal / socialProfileVisitsTotal) * 100
       : null;
   const salesRecordCount = executiveSales.length;
+  const costPerConversation =
+    marketing.messagingStarted > 0 ? overall.spend / marketing.messagingStarted : null;
+  const averageTicket =
+    salesRecordCount > 0 ? overall.total_sales / salesRecordCount : null;
   const specialClickSignals = specialSummary.whatsappClicks + specialSummary.linkClicks;
   const commercialSignalRows = [
     {
@@ -377,6 +381,7 @@ export function DashboardPage() {
               <span className="meta-chip">{executiveMonthLabel}</span>
               <span className="meta-chip">KPIs: mensual</span>
               <span className="meta-chip">Riesgo y Meta: actual</span>
+              <span className="meta-chip">ROAS operativo = ventas manuales / inversión</span>
               <span className="meta-chip">Supabase real</span>
             </div>
           </div>
@@ -391,38 +396,34 @@ export function DashboardPage() {
           color="blue"
         />
         <KpiBox
-          icon={<TrendingUp size={18} />}
-          label={`Ventas ${executiveMonthLabel}`}
-          value={formatCop(overall.total_sales)}
-          color="green"
-        />
-        <KpiBox
-          icon={<BarChart3 size={18} />}
-          label={`ROAS real ${executiveMonthLabel}`}
-          value={formatRoas(overall.real_roas)}
-          color="amber"
-        />
-        <KpiBox
           icon={<MessageSquare size={18} />}
           label={`Conversaciones ${executiveMonthLabel}`}
           value={formatNumber(marketing.messagingStarted)}
           color="purple"
         />
         <KpiBox
+          icon={<BarChart3 size={18} />}
+          label="Costo por conversación"
+          value={costPerConversation != null ? formatCop(costPerConversation) : 'Sin dato'}
+          color="amber"
+        />
+        <KpiBox
+          icon={<TrendingUp size={18} />}
+          label={`Ventas manuales ${executiveMonthLabel}`}
+          value={formatCop(overall.total_sales)}
+          color="green"
+        />
+        <KpiBox
+          icon={<Users size={18} />}
+          label="Ticket promedio"
+          value={averageTicket != null ? formatCop(averageTicket) : 'Sin dato'}
+          color="blue"
+        />
+        <KpiBox
           icon={<ShieldAlert size={18} />}
           label="Clientes con alertas"
           value={String(clientsWithAlerts)}
           color="red"
-        />
-        <KpiBox
-          icon={<Users size={18} />}
-          label={socialFollowersTotal > 0 ? `Seguidores ${executiveMonthLabel}` : 'Registros de venta'}
-          value={
-            socialFollowersTotal > 0
-              ? formatNumber(socialFollowersTotal)
-              : formatNumber(salesRecordCount)
-          }
-          color="blue"
         />
       </div>
 
@@ -474,7 +475,7 @@ export function DashboardPage() {
               </div>
               <div className="executive-list-block">
                 <div className="section-heading section-heading-mini">
-                  <h3>Top ROAS</h3>
+                  <h3>Top ROAS operativo</h3>
                 </div>
                 <div className="executive-client-list">
                   {topRoasClients.map(({ client, monthTotals, meta }) => (
@@ -520,6 +521,9 @@ export function DashboardPage() {
             ))}
           </div>
           <div className="period-chip-row">
+            <span className="meta-chip source-automatic">
+              ROAS operativo {formatRoas(overall.real_roas)}
+            </span>
             {socialFollowersTotal > 0 && (
               <span className="meta-chip source-manual">
                 Conversión visita → seguidor {socialConversion != null ? `${socialConversion.toFixed(1)}%` : '—'}

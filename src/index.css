@@ -4616,6 +4616,11 @@ tbody tr:hover td {
   list-style: none;
 }
 
+.dashboard-collapsible {
+  background: linear-gradient(180deg, rgba(10, 15, 26, 0.92), rgba(6, 10, 18, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .dashboard-collapsible summary::-webkit-details-marker {
   display: none;
 }
@@ -4791,12 +4796,13 @@ tbody tr:hover td {
 .distribution-legend {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .distribution-legend-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
@@ -4806,10 +4812,34 @@ tbody tr:hover td {
   font-size: 0.84rem;
 }
 
+.distribution-legend-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .distribution-legend-copy {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.distribution-legend-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.distribution-legend-value,
+.distribution-legend-share {
+  color: var(--gs-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.distribution-legend-share {
+  font-weight: 600;
 }
 
 .distribution-legend-dot {
@@ -4894,11 +4924,93 @@ tbody tr:hover td {
   font-variant-numeric: tabular-nums;
 }
 
+.table-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--gs-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.table-action-button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.table-action-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.table-action-button.danger {
+  color: #ffb7b7;
+  border-color: rgba(248, 113, 113, 0.22);
+  background: rgba(127, 29, 29, 0.18);
+}
+
+.table-action-button.danger:hover:not(:disabled) {
+  background: rgba(153, 27, 27, 0.24);
+  border-color: rgba(248, 113, 113, 0.32);
+}
+
+.sales-feedback-error {
+  margin: 0 0 8px;
+  color: #ffb7b7;
+}
+
+.actions-col {
+  width: 148px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.settings-card {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-status-value {
+  color: #7ef2c6;
+}
+
+.settings-advanced-card {
+  margin-top: 18px;
+}
+
+.settings-advanced-content {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-advanced-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--gs-text-soft);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.settings-advanced-list a {
+  color: #7ab1ff;
+}
+
 @media (max-width: 1100px) {
   .executive-focus-grid,
   .report-main-grid,
   .report-distribution-grid,
-  .dashboard-secondary-grid {
+  .dashboard-secondary-grid,
+  .settings-grid {
     grid-template-columns: 1fr;
   }
 
@@ -4917,6 +5029,10 @@ tbody tr:hover td {
   }
 
   .distribution-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .distribution-legend-row {
     grid-template-columns: 1fr;
   }
 
@@ -4949,6 +5065,10 @@ tbody tr:hover td {
 
   .report-coverage-item {
     flex-direction: column;
+  }
+
+  .actions-col {
+    width: auto;
   }
 }
 
