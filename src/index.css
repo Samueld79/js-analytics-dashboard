@@ -5247,3 +5247,36 @@ tbody tr:hover td {
 .alert-actions-compact .alert-action-pill svg {
   display: none;
 }
+
+/* ─── Tasa de cierre Mensajes vs Ventas ──────────── */
+.closure-rate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.closure-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+}
+.closure-stat-label {
+  font-size: 0.74rem;
+  color: var(--gs-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.closure-stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--gs-text);
+}
+@media (max-width: 660px) {
+  .closure-rate-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

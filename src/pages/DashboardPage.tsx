@@ -403,8 +403,9 @@ export function DashboardPage() {
         <div>
           <h1 className="page-title">{portalClientName ? `Resultados de ${portalClientName}` : 'Dashboard General'}</h1>
           <p className="page-subtitle">
-            Tablero ejecutivo del mes visible · {executiveMonthLabel}
-            {!isInternal ? ' · portal cliente filtrado por membresía' : ''}
+            {portalClientName
+              ? `Panel de resultados · ${executiveMonthLabel}`
+              : `Tablero ejecutivo · ${executiveMonthLabel}`}
           </p>
         </div>
         <div className="header-actions">

@@ -4,6 +4,7 @@ import { SalesModal } from '../components/SalesModal';
 import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
+import { useMonthlyOperatingKpis } from '../hooks/useData';
 import type { Client } from '../lib/supabase';
 import {
   formatCop,
@@ -87,6 +88,11 @@ export function SalesPage() {
   const [customFrom, setCustomFrom] = useState(monthStart);
   const [customTo, setCustomTo] = useState(today);
 
+  const { monthlyKpis } = useMonthlyOperatingKpis(
+    quickClientId || undefined,
+    2,
+  );
+
   const visibleClients = useMemo(
     () =>
       isInternal
@@ -116,6 +122,19 @@ export function SalesPage() {
     () => orderedSales.filter((sale) => isDateWithinRange(sale.date, monthStart, today)),
     [monthStart, orderedSales, today],
   );
+
+  const closureRateData = useMemo(() => {
+    const currentMonthKey = today.slice(0, 7);
+    const kpi = monthlyKpis.find(k => k.month?.toString().slice(0, 7) === currentMonthKey);
+    const messages = kpi?.messages ?? 0;
+    const salesCount = monthSales.length;
+    if (messages === 0) return null;
+    const rate = (salesCount / messages) * 100;
+    const status: 'healthy' | 'warning' | 'critical' =
+      rate >= 10 ? 'healthy' : rate >= 8 ? 'warning' : 'critical';
+    return { messages, salesCount, rate, status };
+  }, [monthlyKpis, monthSales, today]);
+
   const yearSales = useMemo(
     () => orderedSales.filter((sale) => isDateWithinRange(sale.date, yearStart, today)),
     [orderedSales, today, yearStart],
@@ -274,6 +293,83 @@ export function SalesPage() {
         <SalesKpi label="Registros del mes actual" value={String(monthSales.length)} />
         <SalesKpi label="Registros del año actual" value={String(yearSales.length)} />
       </div>
+
+      {closureRateData && (
+        <div className="card section-block">
+          <div className="section-heading">
+            <h2>Mensajes vs Ventas — Tasa de cierre</h2>
+            <span className={`status-pill ${
+              closureRateData.status === 'healthy' ? 'status-green' :
+              closureRateData.status === 'warning' ? 'status-amber' : 'status-red'
+            }`}>
+              {closureRateData.status === 'healthy' ? '✓ Saludable' :
+               closureRateData.status === 'warning' ? '⚠ Mejorable' : '✕ Bajo'}
+            </span>
+          </div>
+          <div className="closure-rate-grid">
+            <div className="closure-stat">
+              <span className="closure-stat-label">Mensajes del mes</span>
+              <strong className="closure-stat-value">
+                {closureRateData.messages.toLocaleString('es-CO')}
+              </strong>
+            </div>
+            <div className="closure-stat">
+              <span className="closure-stat-label">Ventas registradas</span>
+              <strong className="closure-stat-value">{closureRateData.salesCount}</strong>
+            </div>
+            <div className="closure-stat">
+              <span className="closure-stat-label">Tasa de cierre</span>
+              <strong className={`closure-stat-value ${
+                closureRateData.status === 'healthy' ? 'text-green' :
+                closureRateData.status === 'warning' ? 'text-amber' : 'text-red'
+              }`}>
+                {closureRateData.rate.toFixed(1)}%
+              </strong>
+            </div>
+            <div className="closure-stat">
+              <span className="closure-stat-label">Meta ideal</span>
+              <strong className="closure-stat-value text-muted">≥ 10%</strong>
+            </div>
+          </div>
+          <div style={{ position:'relative', marginTop:8 }}>
+            <div style={{
+              height:10, borderRadius:999,
+              background:'rgba(255,255,255,0.06)', overflow:'hidden'
+            }}>
+              <div style={{
+                height:'100%', borderRadius:999,
+                width:`${Math.min(closureRateData.rate * 5, 100)}%`,
+                background: closureRateData.status === 'healthy'
+                  ? 'linear-gradient(90deg,#00e676,#57efff)'
+                  : closureRateData.status === 'warning'
+                  ? 'linear-gradient(90deg,#ffc107,#ff9800)'
+                  : 'linear-gradient(90deg,#ff5252,#ff1744)',
+                transition:'width 0.4s ease'
+              }} />
+            </div>
+            <div style={{
+              position:'absolute', top:-3, left:'50%',
+              width:2, height:16,
+              background:'rgba(255,255,255,0.35)', borderRadius:999,
+              transform:'translateX(-50%)'
+            }} title="Meta: 10%" />
+            <div style={{
+              display:'flex', justifyContent:'space-between',
+              marginTop:4, fontSize:'0.72rem', color:'var(--gs-muted)',
+              position:'relative'
+            }}>
+              <span>0%</span>
+              <span style={{ position:'absolute', left:'50%', transform:'translateX(-50%)' }}>
+                10% (meta)
+              </span>
+              <span>20%+</span>
+            </div>
+          </div>
+          <p className="source-note">
+            10% = saludable · 8–9% = aceptable · menos de 8% = revisar proceso comercial
+          </p>
+        </div>
+      )}
 
       <div className="card section-block">
         <div className="section-heading">
