@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { BrandSignature } from './components/BrandSignature';
 import { Sidebar } from './components/Sidebar';
 import { useMetaSyncRows } from './hooks/useData';
@@ -28,6 +28,8 @@ function App() {
 
 function AppContent() {
   const { authEnabled, initialized, session } = useAuth();
+  const location = useLocation();
+  const isPortalRoute = location.pathname.startsWith('/portal/');
 
   if (authEnabled && !initialized) {
     return (
@@ -47,25 +49,44 @@ function AppContent() {
     return <LoginPage />;
   }
 
+  const appRoutes = (
+    <Routes>
+      <Route path="/" element={<RoleAwareHome />} />
+      <Route path="/mi-espacio" element={<ClientWorkspaceEntry />} />
+      <Route path="/clients" element={<RequireInternal><ClientsPage /></RequireInternal>} />
+      <Route path="/clients/:id" element={<RequireClientAccess><ClientDetailPage /></RequireClientAccess>} />
+      <Route path="/portal/:id" element={<RequireClientAccess><ClientDetailPage /></RequireClientAccess>} />
+      <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
+      <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />
+      <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
+      <Route path="/ai" element={<RequireInternal><AIAgentPage /></RequireInternal>} />
+      <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} />
+      <Route path="/settings" element={<RequireSignedIn><SettingsPage /></RequireSignedIn>} />
+      <Route path="*" element={<RoleAwareFallback />} />
+    </Routes>
+  );
+
+  if (isPortalRoute) {
+    return (
+      <div className="portal-shell">
+        <div className="page-bg" />
+        <header className="portal-shell-header">
+          <BrandSignature
+            compact
+            subtitle="Reporte cliente"
+            className="portal-brand-signature"
+          />
+        </header>
+        <main className="app-main portal-main">{appRoutes}</main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <div className="page-bg" />
       <Sidebar />
-      <main className="app-main">
-        <Routes>
-          <Route path="/" element={<RoleAwareHome />} />
-          <Route path="/mi-espacio" element={<ClientWorkspaceEntry />} />
-          <Route path="/clients" element={<RequireInternal><ClientsPage /></RequireInternal>} />
-          <Route path="/clients/:id" element={<RequireClientAccess><ClientDetailPage /></RequireClientAccess>} />
-          <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
-          <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />
-          <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
-          <Route path="/ai" element={<RequireInternal><AIAgentPage /></RequireInternal>} />
-          <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} />
-          <Route path="/settings" element={<RequireSignedIn><SettingsPage /></RequireSignedIn>} />
-          <Route path="*" element={<RoleAwareFallback />} />
-        </Routes>
-      </main>
+      <main className="app-main">{appRoutes}</main>
     </div>
   );
 }
@@ -131,7 +152,8 @@ function RequireSignedIn({ children }: { children: ReactNode }) {
 
 function RequireClientAccess({ children }: { children: ReactNode }) {
   const { id } = useParams<{ id: string }>();
-  const { isInternal, canAccessClient, clientWorkspacePath } = useAuth();
+  const location = useLocation();
+  const { isInternal, canAccessClient, clientWorkspacePath, defaultClientId } = useAuth();
 
   if (isInternal || !isSupabaseConfigured) {
     return <>{children}</>;
@@ -139,6 +161,10 @@ function RequireClientAccess({ children }: { children: ReactNode }) {
 
   if (canAccessClient(id)) {
     return <>{children}</>;
+  }
+
+  if (location.pathname.startsWith('/portal/') && defaultClientId) {
+    return <Navigate to={`/portal/${defaultClientId}`} replace />;
   }
 
   return <Navigate to={clientWorkspacePath} replace />;
@@ -258,28 +284,6 @@ function SettingsPage() {
         </section>
       </div>
 
-      <details className="card section-block dashboard-collapsible settings-advanced-card">
-        <summary>Sistema avanzado</summary>
-        <div className="settings-advanced-content">
-          <p className="source-note">
-            Bloque técnico para instalación o revisión manual. No afecta la operación diaria.
-          </p>
-          <ol className="settings-advanced-list">
-            <li>
-              Crea un proyecto en{' '}
-              <a href="https://supabase.com" target="_blank" rel="noreferrer">
-                supabase.com
-              </a>
-            </li>
-            <li>Ejecuta el schema en <code>/supabase/schema.sql</code></li>
-            <li>Aplica las vistas de <code>/supabase/phase-1-operating-views.sql</code></li>
-            <li>
-              Configura <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code>
-            </li>
-            <li>Crea usuarios en Supabase Auth y asigna perfil/rol</li>
-          </ol>
-        </div>
-      </details>
     </div>
   );
 }

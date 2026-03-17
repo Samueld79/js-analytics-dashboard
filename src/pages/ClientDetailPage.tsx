@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import {
   BarChart2,
   TrendingUp,
@@ -93,6 +93,7 @@ function sectionLabel(section: string): string {
 
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const {
     client,
     metrics,
@@ -119,6 +120,7 @@ export function ClientDetailPage() {
     updateTask,
   } = useClientWorkspace(id, 400);
   const { isInternal, canWriteSales, role } = useAuth();
+  const portalMode = location.pathname.startsWith('/portal/');
   const [tab, setTab] = useState<Tab>('overview');
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
@@ -253,8 +255,9 @@ export function ClientDetailPage() {
     [metrics, monthlyHistory],
   );
 
-  const canRegisterSales = client ? canWriteSales(client.id) : false;
-  const canLoadHistory = role === 'admin';
+  const showInternalTools = isInternal && !portalMode;
+  const canRegisterSales = client ? canWriteSales(client.id) && !portalMode : false;
+  const canLoadHistory = role === 'admin' && !portalMode;
   const isResolvedClient =
     Boolean(client) && Boolean(id) && (client?.id === id || client?.slug === id);
   const allTabs: { key: Tab; label: string; icon: ReactNode }[] = [
@@ -265,9 +268,12 @@ export function ClientDetailPage() {
     { key: 'tasks', label: 'Tareas', icon: <CheckSquare size={14} /> },
     { key: 'files', label: 'Archivos', icon: <FolderOpen size={14} /> },
   ];
-  const tabs = allTabs.filter((entry) =>
-    isInternal || ['overview', 'metrics', 'sales', 'files'].includes(entry.key),
-  );
+  const allowedTabKeys = showInternalTools
+    ? allTabs.map((entry) => entry.key)
+    : portalMode
+      ? ['overview', 'metrics', 'sales']
+      : ['overview', 'metrics', 'sales', 'files'];
+  const tabs = allTabs.filter((entry) => allowedTabKeys.includes(entry.key));
 
   useEffect(() => {
     if (!tabs.some((entry) => entry.key === tab)) {
@@ -313,7 +319,9 @@ export function ClientDetailPage() {
     <div className="page-content">
       <div className="page-header">
         <div className="page-header-left">
-          {isInternal ? (
+          {portalMode ? (
+            <span className="meta-chip">Portal cliente</span>
+          ) : isInternal ? (
             <Link to="/clients" className="back-link"><ArrowLeft size={14} /> Clientes</Link>
           ) : (
             <span className="meta-chip">Mi espacio</span>
@@ -323,7 +331,7 @@ export function ClientDetailPage() {
             <span className="client-niche-tag">{client.niche || 'Sin nicho'}</span>
           </div>
           {client.main_city && <span className="meta-chip"><MapPin size={11} /> {client.main_city}</span>}
-          {client.drive_folder_url && (
+          {client.drive_folder_url && !portalMode && (
             <a href={client.drive_folder_url} target="_blank" rel="noreferrer" className="meta-chip clickable">
               <ExternalLink size={11} /> Drive
             </a>
@@ -440,7 +448,7 @@ export function ClientDetailPage() {
         </div>
       </div>
 
-      {isInternal && (health || criticalAlerts.length > 0) && (
+      {showInternalTools && (health || criticalAlerts.length > 0) && (
         <ClientOperationalBanner health={health} issues={issues} criticalAlerts={criticalAlerts} />
       )}
 
@@ -502,7 +510,7 @@ export function ClientDetailPage() {
             currentYearSalesCount={currentYearSales.length}
             recentSales={recentSales}
             activityLog={activityLog}
-            showOperational={isInternal}
+            showOperational={showInternalTools}
           />
         )}
         {tab === 'metrics' && (
@@ -524,7 +532,7 @@ export function ClientDetailPage() {
           <ClientFilesTab
             files={files}
             strategies={strategies}
-            onAddFile={isInternal ? () => setShowFileModal(true) : undefined}
+            onAddFile={showInternalTools ? () => setShowFileModal(true) : undefined}
           />
         )}
       </ClientDetailRenderBoundary>
@@ -542,7 +550,7 @@ export function ClientDetailPage() {
         />
       )}
 
-      {isInternal && showFileModal && (
+      {showInternalTools && showFileModal && (
         <ClientFileModal
           clientId={client.id}
           strategies={strategies}

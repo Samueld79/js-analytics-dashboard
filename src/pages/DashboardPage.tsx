@@ -7,7 +7,6 @@ import {
   DollarSign,
   MessageSquare,
   ShieldAlert,
-  Sparkles,
   TrendingUp,
   Users,
 } from 'lucide-react';
@@ -398,28 +397,6 @@ export function DashboardPage() {
     })),
   ].slice(0, 5);
 
-  const hasExecutiveSpecialData = specialSummary.rowsWithData > 0;
-  const pendingSourceItems = [
-    marketing.profileVisits == null
-      ? {
-          title: 'Visitas al perfil desde Ads',
-          detail: 'La fuente actual no está trayendo profile_visit_view en el mes ejecutivo.',
-        }
-      : null,
-    !hasExecutiveSpecialData
-      ? {
-          title: 'Métricas especiales mensuales',
-          detail:
-            'No hay cierres especiales suficientes para destacar WhatsApp, link o clientes nuevos en portada.',
-        }
-      : null,
-    {
-      title: 'Distribución de presupuesto por objetivo',
-      detail:
-        'Sigue pendiente hasta tener spend por campaña u objetivo. ad_metrics hoy agrega por cuenta y fecha.',
-    },
-  ].filter(Boolean) as Array<{ title: string; detail: string }>;
-
   return (
     <div className="page-content reporting-page executive-dashboard-page">
       <div className="page-header">
@@ -754,20 +731,6 @@ export function DashboardPage() {
         </section>
 
       </div>
-
-      {pendingSourceItems.length > 0 && (
-        <details className="card section-block dashboard-collapsible">
-          <summary>
-            <Sparkles size={14} />
-            Fuentes pendientes y capas secundarias
-          </summary>
-          <div className="special-metrics-list">
-            {pendingSourceItems.map((item) => (
-              <PendingItem key={item.title} title={item.title} detail={item.detail} />
-            ))}
-          </div>
-        </details>
-      )}
     </div>
   );
 }
@@ -852,24 +815,6 @@ function MetricBoxMini({
     <div className={`metric-box ${muted ? 'metric-box-muted' : ''}`}>
       <span className="metric-box-label">{label}</span>
       <span className="metric-box-value">{value}</span>
-    </div>
-  );
-}
-
-function PendingItem({
-  title,
-  detail,
-}: {
-  title: string;
-  detail: string;
-}) {
-  return (
-    <div className="special-metric-row">
-      <div className="special-metric-main">
-        <strong>{title}</strong>
-        <span>{detail}</span>
-      </div>
-      <span className="status-pill status-gray">Pendiente</span>
     </div>
   );
 }

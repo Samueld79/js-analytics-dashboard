@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { DailySale, DailySaleInput, ServiceMutationResult } from '../lib/supabase';
+import { getDateKey } from '../lib/utils';
 
 interface Props {
   clientId: string;
@@ -14,7 +15,7 @@ function parseMoney(value: string): number {
 }
 
 export function SalesModal({ clientId, clientName, onClose, onSave }: Props) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getDateKey();
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [form, setForm] = useState({

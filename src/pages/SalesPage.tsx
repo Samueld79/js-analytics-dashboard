@@ -149,6 +149,7 @@ export function SalesPage() {
   const monthTotal = useMemo(() => sumSales(monthSales).total, [monthSales]);
   const yearTotal = useMemo(() => sumSales(yearSales).total, [yearSales]);
   const currentMonthLabel = getMonthLabel(today);
+  const shouldShowLoadingState = salesLoading && filteredSales.length === 0;
   const registerClient = selectedClient;
   const canRegisterSales = Boolean((quickClientId || defaultClientId) && canWriteSales(quickClientId || defaultClientId));
 
@@ -345,7 +346,7 @@ export function SalesPage() {
         </p>
         {!actionError && actionFeedback && <p className="history-success">{actionFeedback}</p>}
         {actionError && <p className="sales-feedback-error">{actionError}</p>}
-        {salesLoading ? (
+        {shouldShowLoadingState ? (
           <p className="empty-note">Cargando ventas...</p>
         ) : filteredSales.length === 0 ? (
           <p className="empty-note">No hay ventas para el filtro activo.</p>
@@ -410,6 +411,12 @@ export function SalesPage() {
           onSave={async (data) => {
             const result = await addSale(data);
             if (!result.error) {
+              setFilterKey('month');
+              setSearch('');
+              setCustomFrom(monthStart);
+              setCustomTo(today);
+              setActionError(null);
+              setActionFeedback('Venta registrada. El listado y los KPIs ya reflejan el cambio.');
               setSelectedClient(null);
             }
             return result;

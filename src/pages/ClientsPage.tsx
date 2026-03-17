@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
-import { Plus, Search, Users, Building2, MapPin } from 'lucide-react';
+import { Plus, Search, Users, Building2, MapPin, ExternalLink } from 'lucide-react';
 import { statusLabel } from '../lib/utils';
 
 export function ClientsPage() {
@@ -55,29 +55,45 @@ export function ClientsPage() {
       ) : (
         <div className="clients-list-grid">
           {filtered.map(client => (
-            <Link key={client.id} to={`/clients/${client.id}`} className="client-list-card card">
-              <div className="client-list-header">
-                <div className="client-avatar" style={{ background: clientGradient(client.id) }}>
-                  {client.name.charAt(0).toUpperCase()}
+            <article key={client.id} className="client-list-card card">
+              <Link to={`/clients/${client.id}`} className="client-list-body">
+                <div className="client-list-header">
+                  <div className="client-avatar" style={{ background: clientGradient(client.id) }}>
+                    {client.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="client-list-info">
+                    <h3>{client.name}</h3>
+                    <span className="client-niche">{client.niche ?? 'Sin nicho'}</span>
+                  </div>
+                  <span className={`status-pill status-${client.status === 'active' ? 'green' : client.status === 'paused' ? 'amber' : 'red'}`}>
+                    {statusLabel(client.status)}
+                  </span>
                 </div>
-                <div className="client-list-info">
-                  <h3>{client.name}</h3>
-                  <span className="client-niche">{client.niche ?? 'Sin nicho'}</span>
+                <div className="client-list-meta">
+                  {client.main_city && (
+                    <span className="meta-chip"><MapPin size={11} /> {client.main_city}</span>
+                  )}
+                  {client.ad_account_id && (
+                    <span className="meta-chip"><Building2 size={11} /> {client.ad_account_id}</span>
+                  )}
                 </div>
-                <span className={`status-pill status-${client.status === 'active' ? 'green' : client.status === 'paused' ? 'amber' : 'red'}`}>
-                  {statusLabel(client.status)}
-                </span>
+                {client.notes && <p className="client-notes-preview">{client.notes}</p>}
+              </Link>
+              <div className="client-list-actions">
+                <Link to={`/clients/${client.id}`} className="btn-secondary client-card-action">
+                  Ver interno
+                </Link>
+                <Link
+                  to={`/portal/${client.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-primary client-card-action"
+                >
+                  <ExternalLink size={14} />
+                  Abrir portal
+                </Link>
               </div>
-              <div className="client-list-meta">
-                {client.main_city && (
-                  <span className="meta-chip"><MapPin size={11} /> {client.main_city}</span>
-                )}
-                {client.ad_account_id && (
-                  <span className="meta-chip"><Building2 size={11} /> {client.ad_account_id}</span>
-                )}
-              </div>
-              {client.notes && <p className="client-notes-preview">{client.notes}</p>}
-            </Link>
+            </article>
           ))}
 
           {filtered.length === 0 && (

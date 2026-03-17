@@ -329,14 +329,6 @@ export function MetricsPage() {
     profileVisitsSummary.value != null ||
     budgetSummary.totalBudget != null ||
     specialSummary.rowsWithData > 0;
-  const pendingMetrics = buildPendingMetrics({
-    budgetExecution,
-    hasRecognitionData: false,
-    hasEngagementData: false,
-    hasBudgetDistribution: false,
-    hasProfileVisitCost: false,
-    hasConversationCost: false,
-  });
   const primaryMetricCards = [
     {
       icon: <DollarSign size={18} />,
@@ -909,23 +901,6 @@ export function MetricsPage() {
               </section>
             )}
           </div>
-
-          {pendingMetrics.length > 0 && (
-            <details className="card section-block dashboard-collapsible">
-              <summary>Cobertura avanzada pendiente</summary>
-              <div className="special-metrics-list">
-                {pendingMetrics.map((item) => (
-                  <div key={item.title} className="special-metric-row">
-                    <div className="special-metric-main">
-                      <strong>{item.title}</strong>
-                      <span>{item.detail}</span>
-                    </div>
-                    <span className="status-pill status-gray">Pendiente</span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
         </>
       )}
     </div>
@@ -1143,54 +1118,6 @@ function buildDailySalesRows(sales: DailySale[]) {
   }));
 }
 
-function buildPendingMetrics(params: {
-  hasBudgetDistribution: boolean;
-  hasConversationCost: boolean;
-  hasProfileVisitCost: boolean;
-  hasRecognitionData: boolean;
-  hasEngagementData: boolean;
-  budgetExecution: number | null;
-}) {
-  return [
-    !params.hasBudgetDistribution
-      ? {
-          title: 'Distribución real de presupuesto por objetivo',
-          detail: 'Falta spend por campaña u objetivo para un gráfico de presupuesto honesto.',
-        }
-      : null,
-    !params.hasConversationCost
-      ? {
-          title: 'Costo por conversación',
-          detail: 'No se puede aislar gasto de campañas de mensajes con la fuente actual.',
-        }
-      : null,
-    !params.hasProfileVisitCost
-      ? {
-          title: 'Costo por visita al perfil',
-          detail: 'No se puede aislar gasto de campañas de perfil con la fuente actual.',
-        }
-      : null,
-    !params.hasRecognitionData
-      ? {
-          title: 'Reconocimiento / awareness',
-          detail: 'No existe fuente separada de awareness en el esquema actual.',
-        }
-      : null,
-    !params.hasEngagementData
-      ? {
-          title: 'Engagement',
-          detail: 'No existe fuente separada de engagement en el esquema actual.',
-        }
-      : null,
-    params.budgetExecution == null
-      ? {
-          title: 'Ejecución de presupuesto',
-          detail: 'Requiere estrategia con presupuesto mensual cargado para el mes visible.',
-        }
-      : null,
-  ].filter(Boolean) as Array<{ title: string; detail: string }>;
-}
-
 function roasClass(roas: number): string {
   if (roas >= 3) return 'roas-pill roas-good';
   if (roas >= 2) return 'roas-pill roas-ok';
@@ -1276,17 +1203,17 @@ function DistributionDonutCard({
             const share = total > 0 ? (item.value / total) * 100 : 0;
             return (
               <div key={item.label} className="distribution-legend-row">
-                <div className="distribution-legend-main">
-                  <div className="distribution-legend-copy">
-                    <span
-                      className="distribution-legend-dot"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <strong>{item.label}</strong>
-                  </div>
-                  <span className="distribution-legend-value">{formatNumber(item.value)}</span>
+                <div className="distribution-legend-copy">
+                  <span
+                    className="distribution-legend-dot"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <strong>{item.label}</strong>
                 </div>
-                <span className="distribution-legend-share">{share.toFixed(1)}%</span>
+                <div className="distribution-legend-stats">
+                  <span className="distribution-legend-value">{formatNumber(item.value)}</span>
+                  <span className="distribution-legend-share">{share.toFixed(1)}%</span>
+                </div>
               </div>
             );
           })}
