@@ -401,7 +401,7 @@ export function DashboardPage() {
     <div className="page-content reporting-page executive-dashboard-page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">{portalClientName ? `Dashboard de ${portalClientName}` : 'Dashboard General'}</h1>
+          <h1 className="page-title">{portalClientName ? `Resultados de ${portalClientName}` : 'Dashboard General'}</h1>
           <p className="page-subtitle">
             Tablero ejecutivo del mes visible · {executiveMonthLabel}
             {!isInternal ? ' · portal cliente filtrado por membresía' : ''}
@@ -433,13 +433,19 @@ export function DashboardPage() {
             </p>
             <div className="period-chip-row">
               <span className="meta-chip">{executiveMonthLabel}</span>
-              <span className="meta-chip">KPIs: mensual</span>
-              <span className="meta-chip">Riesgo y Meta: actual</span>
-              <span className="meta-chip">ROAS operativo = ventas manuales / inversión</span>
+              {isInternal && (
+                <>
+                  <span className="meta-chip">KPIs: mensual</span>
+                  <span className="meta-chip">Riesgo y Meta: actual</span>
+                  <span className="meta-chip">ROAS operativo = ventas manuales / inversión</span>
+                </>
+              )}
               <span className="meta-chip">
                 {latestSyncAt ? `Último sync Meta ${formatDateTime(latestSyncAt)}` : 'Meta sin sync reciente'}
               </span>
-              <span className="meta-chip">Supabase real</span>
+              {isInternal && (
+                <span className="meta-chip">Supabase real</span>
+              )}
             </div>
           </div>
         </div>
@@ -597,6 +603,7 @@ export function DashboardPage() {
           </div>
         </section>
 
+        {isInternal && (
         <section className="card section-block executive-radar-card">
           <div className="section-heading">
             <h2>Radar operativo</h2>
@@ -631,8 +638,10 @@ export function DashboardPage() {
             )}
           </div>
         </section>
+        )}
       </div>
 
+      {isInternal && (
       <div className="dashboard-grid dashboard-secondary-grid">
         <section className="card section-block">
           <div className="section-heading">
@@ -731,6 +740,7 @@ export function DashboardPage() {
         </section>
 
       </div>
+      )}
     </div>
   );
 }

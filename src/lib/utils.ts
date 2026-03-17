@@ -32,18 +32,15 @@ function toSafeInteger(value: unknown): number {
 
 export const formatCop = (value: unknown): string => {
   const amount = toFiniteNumber(value);
-
-  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `$${Math.round(amount / 1_000)}K`;
+  if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1).replace('.', ',')} MM`;
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1).replace('.', ',')}M`;
   return `$${Math.round(amount).toLocaleString('es-CO')}`;
 };
 
 export const formatNumber = (value: unknown): string => {
   const amount = toFiniteNumber(value);
-
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)}K`;
-  return amount.toLocaleString('es-CO');
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1).replace('.', ',')}M`;
+  return Math.round(amount).toLocaleString('es-CO');
 };
 
 export const formatPct = (value: unknown): string => `${toFiniteNumber(value).toFixed(2)}%`;

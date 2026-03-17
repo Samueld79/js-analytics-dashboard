@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Bot,
   Bell,
+  Calendar,
   Settings,
   ChevronRight,
   LockKeyhole,
@@ -32,6 +33,7 @@ type NavItem = {
 const INTERNAL_NAV: NavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Clientes' },
+  { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/metrics', icon: BarChart2, label: 'Métricas Ads' },
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
   { to: '/strategies', icon: ClipboardList, label: 'Estrategias' },

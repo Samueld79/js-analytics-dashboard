@@ -3625,7 +3625,7 @@ tbody tr:hover td {
 }
 
 body {
-  font-family: "JetBrains Mono", "SFMono-Regular", "Menlo", monospace;
+  font-family: "Outfit", "Manrope", "Segoe UI", system-ui, sans-serif;
   color: var(--gs-text);
   background:
     radial-gradient(circle at 16% 12%, rgba(87, 239, 255, 0.12), transparent 28%),
@@ -4661,7 +4661,9 @@ tbody tr:hover td {
 }
 
 .dashboard-secondary-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .dashboard-collapsible summary {
@@ -5086,6 +5088,10 @@ tbody tr:hover td {
   .executive-duo-grid {
     grid-template-columns: 1fr;
   }
+
+  .dashboard-secondary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 860px) {
@@ -5154,4 +5160,90 @@ tbody tr:hover td {
   .distribution-donut {
     width: min(180px, 100%);
   }
+}
+
+/* ─── Calendar Widget ─────────────────────────────────── */
+.cal-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-event-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(148,167,199,0.1);
+  transition: background-color 0.15s;
+}
+.cal-event-row:hover {
+  background: rgba(87,239,255,0.04);
+  border-color: rgba(87,239,255,0.14);
+}
+.cal-event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.cal-event-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cal-event-title {
+  font-size: 0.86rem;
+  color: var(--gs-text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-event-date {
+  font-size: 0.74rem;
+  color: var(--gs-muted);
+}
+.cal-event-link {
+  color: var(--gs-muted);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 4px;
+  text-decoration: none;
+}
+.cal-event-link:hover { color: var(--gs-text); }
+.cal-event-row-full {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(148,167,199,0.1);
+  margin-bottom: 8px;
+}
+.cal-event-row-full:hover {
+  background: rgba(87,239,255,0.04);
+  border-color: rgba(87,239,255,0.14);
+}
+
+/* ─── Alertas compactas ───────────────────────────────── */
+.alert-actions-compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.alert-actions-compact .alert-action-pill {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.74rem;
+}
+.alert-actions-compact .alert-action-pill svg {
+  display: none;
 }

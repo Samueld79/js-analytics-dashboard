@@ -207,7 +207,7 @@ export function AlertsPage() {
                   </div>
                 )}
               </div>
-              <div className="alert-actions">
+              <div className="alert-actions alert-actions-compact">
                 {canAct && (
                   <button
                     className="alert-action-pill action-success"
