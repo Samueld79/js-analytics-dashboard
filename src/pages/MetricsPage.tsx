@@ -128,6 +128,8 @@ export function MetricsPage() {
     profileVisits: profileVisitsSummary.value,
     specialSummary,
   });
+  const averageSalePerRecord =
+    monthSales.length > 0 ? operatingTotals.total_sales / monthSales.length : null;
 
   const historyMonths = useMemo(
     () =>
@@ -225,6 +227,23 @@ export function MetricsPage() {
         }),
     [activeMonth, clients, monthMetrics, monthOperatingRows, monthSales, monthSocialMetrics, monthStrategies],
   );
+  const activeClientsThisMonth = clientComparison.length;
+  const comparisonLeaderBySales =
+    [...clientComparison].sort((left, right) => {
+      if (right.totals.total_sales !== left.totals.total_sales) {
+        return right.totals.total_sales - left.totals.total_sales;
+      }
+      return right.totals.real_roas - left.totals.real_roas;
+    })[0] ?? null;
+  const comparisonLeaderByRoas =
+    [...clientComparison]
+      .filter((row) => row.totals.spend > 0 && row.totals.total_sales > 0)
+      .sort((left, right) => {
+        if (right.totals.real_roas !== left.totals.real_roas) {
+          return right.totals.real_roas - left.totals.real_roas;
+        }
+        return right.totals.total_sales - left.totals.total_sales;
+      })[0] ?? null;
 
   const showBudgetExecution = budgetSummary.totalBudget != null && budgetSummary.totalBudget > 0;
   const budgetExecution =
@@ -247,7 +266,8 @@ export function MetricsPage() {
     hasConversationCost: false,
   });
   const reportCoverage = [
-    {
+    operatingTotals.spend > 0 || monthMetrics.length > 0
+      ? {
       label: 'Ads del mes',
       value: adDataOriginLabel(adSourceOrigin),
       note:
@@ -255,15 +275,19 @@ export function MetricsPage() {
           ? `${formatCop(operatingTotals.spend)} invertidos en el mes visible`
           : 'No hay inversión registrada para este mes',
       className: adDataOriginClass(adSourceOrigin),
-    },
-    {
+    }
+      : null,
+    budgetSummary.totalBudget != null || monthStrategies.length > 0
+      ? {
       label: 'Presupuesto mensual',
       value:
         budgetSummary.totalBudget != null ? formatCop(budgetSummary.totalBudget) : 'Sin presupuesto',
       note: budgetSummary.sourceLabel,
       className: budgetSummary.totalBudget != null ? 'source-manual' : 'source-unknown',
-    },
-    {
+    }
+      : null,
+    monthSales.length > 0 || operatingTotals.total_sales > 0
+      ? {
       label: 'Ventas reportadas',
       value:
         monthSales.length > 0
@@ -276,20 +300,36 @@ export function MetricsPage() {
           ? `${formatCop(operatingTotals.total_sales)} en ventas reales`
           : 'ROAS real usa ventas reales reportadas',
       className: operatingTotals.total_sales > 0 ? 'source-automatic' : 'source-unknown',
-    },
-    {
+    }
+      : null,
+    profileVisitsSummary.value != null
+      ? {
+      label: 'Visitas al perfil',
+      value: formatNumber(profileVisitsSummary.value),
+      note: profileVisitsSummary.sourceLabel,
+      className:
+        profileVisitsSummary.sourceOrigin === 'manual'
+          ? 'source-manual'
+          : profileVisitsSummary.sourceOrigin === 'automatic'
+            ? 'source-automatic'
+            : 'source-unknown',
+    }
+      : null,
+    specialSummary.rowsWithData > 0
+      ? {
       label: 'Señales especiales',
-      value:
-        specialSummary.rowsWithData > 0
-          ? `${formatNumber(specialSummary.whatsappClicks + specialSummary.linkClicks)} clicks`
-          : 'Sin cierres especiales',
+      value: `${formatNumber(specialSummary.whatsappClicks + specialSummary.linkClicks)} clicks`,
       note:
-        specialSummary.rowsWithData > 0
-          ? `${formatNumber(specialSummary.newCustomersReported)} nuevos clientes reportados`
-          : 'Solo sube si existe cierre mensual manual',
-      className: specialSummary.rowsWithData > 0 ? 'source-manual' : 'source-unknown',
-    },
-  ];
+        `${formatNumber(specialSummary.newCustomersReported)} nuevos clientes reportados`,
+      className: 'source-manual',
+    }
+      : null,
+  ].filter(Boolean) as Array<{
+    label: string;
+    value: string;
+    note: string;
+    className: string;
+  }>;
 
   return (
     <div className="page-content reporting-page campaign-dashboard-page">
@@ -303,8 +343,7 @@ export function MetricsPage() {
             Desempeño mensual de campañas
           </h1>
           <p className="page-subtitle">
-            Reporte mensual profundo con Ads, ventas, cierres manuales y lectura comercial del mes
-            seleccionado.
+            Reporte mensual para revisar inversión, ventas reales y señales observadas del mes seleccionado.
           </p>
         </div>
         {selectedClient !== 'all' && (
@@ -424,20 +463,21 @@ export function MetricsPage() {
                 <h2>Lectura comercial del mes</h2>
               </div>
               <p className="source-note">
-                Esta capa consolida solo lo que hoy es confiable: inversión, ventas reales,
-                presupuesto visible y señales manuales disponibles.
+                Esta capa prioriza solo lo que hoy es confiable: inversión, ventas reales, presupuesto visible y cierres mensuales con data real.
               </p>
-              <div className="report-coverage-list">
-                {reportCoverage.map((item) => (
-                  <div key={item.label} className="report-coverage-item">
-                    <div className="report-coverage-main">
-                      <strong>{item.label}</strong>
-                      <span>{item.note}</span>
+              {reportCoverage.length > 0 && (
+                <div className="report-coverage-list">
+                  {reportCoverage.map((item) => (
+                    <div key={item.label} className="report-coverage-item">
+                      <div className="report-coverage-main">
+                        <strong>{item.label}</strong>
+                        <span>{item.note}</span>
+                      </div>
+                      <span className={`meta-chip ${item.className}`}>{item.value}</span>
                     </div>
-                    <span className={`meta-chip ${item.className}`}>{item.value}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               <div className="report-inline-summary">
                 <MetricBoxInline
                   label="Clicks WhatsApp + link"
@@ -467,11 +507,10 @@ export function MetricsPage() {
 
             <section className="card section-block">
               <div className="section-heading">
-                <h2>Distribución y mix del mes</h2>
+                <h2>Mix del mes</h2>
               </div>
               <p className="source-note">
-                El gráfico muestra mix de resultados observados del mes. La distribución real de
-                presupuesto por objetivo sigue pendiente hasta tener spend por campaña.
+                Resultados observados del mes visible. La distribución real de presupuesto por objetivo sigue pendiente hasta tener spend por campaña.
               </p>
               <div className="report-distribution-grid">
                 <DistributionDonutCard
@@ -501,11 +540,10 @@ export function MetricsPage() {
 
           <div className="report-objective-section card section-block">
             <div className="section-heading">
-              <h2>Rendimiento por objetivo</h2>
+              <h2>Resultados observados del mes</h2>
             </div>
             <p className="source-note">
-              Se muestran primero los objetivos con fuente real. Lo pendiente por costo o fuente
-              separada baja al pie del reporte.
+              Primero se muestran señales con fuente real. Lo que todavía no tiene fuente separada baja al pie del reporte.
             </p>
             <div className="report-objective-grid">
               <ObjectiveMetricCard
@@ -548,13 +586,6 @@ export function MetricsPage() {
                 pending={specialSummary.rowsWithData === 0}
               />
             </div>
-            <div className="report-pending-pill-row">
-              {pendingMetrics.map((item) => (
-                <span key={item.title} className="meta-chip source-unknown">
-                  {item.title}
-                </span>
-              ))}
-            </div>
             <div className="report-history-grid objective-history-grid">
               <BarChart
                 title="Conversaciones por mes"
@@ -583,7 +614,11 @@ export function MetricsPage() {
               <div className="report-sales-grid">
                 <MetricBoxInline label="Ventas del mes" value={formatCop(operatingTotals.total_sales)} />
                 <MetricBoxInline label="Registros del mes" value={String(monthSales.length)} />
-                <MetricBoxInline label="Objetivo de ventas" value="Pendiente" muted />
+                <MetricBoxInline
+                  label="Venta promedio por registro"
+                  value={averageSalePerRecord != null ? formatCop(averageSalePerRecord) : 'Sin dato'}
+                  muted={averageSalePerRecord == null}
+                />
               </div>
               <div className="sales-day-list">
                 {dailySalesRows.length === 0 ? (
@@ -611,9 +646,29 @@ export function MetricsPage() {
                   <h2>Comparativa por cliente</h2>
                 </div>
                 <p className="source-note">
-                  Comparativa agregada del mes visible. Útil para sustentar reporte ejecutivo antes
-                  de entrar al detalle.
+                  Comparativa agregada del mes visible para detectar líderes de ventas, eficiencia y volumen comercial.
                 </p>
+                <div className="report-inline-summary comparison-summary-grid">
+                  <MetricBoxInline label="Clientes con data" value={String(activeClientsThisMonth)} muted={activeClientsThisMonth === 0} />
+                  <MetricBoxInline
+                    label="Líder en ventas"
+                    value={
+                      comparisonLeaderBySales
+                        ? `${comparisonLeaderBySales.client.name} · ${formatCop(comparisonLeaderBySales.totals.total_sales)}`
+                        : 'Sin líder'
+                    }
+                    muted={!comparisonLeaderBySales}
+                  />
+                  <MetricBoxInline
+                    label="Mejor ROAS"
+                    value={
+                      comparisonLeaderByRoas
+                        ? `${comparisonLeaderByRoas.client.name} · ${formatRoas(comparisonLeaderByRoas.totals.real_roas)}`
+                        : 'Sin líder'
+                    }
+                    muted={!comparisonLeaderByRoas}
+                  />
+                </div>
                 {clientComparison.length === 0 ? (
                   <p className="empty-note">No hay suficiente data para comparar clientes este mes.</p>
                 ) : (
@@ -743,7 +798,7 @@ export function MetricsPage() {
 
           {pendingMetrics.length > 0 && (
             <details className="card section-block dashboard-collapsible">
-              <summary>Fuentes pendientes del reporte mensual</summary>
+              <summary>Cobertura pendiente del reporte mensual</summary>
               <div className="special-metrics-list">
                 {pendingMetrics.map((item) => (
                   <div key={item.title} className="special-metric-row">

@@ -39,7 +39,6 @@ import {
   sumMetrics,
   sumOperatingKpis,
   sumSales,
-  summarizeAdDataOrigin,
 } from '../lib/utils';
 import { buildClientMetaOverviewByClient } from '../services/meta';
 import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
@@ -157,6 +156,31 @@ export function DashboardPage() {
     socialFollowersTotal > 0 && socialProfileVisitsTotal > 0
       ? (socialFollowersTotal / socialProfileVisitsTotal) * 100
       : null;
+  const salesRecordCount = executiveSales.length;
+  const specialClickSignals = specialSummary.whatsappClicks + specialSummary.linkClicks;
+  const commercialSignalRows = [
+    {
+      label: 'Seguidores del mes',
+      value: socialFollowersTotal > 0 ? formatNumber(socialFollowersTotal) : 'Sin cierres',
+      muted: socialFollowersTotal <= 0,
+    },
+    {
+      label: 'Visitas al perfil',
+      value:
+        socialProfileVisitsTotal > 0 ? formatNumber(socialProfileVisitsTotal) : 'Sin dato',
+      muted: socialProfileVisitsTotal <= 0,
+    },
+    {
+      label: 'Clicks WhatsApp + link',
+      value: specialClickSignals > 0 ? formatNumber(specialClickSignals) : 'Sin cierre',
+      muted: specialClickSignals <= 0,
+    },
+    {
+      label: 'Registros de venta',
+      value: formatNumber(salesRecordCount),
+      muted: salesRecordCount === 0,
+    },
+  ];
 
   const clientExecutiveRows = clients
     .map((client) => {
@@ -200,6 +224,30 @@ export function DashboardPage() {
     });
 
   const topClients = clientExecutiveRows.slice(0, 5);
+  const topSalesClients = [...clientExecutiveRows]
+    .filter((entry) => entry.monthTotals.total_sales > 0)
+    .sort((left, right) => {
+      if (right.monthTotals.total_sales !== left.monthTotals.total_sales) {
+        return right.monthTotals.total_sales - left.monthTotals.total_sales;
+      }
+      if (right.monthTotals.real_roas !== left.monthTotals.real_roas) {
+        return right.monthTotals.real_roas - left.monthTotals.real_roas;
+      }
+      return right.monthTotals.spend - left.monthTotals.spend;
+    })
+    .slice(0, 4);
+  const topRoasClients = [...clientExecutiveRows]
+    .filter((entry) => entry.monthTotals.spend > 0 && entry.monthTotals.total_sales > 0)
+    .sort((left, right) => {
+      if (right.monthTotals.real_roas !== left.monthTotals.real_roas) {
+        return right.monthTotals.real_roas - left.monthTotals.real_roas;
+      }
+      if (right.monthTotals.total_sales !== left.monthTotals.total_sales) {
+        return right.monthTotals.total_sales - left.monthTotals.total_sales;
+      }
+      return right.monthTotals.spend - left.monthTotals.spend;
+    })
+    .slice(0, 4);
   const clientsAtRisk = clientExecutiveRows
     .map((entry) => {
       const reasons: string[] = [];
@@ -272,7 +320,6 @@ export function DashboardPage() {
     })),
   ].slice(0, 5);
 
-  const hasExecutiveSocialData = socialRows.length > 0;
   const hasExecutiveSpecialData = specialSummary.rowsWithData > 0;
   const pendingSourceItems = [
     marketing.profileVisits == null
@@ -320,17 +367,17 @@ export function DashboardPage() {
         <div className="period-toolbar">
           <div className="period-toolbar-copy">
             <div className="section-heading">
-              <h2>Lectura principal</h2>
+              <h2>Resumen ejecutivo</h2>
             </div>
             <p className="source-note">
-              Esta portada prioriza el mes ejecutivo con fuentes reales de Ads, ventas y cierres
-              mensuales. Alertas, riesgo y estado Meta siguen leyendo operación actual.
+              Mes visible para negocio arriba. Riesgo, alertas y estado Meta siguen leyendo la
+              operación actual.
             </p>
             <div className="period-chip-row">
               <span className="meta-chip">{executiveMonthLabel}</span>
-              <span className="meta-chip">KPIs y clientes destacados: mensual</span>
-              <span className="meta-chip">Alertas y Meta: actual</span>
-              <span className="meta-chip">Fuente principal: Supabase</span>
+              <span className="meta-chip">KPIs: mensual</span>
+              <span className="meta-chip">Riesgo y Meta: actual</span>
+              <span className="meta-chip">Supabase real</span>
             </div>
           </div>
         </div>
@@ -369,8 +416,12 @@ export function DashboardPage() {
         />
         <KpiBox
           icon={<Users size={18} />}
-          label="Meta desactualizado"
-          value={String(metaStaleCount)}
+          label={socialFollowersTotal > 0 ? `Seguidores ${executiveMonthLabel}` : 'Registros de venta'}
+          value={
+            socialFollowersTotal > 0
+              ? formatNumber(socialFollowersTotal)
+              : formatNumber(salesRecordCount)
+          }
           color="blue"
         />
       </div>
@@ -384,54 +435,105 @@ export function DashboardPage() {
             </Link>
           </div>
           <p className="source-note">
-            Ordenados por ventas reales y ROAS del mes visible. La lista no depende del snapshot
-            operativo general.
+            Dos cortes rápidos del mes visible: quién más vende y quién mejor convierte inversión
+            en ventas reales.
           </p>
 
           {topClients.length === 0 ? (
             <p className="empty-note">No hay clientes con data suficiente para destacar este mes.</p>
           ) : (
-            <div className="executive-client-list">
-              {topClients.map(({ client, monthTotals, alertCount, socialMetric, meta }) => (
-                <Link key={client.id} to={`/clients/${client.id}`} className="executive-client-row">
-                  <div className="executive-client-main">
-                    <div className="table-primary-cell">
-                      <strong>{client.name}</strong>
-                      <span className="table-secondary-note">
-                        {client.niche ?? 'Sin nicho'} · {formatCop(monthTotals.spend)} inversión
-                      </span>
-                    </div>
-                    <div className="period-chip-row">
-                      {monthTotals.total_sales > 0 && (
-                        <span className="status-pill status-green">
-                          {formatCop(monthTotals.total_sales)} ventas
+            <div className="executive-duo-grid">
+              <div className="executive-list-block">
+                <div className="section-heading section-heading-mini">
+                  <h3>Top ventas</h3>
+                </div>
+                <div className="executive-client-list">
+                  {topSalesClients.map(({ client, monthTotals, alertCount }) => (
+                    <Link key={`sales-${client.id}`} to={`/clients/${client.id}`} className="executive-client-row">
+                      <div className="executive-client-main">
+                        <div className="table-primary-cell">
+                          <strong>{client.name}</strong>
+                          <span className="table-secondary-note">
+                            {formatCop(monthTotals.total_sales)} ventas · {formatCop(monthTotals.spend)} inversión
+                          </span>
+                        </div>
+                        {alertCount > 0 && (
+                          <div className="period-chip-row">
+                            <span className="status-pill status-red">{alertCount} alerta(s)</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="executive-client-metrics">
+                        <span className={roasClass(monthTotals.real_roas)}>
+                          {formatRoas(monthTotals.real_roas)}
                         </span>
-                      )}
-                      {alertCount > 0 && (
-                        <span className="status-pill status-red">{alertCount} alerta(s)</span>
-                      )}
-                      {socialMetric && socialMetric.new_followers > 0 && (
-                        <span className="status-pill status-blue">
-                          +{formatNumber(socialMetric.new_followers)} seguidores
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              <div className="executive-list-block">
+                <div className="section-heading section-heading-mini">
+                  <h3>Top ROAS</h3>
+                </div>
+                <div className="executive-client-list">
+                  {topRoasClients.map(({ client, monthTotals, meta }) => (
+                    <Link key={`roas-${client.id}`} to={`/clients/${client.id}`} className="executive-client-row">
+                      <div className="executive-client-main">
+                        <div className="table-primary-cell">
+                          <strong>{client.name}</strong>
+                          <span className="table-secondary-note">
+                            {formatCop(monthTotals.total_sales)} ventas · {formatCop(monthTotals.spend)} inversión
+                          </span>
+                        </div>
+                        {meta && (
+                          <div className="period-chip-row">
+                            <span className={`status-pill ${metaSyncStatusClass(meta.sync_status)}`}>
+                              {metaSyncStatusLabel(meta.sync_status)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="executive-client-metrics">
+                        <span className={roasClass(monthTotals.real_roas)}>
+                          {formatRoas(monthTotals.real_roas)}
                         </span>
-                      )}
-                      {meta && (
-                        <span className={`status-pill ${metaSyncStatusClass(meta.sync_status)}`}>
-                          {metaSyncStatusLabel(meta.sync_status)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="executive-client-metrics">
-                    <span className={roasClass(monthTotals.real_roas)}>
-                      {formatRoas(monthTotals.real_roas)}
-                    </span>
-                    <span className="table-secondary-note">{formatCop(monthTotals.spend)} invertidos</span>
-                  </div>
-                </Link>
-              ))}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
+        </section>
+
+        <section className="card section-block executive-signals-card">
+          <div className="section-heading">
+            <h2>Señales comerciales del mes</h2>
+          </div>
+          <p className="source-note">
+            Cierres sociales, clicks reportados y tracción comercial real del mes visible.
+          </p>
+          <div className="executive-micro-grid">
+            {commercialSignalRows.map((item) => (
+              <MetricBoxMini key={item.label} label={item.label} value={item.value} muted={item.muted} />
+            ))}
+          </div>
+          <div className="period-chip-row">
+            {socialFollowersTotal > 0 && (
+              <span className="meta-chip source-manual">
+                Conversión visita → seguidor {socialConversion != null ? `${socialConversion.toFixed(1)}%` : '—'}
+              </span>
+            )}
+            {specialSummary.newCustomersReported > 0 && (
+              <span className="meta-chip source-manual">
+                {formatNumber(specialSummary.newCustomersReported)} nuevos clientes reportados
+              </span>
+            )}
+            <span className={`meta-chip ${adDataOriginClass(marketing.sourceOrigin)}`}>
+              Ads {adDataOriginLabel(marketing.sourceOrigin)}
+            </span>
+          </div>
         </section>
 
         <section className="card section-block executive-radar-card">
@@ -442,8 +544,7 @@ export function DashboardPage() {
             </Link>
           </div>
           <p className="source-note">
-            Lo que requiere atención hoy: alertas abiertas, riesgo operativo y estado de
-            sincronización.
+            Lo que requiere atención hoy: alertas abiertas, riesgo operativo y sincronización.
           </p>
 
           <div className="executive-micro-grid">
@@ -568,90 +669,6 @@ export function DashboardPage() {
           </div>
         </section>
 
-        {hasExecutiveSocialData && (
-          <section className="card section-block">
-            <div className="section-heading">
-              <h2>Crecimiento social</h2>
-            </div>
-            <p className="source-note">
-              Cierre mensual de seguidores y visitas al perfil. No se infieren seguidores desde Ads.
-            </p>
-            <div className="metric-grid-4">
-              <MetricBoxMini label="Nuevos seguidores" value={formatNumber(socialFollowersTotal)} />
-              <MetricBoxMini
-                label="Visitas al perfil"
-                value={socialProfileVisitsTotal > 0 ? formatNumber(socialProfileVisitsTotal) : 'Sin dato'}
-              />
-              <MetricBoxMini
-                label="Conversión visita → seguidor"
-                value={socialConversion != null ? `${socialConversion.toFixed(1)}%` : '—'}
-              />
-              <MetricBoxMini label="Costo por seguidor" value="Pendiente de fuente" />
-            </div>
-            <div className="special-metrics-list compact-grid-list">
-              {socialRows.slice(0, 5).map((entry) => (
-                <Link
-                  key={entry.clientId}
-                  to={`/clients/${entry.clientId}`}
-                  className="special-metric-row special-metric-link"
-                >
-                  <div className="special-metric-main">
-                    <strong>{entry.clientName}</strong>
-                    <span>
-                      Seguidores{' '}
-                      {entry.socialMetric ? formatNumber(entry.socialMetric.new_followers) : 'Sin dato'} ·
-                      Perfil{' '}
-                      {entry.profileVisits.value != null
-                        ? formatNumber(entry.profileVisits.value)
-                        : 'Sin dato'}
-                    </span>
-                  </div>
-                  <span
-                    className={`meta-chip ${
-                      entry.socialMetric
-                        ? 'source-manual'
-                        : adDataOriginClass(entry.profileVisits.sourceOrigin)
-                    }`}
-                  >
-                    {entry.socialMetric ? 'Manual mensual' : entry.profileVisits.sourceLabel}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {hasExecutiveSpecialData && (
-          <section className="card section-block">
-            <div className="section-heading">
-              <h2>Métricas especiales</h2>
-            </div>
-            <p className="source-note">
-              Cierres mensuales manuales para clicks y señales de negocio. Solo suben aquí cuando
-              ya existe data real.
-            </p>
-            <div className="metric-grid-4">
-              <MetricBoxMini label="Clicks WhatsApp" value={formatNumber(specialSummary.whatsappClicks)} />
-              <MetricBoxMini label="Clicks al link" value={formatNumber(specialSummary.linkClicks)} />
-              <MetricBoxMini
-                label="Nuevos clientes"
-                value={formatNumber(specialSummary.newCustomersReported)}
-              />
-              <MetricBoxMini
-                label="Recompra"
-                value={formatNumber(specialSummary.returningCustomersReported)}
-              />
-              <MetricBoxMini
-                label="Visitas a tienda"
-                value={formatNumber(specialSummary.storeVisitsReported)}
-              />
-            </div>
-            <p className="source-note">
-              Ads visible: {adDataOriginLabel(summarizeAdDataOrigin(executiveAdMetrics.map((row) => row.source)))} ·
-              Cierres especiales: manual mensual
-            </p>
-          </section>
-        )}
       </div>
 
       {pendingSourceItems.length > 0 && (
@@ -741,12 +758,14 @@ function KpiBox({
 function MetricBoxMini({
   label,
   value,
+  muted,
 }: {
   label: string;
   value: string;
+  muted?: boolean;
 }) {
   return (
-    <div className="metric-box">
+    <div className={`metric-box ${muted ? 'metric-box-muted' : ''}`}>
       <span className="metric-box-label">{label}</span>
       <span className="metric-box-value">{value}</span>
     </div>
