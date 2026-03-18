@@ -1,17 +1,21 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
 import { useMonthlyOperatingKpis, useMetaSyncRows, useAlerts } from '../hooks/useData';
-import { Plus, Search, Users, Building2, MapPin, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
-import { formatCop, formatRoas, statusLabel } from '../lib/utils';
+import { Plus, Search, Users } from 'lucide-react';
+import { formatCop, formatRoas } from '../lib/utils';
+
+type StatusFilter = 'all' | 'active' | 'paused';
 
 export function ClientsPage() {
+  const navigate = useNavigate();
   const { clients, loading, saving, error, createClient } = useClients();
   const { monthlyKpis } = useMonthlyOperatingKpis(undefined, 1);
   const { syncRows } = useMetaSyncRows();
   const { alerts } = useAlerts();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -48,133 +52,408 @@ export function ClientsPage() {
     return map;
   }, [syncRows]);
 
-  const filtered = clients.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.niche ?? '').toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(
+    () =>
+      clients.filter((c) => {
+        const matchesSearch =
+          c.name.toLowerCase().includes(search.toLowerCase()) ||
+          (c.niche ?? '').toLowerCase().includes(search.toLowerCase());
+        const matchesStatus =
+          statusFilter === 'all' ||
+          (statusFilter === 'active' && c.status === 'active') ||
+          (statusFilter === 'paused' && c.status === 'paused');
+        return matchesSearch && matchesStatus;
+      }),
+    [clients, search, statusFilter],
   );
 
   return (
-    <div className="page-content">
+    <div className="page-content dashboard-v3">
+      {/* ── Header ── */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Clientes</h1>
-          <p className="page-subtitle">Base operativa de empresas y portal cliente por membresías activas</p>
-          <div className="period-chip-row">
-            <span className="meta-chip">{clients.length} clientes registrados</span>
-            <span className="meta-chip">Admins: vista global</span>
-            <span className="meta-chip">Clientes: solo su empresa</span>
-          </div>
+          <p className="page-subtitle">
+            BASE OPERATIVA · {clients.length} ACTIVOS
+          </p>
         </div>
-        <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
-          <Plus size={16} /> Nuevo Cliente
+        <button
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          onClick={() => setShowCreateModal(true)}
+        >
+          <Plus size={14} />
+          Nuevo cliente
         </button>
       </div>
 
-      {error && (
-        <div className="card section-block" style={{ padding: 16 }}>
-          <p className="empty-note">{error}</p>
+      {/* ── Search + Filter row ── */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '10px',
+          padding: '16px 24px 0',
+          alignItems: 'center',
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <Search
+            size={13}
+            style={{
+              position: 'absolute',
+              left: '10px',
+              color: 'hsl(215,15%,45%)',
+              pointerEvents: 'none',
+            }}
+          />
+          <input
+            style={{
+              width: '100%',
+              height: '36px',
+              paddingLeft: '32px',
+              paddingRight: '12px',
+              background: 'hsl(220,18%,9%)',
+              border: '1px solid hsl(0 0% 100% / 0.08)',
+              borderRadius: '4px',
+              color: 'hsl(0,0%,92%)',
+              fontFamily: 'JetBrains Mono',
+              fontSize: '0.78rem',
+              outline: 'none',
+            }}
+            placeholder="Buscar cliente..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-      )}
-
-      <div className="search-bar-wrap">
-        <Search size={16} className="search-icon" />
-        <input
-          className="search-input"
-          placeholder="Buscar por nombre o nicho..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          style={{
+            height: '36px',
+            padding: '0 12px',
+            background: 'hsl(220,18%,9%)',
+            border: '1px solid hsl(0 0% 100% / 0.08)',
+            borderRadius: '4px',
+            color: 'hsl(215,15%,65%)',
+            fontFamily: 'JetBrains Mono',
+            fontSize: '0.72rem',
+            letterSpacing: '0.05em',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="all">Todos</option>
+          <option value="active">Activos</option>
+          <option value="paused">Pausados</option>
+        </select>
       </div>
 
-      {loading ? (
-        <div className="loading-grid">
-          {[1, 2, 3, 4].map(i => <div key={i} className="skeleton-card" />)}
-        </div>
-      ) : (
-        <div className="clients-list-grid">
-          {filtered.map(client => (
-            <article key={client.id} className="client-list-card card">
-              <Link to={`/clients/${client.id}`} className="client-list-body">
-                <div className="client-list-header">
-                  <div className="client-avatar" style={{ background: clientGradient(client.id) }}>
-                    {client.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="client-list-info">
-                    <h3>{client.name}</h3>
-                    <span className="client-niche">{client.niche ?? 'Sin nicho'}</span>
-                  </div>
-                  <span className={`status-pill status-${client.status === 'active' ? 'green' : client.status === 'paused' ? 'amber' : 'red'}`}>
-                    {statusLabel(client.status)}
-                  </span>
-                </div>
-                <div className="client-list-meta">
-                  {client.main_city && (
-                    <span className="meta-chip"><MapPin size={11} /> {client.main_city}</span>
-                  )}
-                  {client.ad_account_id && (
-                    <span className="meta-chip"><Building2 size={11} /> {client.ad_account_id}</span>
-                  )}
-                </div>
-                {client.notes && <p className="client-notes-preview">{client.notes}</p>}
-                <div className="client-list-kpis">
-                  {(() => {
-                    const kpi = kpiByClient.get(client.id);
-                    const openAlerts = alertsByClient.get(client.id) ?? 0;
-                    const lastSync = syncByClient.get(client.id);
-                    const syncAge = lastSync
-                      ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 86400000)
-                      : null;
-                    return (
-                      <>
-                        {kpi ? (
-                          <>
-                            <span className="meta-chip">{formatCop(kpi.spend)}</span>
-                            <span className="meta-chip">{formatRoas(kpi.roas)} ROAS</span>
-                          </>
-                        ) : (
-                          <span className="meta-chip source-unknown">Sin KPI mensual</span>
-                        )}
-                        {openAlerts > 0 && (
-                          <span className="meta-chip" style={{ color: '#ff5252' }}>
-                            <AlertTriangle size={11} style={{ display:'inline', marginRight:3 }} />
-                            {openAlerts} alerta{openAlerts > 1 ? 's' : ''}
-                          </span>
-                        )}
-                        <span className={`meta-chip ${syncAge === null ? 'source-unknown' : syncAge <= 1 ? 'source-automatic' : syncAge <= 3 ? '' : 'source-manual'}`}>
-                          <RefreshCw size={11} style={{ display:'inline', marginRight:3 }} />
-                          {syncAge === null ? 'Sin sync' : syncAge === 0 ? 'Sync hoy' : `Sync hace ${syncAge}d`}
-                        </span>
-                      </>
-                    );
-                  })()}
-                </div>
-              </Link>
-              <div className="client-list-actions">
-                <Link to={`/clients/${client.id}`} className="btn-secondary client-card-action">
-                  Ver interno
-                </Link>
-                <Link
-                  to={`/portal/${client.id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-primary client-card-action"
-                >
-                  <ExternalLink size={14} />
-                  Abrir portal
-                </Link>
-              </div>
-            </article>
-          ))}
-
-          {filtered.length === 0 && (
-            <div className="empty-state">
-              <Users size={32} />
-              <h3>{search ? 'No se encontraron clientes' : 'No hay clientes cargados'}</h3>
-              <p>{search ? 'Prueba con otro término de búsqueda' : 'Crea el primer cliente en Supabase para comenzar.'}</p>
-            </div>
-          )}
+      {error && (
+        <div style={{ padding: '12px 24px 0' }}>
+          <p
+            style={{
+              fontFamily: 'JetBrains Mono',
+              fontSize: '0.72rem',
+              color: 'hsl(0,84%,65%)',
+              padding: '10px 14px',
+              background: 'hsl(0 84% 60% / 0.08)',
+              border: '1px solid hsl(0 84% 60% / 0.15)',
+              borderRadius: '4px',
+            }}
+          >
+            {error}
+          </p>
         </div>
       )}
+
+      {/* ── Table ── */}
+      <div
+        className="card-glass"
+        style={{ margin: '16px 24px 24px', borderRadius: '4px', overflow: 'hidden' }}
+      >
+        {loading ? (
+          <div
+            style={{
+              padding: '48px 24px',
+              textAlign: 'center',
+              fontFamily: 'JetBrains Mono',
+              fontSize: '0.72rem',
+              color: 'hsl(215,15%,40%)',
+            }}
+          >
+            Cargando clientes...
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.08)' }}>
+                  {['Cliente', 'Nicho', 'Ciudad', 'Inversión', 'ROAS', 'Meta', 'Acciones'].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className="number-label"
+                        style={{
+                          padding: '11px 20px',
+                          textAlign: 'left',
+                          fontWeight: 400,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((client) => {
+                  const kpi = kpiByClient.get(client.id);
+                  const openAlerts = alertsByClient.get(client.id) ?? 0;
+                  const lastSync = syncByClient.get(client.id);
+                  const syncAge = lastSync
+                    ? Math.floor(
+                        (Date.now() - new Date(lastSync).getTime()) / 86_400_000,
+                      )
+                    : null;
+                  const syncLabel =
+                    syncAge === null
+                      ? 'SIN SYNC'
+                      : syncAge === 0
+                        ? 'HOY'
+                        : `HACE ${syncAge}D`;
+                  const syncOk = syncAge !== null && syncAge <= 1;
+                  const syncWarn = syncAge !== null && syncAge > 1 && syncAge <= 3;
+
+                  return (
+                    <tr
+                      key={client.id}
+                      style={{
+                        borderBottom: '1px solid hsl(0 0% 100% / 0.05)',
+                        transition: 'background 150ms ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLTableRowElement).style.background =
+                          'hsl(0 0% 100% / 0.02)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLTableRowElement).style.background = 'transparent';
+                      }}
+                    >
+                      {/* Cliente */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div
+                            style={{
+                              width: '30px',
+                              height: '30px',
+                              borderRadius: '4px',
+                              background: clientGradient(client.id),
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontFamily: 'Outfit, sans-serif',
+                                fontWeight: 700,
+                                fontSize: '0.72rem',
+                                color: '#fff',
+                              }}
+                            >
+                              {client.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <Link
+                              to={`/clients/${client.id}`}
+                              style={{
+                                fontFamily: 'Outfit, sans-serif',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                color: 'hsl(0,0%,92%)',
+                                textDecoration: 'none',
+                                display: 'block',
+                              }}
+                            >
+                              {client.name}
+                            </Link>
+                            {openAlerts > 0 && (
+                              <span
+                                style={{
+                                  fontFamily: 'JetBrains Mono',
+                                  fontSize: '0.58rem',
+                                  letterSpacing: '0.08em',
+                                  color: 'hsl(0,84%,65%)',
+                                }}
+                              >
+                                {openAlerts} alerta{openAlerts > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Nicho */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <span className="number-label">
+                          {client.niche ?? '—'}
+                        </span>
+                      </td>
+
+                      {/* Ciudad */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <span className="number-label">
+                          {client.main_city ?? '—'}
+                        </span>
+                      </td>
+
+                      {/* Inversión */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <span
+                          style={{
+                            fontFamily: 'JetBrains Mono',
+                            fontSize: '0.78rem',
+                            color: 'hsl(0,0%,85%)',
+                          }}
+                        >
+                          {kpi ? formatCop(kpi.spend) : '—'}
+                        </span>
+                      </td>
+
+                      {/* ROAS */}
+                      <td style={{ padding: '13px 20px' }}>
+                        {kpi ? (
+                          <span
+                            style={{
+                              fontFamily: 'JetBrains Mono',
+                              fontSize: '0.78rem',
+                              color:
+                                kpi.roas >= 1
+                                  ? 'hsl(180,100%,50%)'
+                                  : 'hsl(0,84%,65%)',
+                            }}
+                          >
+                            {formatRoas(kpi.roas)}
+                          </span>
+                        ) : (
+                          <span className="number-label">—</span>
+                        )}
+                      </td>
+
+                      {/* Meta sync */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <span
+                          style={{
+                            fontFamily: 'JetBrains Mono',
+                            fontSize: '0.6rem',
+                            letterSpacing: '0.08em',
+                            padding: '3px 7px',
+                            borderRadius: '4px',
+                            ...(syncOk
+                              ? {
+                                  background: 'hsl(145 100% 45% / 0.12)',
+                                  color: 'hsl(145,100%,45%)',
+                                  border: '1px solid hsl(145 100% 45% / 0.2)',
+                                }
+                              : syncWarn
+                                ? {
+                                    background: 'hsl(38 100% 50% / 0.12)',
+                                    color: 'hsl(38,100%,60%)',
+                                    border: '1px solid hsl(38 100% 50% / 0.2)',
+                                  }
+                                : {
+                                    background: 'hsl(0 0% 100% / 0.04)',
+                                    color: 'hsl(215,15%,45%)',
+                                    border: '1px solid hsl(0 0% 100% / 0.08)',
+                                  }),
+                          }}
+                        >
+                          {syncLabel}
+                        </span>
+                      </td>
+
+                      {/* Acciones */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            className="btn-ghost"
+                            style={{
+                              fontSize: '0.7rem',
+                              padding: '4px 10px',
+                              cursor: 'pointer',
+                              border: '1px solid hsl(0 0% 100% / 0.08)',
+                            }}
+                            onClick={() => void navigate(`/clients/${client.id}`)}
+                          >
+                            Ver
+                          </button>
+                          <a
+                            href={`/portal/${client.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              fontFamily: 'JetBrains Mono',
+                              fontSize: '0.7rem',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              border: '1px solid hsl(180 100% 50% / 0.25)',
+                              color: 'hsl(180,100%,50%)',
+                              textDecoration: 'none',
+                              transition: 'all 200ms ease',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Portal ↗
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '10px',
+                          color: 'hsl(215,15%,40%)',
+                        }}
+                      >
+                        <Users size={28} style={{ opacity: 0.5 }} />
+                        <p
+                          style={{
+                            fontFamily: 'JetBrains Mono',
+                            fontSize: '0.72rem',
+                            margin: 0,
+                          }}
+                        >
+                          {search || statusFilter !== 'all'
+                            ? 'Sin resultados para este filtro'
+                            : 'No hay clientes registrados'}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {showCreateModal && (
         <ClientCreateModal
@@ -182,9 +461,7 @@ export function ClientsPage() {
           onClose={() => setShowCreateModal(false)}
           onSave={async (input) => {
             const result = await createClient(input);
-            if (!result.error) {
-              setShowCreateModal(false);
-            }
+            if (!result.error) setShowCreateModal(false);
             return result;
           }}
         />

@@ -3,6 +3,7 @@ import {
   Area,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -110,7 +111,7 @@ export function DashboardPage() {
       : undefined;
   const { monthlyKpis } = useMonthlyOperatingKpis(scopedClientId, 6);
   const { metrics: rawAdMetrics } = useAdMetrics(scopedClientId, 180);
-  const { sales } = useDailySales({ clientId: scopedClientId, days: 180 });
+  const { sales } = useDailySales({ clientId: scopedClientId, days: 365 });
   const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(scopedClientId, 12);
   const { syncRows } = useMetaSyncRows(scopedClientId);
 
@@ -335,6 +336,60 @@ export function DashboardPage() {
         .slice(0, 8),
     [clientExecutiveRows],
   );
+
+  // ── Year sales ────────────────────────────────────────────────────────────────
+  const currentYear = String(new Date().getFullYear());
+  const currentMonthIdx = new Date().getMonth(); // 0-based
+
+  const yearSalesData = useMemo(() => {
+    const byMonth = new Map<string, number>();
+    scopedSales.forEach((s) => {
+      const m = s.date.slice(0, 7);
+      if (m.startsWith(currentYear)) {
+        byMonth.set(m, (byMonth.get(m) ?? 0) + s.total_sales);
+      }
+    });
+    return Array.from({ length: 12 }, (_, i) => {
+      const mm = String(i + 1).padStart(2, '0');
+      const key = `${currentYear}-${mm}`;
+      return {
+        month: key,
+        label: new Date(`${currentYear}-${mm}-15`).toLocaleDateString('es-CO', { month: 'short' }),
+        sales: byMonth.get(key) ?? 0,
+        isFuture: i > currentMonthIdx,
+        isCurrent: i === currentMonthIdx,
+      };
+    });
+  }, [scopedSales, currentYear, currentMonthIdx]);
+
+  const yearClientSales = useMemo(() => {
+    const byClient = new Map<string, number>();
+    scopedSales.forEach((s) => {
+      if (s.date.startsWith(currentYear)) {
+        byClient.set(s.client_id, (byClient.get(s.client_id) ?? 0) + s.total_sales);
+      }
+    });
+    return [...byClient.entries()]
+      .map(([clientId, total]) => ({
+        clientId,
+        name: visibleClients.find((c) => c.id === clientId)?.name ?? clientId.slice(0, 8),
+        total,
+      }))
+      .filter((e) => e.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 3);
+  }, [scopedSales, currentYear, visibleClients]);
+
+  const yearTotal = yearSalesData.reduce((s, m) => s + m.sales, 0);
+  const yearMonthsWithData = yearSalesData.filter((m) => !m.isFuture && m.sales > 0);
+  const bestMonth = yearMonthsWithData.reduce<(typeof yearSalesData)[0] | null>(
+    (best, m) => (best === null || m.sales > best.sales ? m : best),
+    null,
+  );
+  const monthlyAvg =
+    yearMonthsWithData.length > 0 ? yearTotal / yearMonthsWithData.length : 0;
+  const yearEstimate =
+    currentMonthIdx > 0 && yearTotal > 0 ? (yearTotal / (currentMonthIdx + 1)) * 12 : 0;
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const currentMonthLabel = new Date()
@@ -770,6 +825,201 @@ export function DashboardPage() {
               )}
             </tbody>
           </table>
+        </div>
+      </motion.div>
+
+      {/* ── Year Sales ── */}
+      <motion.div
+        className="card-glass"
+        style={{ borderRadius: '4px', overflow: 'hidden' }}
+        {...fadeUp(0.4)}
+      >
+        {/* Card header */}
+        <div
+          style={{
+            padding: '24px',
+            borderBottom: '1px solid hsl(0 0% 100% / 0.08)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div>
+            <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
+              Ventas del año
+            </span>
+            <h3
+              className="font-display"
+              style={{
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                color: 'hsl(0,0%,98%)',
+                letterSpacing: '-0.02em',
+                margin: 0,
+              }}
+            >
+              Progreso comercial {currentYear}
+            </h3>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
+              Total acumulado
+            </span>
+            <span
+              className="font-display"
+              style={{
+                fontSize: '1.75rem',
+                fontWeight: 700,
+                color: 'hsl(180,100%,50%)',
+                letterSpacing: '-0.03em',
+                lineHeight: 1,
+              }}
+            >
+              {formatCop(yearTotal)}
+            </span>
+          </div>
+        </div>
+
+        {/* Two-column body */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '60% 40%',
+            gap: '24px',
+            padding: '24px',
+          }}
+        >
+          {/* Left: monthly bar chart */}
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={yearSalesData} barSize={20}>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(0 0% 100% / 0.05)"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="sales" name="Ventas" radius={[2, 2, 0, 0]}>
+                {yearSalesData.map((entry, idx) => (
+                  <Cell
+                    key={idx}
+                    fill="hsl(180,100%,50%)"
+                    fillOpacity={entry.isCurrent ? 1 : entry.isFuture ? 0.12 : 0.45}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+
+          {/* Right: stats + top clients */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Mini stats */}
+            {[
+              {
+                label: 'Mejor mes',
+                value: bestMonth ? `${bestMonth.label} — ${formatCop(bestMonth.sales)}` : '—',
+              },
+              {
+                label: 'Promedio mensual',
+                value: monthlyAvg > 0 ? formatCop(monthlyAvg) : '—',
+              },
+              {
+                label: 'Meta estimada año',
+                value: yearEstimate > 0 ? formatCop(yearEstimate) : '—',
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: '4px',
+                  border: '1px solid hsl(0 0% 100% / 0.06)',
+                  background: 'hsl(220,18%,9%)',
+                }}
+              >
+                <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
+                  {stat.label}
+                </span>
+                <span
+                  className="font-display"
+                  style={{
+                    fontSize: '0.92rem',
+                    fontWeight: 600,
+                    color: 'hsl(0,0%,98%)',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {stat.value}
+                </span>
+              </div>
+            ))}
+
+            {/* Top 3 clients */}
+            {yearClientSales.length > 0 && (
+              <div style={{ marginTop: '4px' }}>
+                <span className="number-label" style={{ display: 'block', marginBottom: '12px' }}>
+                  Top clientes del año
+                </span>
+                {yearClientSales.map((entry, i) => (
+                  <div key={entry.clientId} style={{ marginBottom: '12px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '5px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: 'JetBrains Mono',
+                          fontSize: '0.72rem',
+                          color: 'hsl(0,0%,85%)',
+                        }}
+                      >
+                        {i + 1}. {entry.name}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: 'JetBrains Mono',
+                          fontSize: '0.72rem',
+                          color: 'hsl(215,15%,55%)',
+                        }}
+                      >
+                        {formatCop(entry.total)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: '3px',
+                        background: 'hsl(0 0% 100% / 0.08)',
+                        borderRadius: '2px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${yearClientSales[0].total > 0 ? (entry.total / yearClientSales[0].total) * 100 : 0}%`,
+                          background: 'hsl(180,100%,50%)',
+                          opacity: i === 0 ? 1 : i === 1 ? 0.6 : 0.35,
+                          borderRadius: '2px',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>
