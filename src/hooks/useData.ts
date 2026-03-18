@@ -136,17 +136,18 @@ export function useTasks(clientId?: string) {
 }
 
 // Fetches 2 years of ad_campaign_metrics and aggregates them by month.
-// Used in MetricsPage to fill historical months that ad_metrics doesn't cover.
+// Waits for a real clientId UUID before fetching — never fires without one.
 export function useCampaignMonthlyHistory(clientId?: string) {
   const [byMonth, setByMonth] = useState<CampaignAggregateByMonth[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const prevDataRef = useRef<CampaignAggregateByMonth[] | null>(null);
 
   const load = useCallback(async () => {
+    if (!clientId) return; // wait for real UUID — do not fetch without client scope
     if (!prevDataRef.current) setLoading(true);
     try {
       const rows = await listAdCampaignMetrics({ clientId, days: 730 });
-      console.log('[useCampaignMonthlyHistory] clientId:', clientId, 'rows returned:', rows.length, 'months:', [...new Set(rows.map((r) => r.date.slice(0, 7)))]);
+      console.log('[useCampaignMonthlyHistory] clientId:', clientId, 'rows:', rows.length, 'months:', [...new Set(rows.map((r) => r.date.slice(0, 7)))]);
       const agg = aggregateCampaignMetricsByMonth(rows);
       prevDataRef.current = agg;
       setByMonth(agg);
@@ -166,10 +167,11 @@ export function useCampaignMonthlyHistory(clientId?: string) {
 
 export function useAdCampaignMetrics(clientId?: string, days = 90) {
   const [rows, setRows] = useState<AdCampaignMetric[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const prevDataRef = useRef<AdCampaignMetric[] | null>(null);
 
   const load = useCallback(async () => {
+    if (!clientId) return; // wait for real UUID
     if (!prevDataRef.current) setLoading(true);
     try {
       const data = await listAdCampaignMetrics({ clientId, days });

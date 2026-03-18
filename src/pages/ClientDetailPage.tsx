@@ -80,6 +80,9 @@ export function ClientDetailPage() {
   // Separate hook for campaign table / pie: only needs recent 90 days
   const { rows: campaignRows } = useAdCampaignMetrics(client?.id, 90);
 
+  // Debug — check what history comes back per client
+  console.log('[ClientDetailPage] campaignByMonth:', campaignByMonth, 'clientId:', client?.id);
+
   const [selectedMonth, setSelectedMonth] = useState('');
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
