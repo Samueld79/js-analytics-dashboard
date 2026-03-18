@@ -1,3 +1,4 @@
+import { motion, type Transition } from 'framer-motion';
 import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -397,9 +398,15 @@ export function DashboardPage() {
     })),
   ].slice(0, 5);
 
+  const fadeUp = (delay = 0) => ({
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.4, ease: 'easeOut', delay } as Transition,
+  });
+
   return (
     <div className="page-content reporting-page executive-dashboard-page">
-      <div className="page-header">
+      <motion.div className="page-header" {...fadeUp(0)}>
         <div>
           <h1 className="page-title">{portalClientName ? `Resultados de ${portalClientName}` : 'Dashboard General'}</h1>
           <p className="page-subtitle">
@@ -420,9 +427,9 @@ export function DashboardPage() {
             Ver desempeño mensual
           </Link>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="card section-block period-toolbar-card">
+      <motion.div className="card section-block period-toolbar-card" {...fadeUp(0.1)}>
         <div className="period-toolbar">
           <div className="period-toolbar-copy">
             <div className="section-heading">
@@ -450,9 +457,9 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="kpi-row executive-kpi-row">
+      <motion.div className="kpi-row executive-kpi-row" {...fadeUp(0.2)}>
         <KpiBox
           icon={<DollarSign size={18} />}
           label={`Inversión ${executiveMonthLabel}`}
@@ -489,9 +496,9 @@ export function DashboardPage() {
           value={String(clientsWithAlerts)}
           color="red"
         />
-      </div>
+      </motion.div>
 
-      <div className="executive-focus-grid">
+      <motion.div className="executive-focus-grid" {...fadeUp(0.3)}>
         <section className="card section-block executive-spotlight-card">
           <div className="section-heading">
             <h2>Clientes destacados</h2>
@@ -640,10 +647,10 @@ export function DashboardPage() {
           </div>
         </section>
         )}
-      </div>
+      </motion.div>
 
       {isInternal && (
-      <div className="dashboard-grid dashboard-secondary-grid">
+      <motion.div className="dashboard-grid dashboard-secondary-grid" {...fadeUp(0.4)}>
         <section className="card section-block">
           <div className="section-heading">
             <h2>Clientes en riesgo</h2>
@@ -740,7 +747,7 @@ export function DashboardPage() {
           </div>
         </section>
 
-      </div>
+      </motion.div>
       )}
     </div>
   );
