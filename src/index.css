@@ -2291,6 +2291,13 @@ tbody tr:hover td {
 .task-title.done-text { text-decoration: line-through; opacity: 0.6; }
 .task-desc { font-size: 0.78rem; color: #7b94c4; }
 .task-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.task-delete-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px; border: none;
+  background: transparent; color: var(--gs-text-soft); cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.task-delete-btn:hover { background: rgba(255,82,82,0.12); color: #ff5252; }
 .task-due-date { font-size: 0.76rem; color: #8094b8; }
 
 /* Compact task list (dashboard) */

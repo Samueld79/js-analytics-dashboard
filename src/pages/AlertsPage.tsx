@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useClients } from '../hooks/useClients';
 import { useTasks } from '../hooks/useData';
+import { useAuth } from '../hooks/useAuth';
 import { createTasks } from '../services/tasks';
-import { Bell, CheckCircle2, Clock3, AlertTriangle, Info, XCircle } from 'lucide-react';
+import { Bell, CheckCircle2, Clock3, AlertTriangle, Info, XCircle, Trash2 } from 'lucide-react';
 import {
   alertStateClass,
   alertStateLabel,
@@ -28,6 +29,7 @@ function toCustomIso(dateKey: string): string | null {
 export function AlertsPage() {
   const { alerts, dismiss, postpone, resolve } = useAlerts();
   const { clients } = useClients();
+  const { isInternal } = useAuth();
   const [activeTab, setActiveTab] = useState<'alertas' | 'tareas'>('alertas');
   const [filter, setFilter] = useState<'open' | 'snoozed' | 'resolved' | 'dismissed' | 'critical'>('open');
   const [selectedClient, setSelectedClient] = useState('all');
@@ -273,13 +275,13 @@ export function AlertsPage() {
         </>
       )}
 
-      {activeTab === 'tareas' && <TasksPanel clients={clients} />}
+      {activeTab === 'tareas' && <TasksPanel clients={clients} isInternal={isInternal} />}
     </div>
   );
 }
 
-function TasksPanel({ clients }: { clients: import('../lib/supabase').Client[] }) {
-  const { tasks, updateTask, reload } = useTasks();
+function TasksPanel({ clients, isInternal }: { clients: import('../lib/supabase').Client[]; isInternal: boolean }) {
+  const { tasks, updateTask, deleteTask, reload } = useTasks();
   const [filterClient, setFilterClient] = useState('all');
   const [showDone, setShowDone] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
@@ -437,6 +439,20 @@ function TasksPanel({ clients }: { clients: import('../lib/supabase').Client[] }
                   <span className={`priority-pill priority-${task.priority}`}>
                     {task.priority}
                   </span>
+                  {isInternal && (
+                    <button
+                      className="task-delete-btn"
+                      title="Eliminar tarea"
+                      onClick={async () => {
+                        if (!window.confirm(`¿Eliminar "${task.title}"?`)) return;
+                        const result = await deleteTask(task.id);
+                        if (result.error) setTaskNotice(result.error);
+                        else void reload();
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

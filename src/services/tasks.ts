@@ -155,6 +155,20 @@ export async function createTasks(
   return { data: (data ?? []) as Task[], error: null };
 }
 
+export async function deleteTask(id: string): Promise<ServiceMutationResult<null>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const { error } = await supabase.from('tasks').delete().eq('id', id);
+  if (error) {
+    console.error('[tasks] deleteTask', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo eliminar la tarea.') };
+  }
+
+  return { data: null, error: null };
+}
+
 export async function createTasksFromChecklist(params: {
   clientId: string;
   strategyId?: string | null;

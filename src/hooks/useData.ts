@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { listAdMetrics } from '../services/adMetrics';
 import { listMonthlyOperatingKpis } from '../services/dashboard';
 import { listMetaAccountSyncRows } from '../services/meta';
-import { listTasks, updateTask as saveTask } from '../services/tasks';
+import { listTasks, updateTask as saveTask, deleteTask as removeTask } from '../services/tasks';
 import type {
   AdMetric,
   AdAccountSyncRow,
@@ -93,5 +93,13 @@ export function useTasks(clientId?: string) {
     }
   };
 
-  return { tasks, loading, updateTask, reload: load };
+  const deleteTask = async (id: string) => {
+    const result = await removeTask(id);
+    if (!result.error) {
+      setTasks((current) => current.filter((task) => task.id !== id));
+    }
+    return result;
+  };
+
+  return { tasks, loading, updateTask, deleteTask, reload: load };
 }
