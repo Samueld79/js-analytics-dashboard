@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useMonthlyOperatingKpis, useAdMetrics } from '../hooks/useData';
+import { useMonthlyOperatingKpis, useAdMetrics, useCampaignMonthlyHistory } from '../hooks/useData';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import type { AdMetric, ClientMonthlyOperatingKpi, DailySale } from '../lib/supabase';
@@ -152,6 +152,7 @@ export function MetricsPage() {
   const { metrics } = useAdMetrics(queryClientId, queryDays);
   const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, queryMonths);
   const { sales } = useDailySales({ clientId: queryClientId, days: queryDays });
+  const { byMonth: campaignByMonth } = useCampaignMonthlyHistory(queryClientId);
 
   const scopedMetrics = useMemo(
     () =>
@@ -217,16 +218,27 @@ export function MetricsPage() {
       ? (monthSales.length / marketingSummary.messagingStarted) * 100
       : null;
 
+  // Map YYYY-MM → { spend, messages } from ad_campaign_metrics (historical fallback)
+  const campaignMonthMap = useMemo(() => {
+    const map = new Map<string, { spend: number; messages: number }>();
+    campaignByMonth.forEach((agg) => {
+      map.set(agg.month, { spend: agg.spend, messages: agg.messages });
+    });
+    return map;
+  }, [campaignByMonth]);
+
   const historyMonths = useMemo(
     () =>
       listAvailableMonthKeys([
         ...scopedMonthlyKpis.map((row) => row.month),
         ...scopedMetrics.map((row) => row.date),
         ...scopedSales.map((row) => row.date),
+        // Include months that only exist in ad_campaign_metrics
+        ...[...campaignMonthMap.keys()].map((m) => `${m}-01`),
       ])
         .slice(0, 6)
         .reverse(),
-    [scopedMetrics, scopedMonthlyKpis, scopedSales],
+    [scopedMetrics, scopedMonthlyKpis, scopedSales, campaignMonthMap],
   );
 
   const historyRows = useMemo(
@@ -238,12 +250,16 @@ export function MetricsPage() {
           metrics: scopedMetrics,
           sales: scopedSales,
         });
-        const messages = buildMarketingActionSummary(
+        const adMetricsMessages = buildMarketingActionSummary(
           scopedMetrics.filter((row) => getMonthKey(row.date) === monthKey),
         ).messagingStarted;
-        return { monthKey, spend: totals.spend, messages, roas: totals.real_roas };
+        // Prefer ad_metrics if it has spend; fall back to ad_campaign_metrics
+        const campaign = campaignMonthMap.get(monthKey);
+        const spend = totals.spend > 0 ? totals.spend : (campaign?.spend ?? 0);
+        const messages = adMetricsMessages > 0 ? adMetricsMessages : (campaign?.messages ?? 0);
+        return { monthKey, spend, messages, roas: totals.real_roas };
       }),
-    [historyMonths, scopedMetrics, scopedMonthlyKpis, scopedSales],
+    [historyMonths, scopedMetrics, scopedMonthlyKpis, scopedSales, campaignMonthMap],
   );
 
   const chartData = historyRows.map((row) => ({ month: row.monthKey, spend: row.spend }));

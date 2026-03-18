@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listAdMetrics } from '../services/adMetrics';
-import { listAdCampaignMetrics } from '../services/adCampaignMetrics';
+import { listAdCampaignMetrics, aggregateCampaignMetricsByMonth } from '../services/adCampaignMetrics';
 import { listMonthlyOperatingKpis } from '../services/dashboard';
 import { listMetaAccountSyncRows } from '../services/meta';
 import { listTasks, updateTask as saveTask, deleteTask as removeTask } from '../services/tasks';
@@ -8,6 +8,7 @@ import type {
   AdCampaignMetric,
   AdMetric,
   AdAccountSyncRow,
+  CampaignAggregateByMonth,
   ClientMonthlyOperatingKpi,
   Task,
   TaskUpdateInput,
@@ -132,6 +133,34 @@ export function useTasks(clientId?: string) {
   };
 
   return { tasks, loading, updateTask, deleteTask, reload: load };
+}
+
+// Fetches 2 years of ad_campaign_metrics and aggregates them by month.
+// Used in MetricsPage to fill historical months that ad_metrics doesn't cover.
+export function useCampaignMonthlyHistory(clientId?: string) {
+  const [byMonth, setByMonth] = useState<CampaignAggregateByMonth[]>([]);
+  const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<CampaignAggregateByMonth[] | null>(null);
+
+  const load = useCallback(async () => {
+    if (!prevDataRef.current) setLoading(true);
+    try {
+      const rows = await listAdCampaignMetrics({ clientId, days: 730 });
+      const agg = aggregateCampaignMetricsByMonth(rows);
+      prevDataRef.current = agg;
+      setByMonth(agg);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { byMonth, loading, reload: load };
 }
 
 export function useAdCampaignMetrics(clientId?: string, days = 90) {
