@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ServiceMutationResult,
   type SocialMonthlyMetric,
@@ -10,17 +10,19 @@ export function useSocialMonthlyMetrics(clientId?: string, monthsBack = 6) {
   const [metrics, setMetrics] = useState<SocialMonthlyMetric[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const prevDataRef = useRef<SocialMonthlyMetric[] | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!prevDataRef.current) setLoading(true);
     try {
       const data = await listSocialMonthlyMetrics({ clientId, monthsBack });
+      prevDataRef.current = data;
       setMetrics(data);
       setError(null);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'No se pudieron cargar los cierres sociales mensuales.';
-      setMetrics([]);
+      if (!prevDataRef.current) setMetrics([]);
       setError(message);
     } finally {
       setLoading(false);

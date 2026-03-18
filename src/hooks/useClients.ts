@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient, getClientByIdOrSlug, listClients } from '../services/clients';
 import {
   isSupabaseConfigured,
@@ -12,17 +12,19 @@ export function useClients() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const prevDataRef = useRef<Client[] | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!prevDataRef.current) setLoading(true);
     try {
       const data = await listClients();
+      prevDataRef.current = data;
       setClients(data);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudieron cargar los clientes.';
       setError(message);
-      setClients([]);
+      if (!prevDataRef.current) setClients([]);
     } finally {
       setLoading(false);
     }
@@ -63,6 +65,7 @@ export function useClient(identifier?: string) {
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const prevDataRef = useRef<Client | null>(null);
 
   const load = useCallback(async () => {
     if (!identifier) {
@@ -71,15 +74,16 @@ export function useClient(identifier?: string) {
       return;
     }
 
-    setLoading(true);
+    if (!prevDataRef.current) setLoading(true);
     try {
       const data = await getClientByIdOrSlug(identifier);
+      prevDataRef.current = data;
       setClient(data);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo cargar el cliente.';
       setError(message);
-      setClient(null);
+      if (!prevDataRef.current) setClient(null);
     } finally {
       setLoading(false);
     }

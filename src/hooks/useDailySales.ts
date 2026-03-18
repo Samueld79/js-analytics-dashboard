@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   isSupabaseConfigured,
   type DailySale,
@@ -25,22 +25,24 @@ export function useDailySales(clientIdOrParams?: string | UseDailySalesParams, d
   const [sales, setSales] = useState<DailySale[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const prevDataRef = useRef<DailySale[] | null>(null);
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
 
-    if (!silent) {
+    if (!silent && !prevDataRef.current) {
       setLoading(true);
     }
 
     try {
       const data = await listDailySales(params);
+      prevDataRef.current = data;
       setSales(data);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudieron cargar las ventas.';
       setError(message);
-      if (!silent) {
+      if (!silent && !prevDataRef.current) {
         setSales([]);
       }
     } finally {

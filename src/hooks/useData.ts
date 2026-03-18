@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { listAdMetrics } from '../services/adMetrics';
 import { listMonthlyOperatingKpis } from '../services/dashboard';
 import { listMetaAccountSyncRows } from '../services/meta';
@@ -20,12 +20,19 @@ export { useStrategies } from './useStrategies';
 export function useAdMetrics(clientId?: string, days = 30) {
   const [metrics, setMetrics] = useState<AdMetric[]>([]);
   const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<AdMetric[] | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const data = await listAdMetrics({ clientId, days });
-    setMetrics(data);
-    setLoading(false);
+    if (!prevDataRef.current) setLoading(true);
+    try {
+      const data = await listAdMetrics({ clientId, days });
+      prevDataRef.current = data;
+      setMetrics(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, [clientId, days]);
 
   useEffect(() => {
@@ -38,12 +45,19 @@ export function useAdMetrics(clientId?: string, days = 30) {
 export function useMonthlyOperatingKpis(clientId?: string, monthsBack = 6) {
   const [monthlyKpis, setMonthlyKpis] = useState<ClientMonthlyOperatingKpi[]>([]);
   const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<ClientMonthlyOperatingKpi[] | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const data = await listMonthlyOperatingKpis({ clientId, monthsBack });
-    setMonthlyKpis(data);
-    setLoading(false);
+    if (!prevDataRef.current) setLoading(true);
+    try {
+      const data = await listMonthlyOperatingKpis({ clientId, monthsBack });
+      prevDataRef.current = data;
+      setMonthlyKpis(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, [clientId, monthsBack]);
 
   useEffect(() => {
@@ -56,12 +70,19 @@ export function useMonthlyOperatingKpis(clientId?: string, monthsBack = 6) {
 export function useMetaSyncRows(clientId?: string) {
   const [syncRows, setSyncRows] = useState<AdAccountSyncRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<AdAccountSyncRow[] | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const data = await listMetaAccountSyncRows({ clientId });
-    setSyncRows(data);
-    setLoading(false);
+    if (!prevDataRef.current) setLoading(true);
+    try {
+      const data = await listMetaAccountSyncRows({ clientId });
+      prevDataRef.current = data;
+      setSyncRows(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -74,12 +95,19 @@ export function useMetaSyncRows(clientId?: string) {
 export function useTasks(clientId?: string) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<Task[] | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const data = await listTasks({ clientId });
-    setTasks(data);
-    setLoading(false);
+    if (!prevDataRef.current) setLoading(true);
+    try {
+      const data = await listTasks({ clientId });
+      prevDataRef.current = data;
+      setTasks(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => {

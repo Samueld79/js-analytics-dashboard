@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getDashboardSnapshot, type DashboardSnapshot } from '../services/dashboard';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from './useAuth';
@@ -19,6 +19,7 @@ export function useDashboard(days = 30) {
   const [data, setData] = useState<DashboardSnapshot>(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [error, setError] = useState<string | null>(null);
+  const prevDataRef = useRef<DashboardSnapshot | null>(null);
 
   const load = useCallback(async () => {
     if (isSupabaseConfigured && !initialized) {
@@ -32,15 +33,16 @@ export function useDashboard(days = 30) {
       return;
     }
 
-    setLoading(true);
+    if (!prevDataRef.current) setLoading(true);
     try {
       const snapshot = await getDashboardSnapshot(days);
+      prevDataRef.current = snapshot;
       setData(snapshot);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo cargar el dashboard.';
       setError(message);
-      setData(EMPTY_DASHBOARD);
+      if (!prevDataRef.current) setData(EMPTY_DASHBOARD);
     } finally {
       setLoading(false);
     }

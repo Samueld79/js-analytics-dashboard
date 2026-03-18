@@ -100,6 +100,10 @@ export function SalesPage() {
         : clients.filter((client) => accessibleClientIds.includes(client.id)),
     [accessibleClientIds, clients, isInternal],
   );
+  const activeVisibleClients = useMemo(
+    () => visibleClients.filter((client) => client.status === 'active'),
+    [visibleClients],
+  );
   const visibleClientIds = useMemo(
     () => new Set(visibleClients.map((client) => client.id)),
     [visibleClients],
@@ -243,27 +247,36 @@ export function SalesPage() {
           </div>
 
           <div className="sales-quick-actions">
-            {visibleClients.length > 1 || isInternal ? (
+            {activeVisibleClients.length > 1 || isInternal ? (
               <label className="form-field">
                 <span className="form-label">Cliente para registrar</span>
                 <select
                   className="form-input"
                   value={quickClientId}
                   onChange={(event) => setQuickClientId(event.target.value)}
+                  disabled={clientsLoading}
                 >
-                  <option value="">Selecciona un cliente</option>
-                  {visibleClients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
+                  {clientsLoading ? (
+                    <option value="">Cargando clientes...</option>
+                  ) : activeVisibleClients.length === 0 ? (
+                    <option value="">No hay clientes activos</option>
+                  ) : (
+                    <>
+                      <option value="">Selecciona un cliente</option>
+                      {activeVisibleClients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.name}
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
               </label>
             ) : (
               <div className="metric-box">
                 <span className="metric-box-label">Cliente visible</span>
                 <span className="metric-box-value">
-                  {visibleClients[0]?.name ?? 'Sin empresa asignada'}
+                  {activeVisibleClients[0]?.name ?? visibleClients[0]?.name ?? 'Sin empresa asignada'}
                 </span>
               </div>
             )}

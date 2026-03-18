@@ -51,6 +51,24 @@ import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/mon
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
+function RefreshIndicator() {
+  return (
+    <motion.span
+      style={{
+        width: '7px',
+        height: '7px',
+        borderRadius: '50%',
+        background: 'hsl(180,100%,50%)',
+        display: 'inline-block',
+        flexShrink: 0,
+      }}
+      animate={{ opacity: [1, 0.25, 1] }}
+      transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' } as Transition}
+      title="Actualizando datos..."
+    />
+  );
+}
+
 type ChartPayloadEntry = {
   dataKey: string;
   name: string;
@@ -101,7 +119,7 @@ function CustomTooltip({
 
 export function DashboardPage() {
   // ── Data hooks ──────────────────────────────────────────────────────────────
-  const { clients } = useClients();
+  const { clients, loading: clientsLoading } = useClients();
   const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
   const { alerts, unreadCount } = useAlerts();
   const { tasks } = useTasks();
@@ -109,9 +127,9 @@ export function DashboardPage() {
     !isInternal && accessibleClientIds.length <= 1
       ? defaultClientId ?? EMPTY_CLIENT_SCOPE
       : undefined;
-  const { monthlyKpis } = useMonthlyOperatingKpis(scopedClientId, 6);
-  const { metrics: rawAdMetrics } = useAdMetrics(scopedClientId, 180);
-  const { sales } = useDailySales({ clientId: scopedClientId, days: 365 });
+  const { monthlyKpis, loading: kpisLoading } = useMonthlyOperatingKpis(scopedClientId, 6);
+  const { metrics: rawAdMetrics, loading: metricsLoading } = useAdMetrics(scopedClientId, 180);
+  const { sales, loading: salesLoading } = useDailySales({ clientId: scopedClientId, days: 365 });
   const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(scopedClientId, 12);
   const { syncRows } = useMetaSyncRows(scopedClientId);
 
@@ -391,6 +409,11 @@ export function DashboardPage() {
   const yearEstimate =
     currentMonthIdx > 0 && yearTotal > 0 ? (yearTotal / (currentMonthIdx + 1)) * 12 : 0;
 
+  // ── Refresh indicator ────────────────────────────────────────────────────────
+  const isRefreshing = clientsLoading || kpisLoading || metricsLoading || salesLoading;
+  const hasData =
+    clients.length > 0 || monthlyKpis.length > 0 || rawAdMetrics.length > 0 || sales.length > 0;
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const currentMonthLabel = new Date()
     .toLocaleString('es-ES', { month: 'long', year: 'numeric' })
@@ -451,6 +474,7 @@ export function DashboardPage() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {isRefreshing && hasData && <RefreshIndicator />}
           {pendingTasks > 0 && (
             <span
               style={{
