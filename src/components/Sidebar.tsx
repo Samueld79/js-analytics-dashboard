@@ -175,7 +175,6 @@ export function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="sidebar-section-label">Navegación</div>
           {nav.map(({ to, icon: Icon, label, badge }) => {
             const active =
               to === '/'

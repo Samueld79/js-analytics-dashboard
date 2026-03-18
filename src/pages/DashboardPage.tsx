@@ -129,10 +129,6 @@ export function DashboardPage() {
       ...scopedSocialMonthlyMetrics.map((row) => row.month),
     ])[0] ?? new Date().toISOString().slice(0, 7);
   const executiveMonthLabel = getMonthLabel(executiveMonth);
-  const latestSyncAt = [...scopedSyncRows]
-    .map((row) => row.last_sync_at)
-    .filter((value): value is string => Boolean(value))
-    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? null;
   const portalClientName =
     !isInternal && visibleClients.length === 1 ? visibleClients[0]?.name ?? 'Mi empresa' : null;
 
@@ -433,37 +429,7 @@ export function DashboardPage() {
         </div>
       </motion.div>
 
-      <motion.div className="card section-block period-toolbar-card" {...fadeUp(0.1)}>
-        <div className="period-toolbar">
-          <div className="period-toolbar-copy">
-            <div className="section-heading">
-              <h2>Resumen ejecutivo</h2>
-            </div>
-            <p className="source-note">
-              Mes visible para negocio arriba. Riesgo, alertas y estado Meta siguen leyendo la
-              operación actual.
-            </p>
-            <div className="period-chip-row">
-              <span className="meta-chip">{executiveMonthLabel}</span>
-              {isInternal && (
-                <>
-                  <span className="meta-chip">KPIs: mensual</span>
-                  <span className="meta-chip">Riesgo y Meta: actual</span>
-                  <span className="meta-chip">ROAS operativo = ventas manuales / inversión</span>
-                </>
-              )}
-              <span className="meta-chip">
-                {latestSyncAt ? `Último sync Meta ${formatDateTime(latestSyncAt)}` : 'Meta sin sync reciente'}
-              </span>
-              {isInternal && (
-                <span className="meta-chip">Supabase real</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      <motion.div className="kpi-row executive-kpi-row" {...fadeUp(0.2)}>
+      <motion.div className="kpi-row executive-kpi-row" {...fadeUp(0.1)}>
         <KpiBox
           icon={<DollarSign size={18} />}
           label={`Inversión ${executiveMonthLabel}`}
@@ -502,7 +468,7 @@ export function DashboardPage() {
         />
       </motion.div>
 
-      <motion.div className="executive-focus-grid" {...fadeUp(0.3)}>
+      <motion.div className="executive-focus-grid" {...fadeUp(0.2)}>
         <section className="card section-block executive-spotlight-card">
           <div className="section-heading">
             <h2>Clientes destacados</h2>
@@ -654,7 +620,7 @@ export function DashboardPage() {
       </motion.div>
 
       {isInternal && (
-      <motion.div className="dashboard-grid dashboard-secondary-grid" {...fadeUp(0.4)}>
+      <motion.div className="dashboard-grid dashboard-secondary-grid" {...fadeUp(0.3)}>
         <section className="card section-block">
           <div className="section-heading">
             <h2>Clientes en riesgo</h2>
@@ -806,20 +772,19 @@ function KpiBox({
   icon,
   label,
   value,
-  color,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
-  color: string;
+  color?: string;
 }) {
   return (
-    <div className={`kpi-box kpi-${color}`}>
-      <div className="kpi-box-icon">{icon}</div>
-      <div>
-        <div className="kpi-box-label">{label}</div>
-        <div className="kpi-box-value">{value}</div>
+    <div className="executive-kpi-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <span className="executive-kpi-label">{label}</span>
+        <span style={{ color: 'hsl(215,15%,40%)', display: 'flex' }}>{icon}</span>
       </div>
+      <div className="executive-kpi-value">{value}</div>
     </div>
   );
 }

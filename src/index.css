@@ -6008,3 +6008,102 @@ table tbody td {
   color: hsl(215, 15%, 55%) !important;
   font-family: 'JetBrains Mono', monospace !important;
 }
+
+/* ============================================================
+   CLEAN DASHBOARD — REFERENCE MATCH OVERRIDES
+   ============================================================ */
+
+/* Eliminar bordes de color en KPI cards */
+.executive-kpi-card {
+  border-left: none !important;
+  border: 1px solid hsl(0 0% 100% / 0.08) !important;
+  background: hsl(220, 18%, 7%) !important;
+  border-radius: 4px !important;
+  padding: 20px !important;
+  transition: border-color 300ms ease !important;
+}
+
+.executive-kpi-card:hover {
+  border-color: hsl(180 100% 50% / 0.25) !important;
+}
+
+/* KPI label limpio */
+.executive-kpi-label {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.62rem !important;
+  letter-spacing: 0.15em !important;
+  text-transform: uppercase !important;
+  color: hsl(215, 15%, 55%) !important;
+  display: block !important;
+  margin-bottom: 12px !important;
+}
+
+/* KPI valor grande */
+.executive-kpi-value {
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  color: hsl(0, 0%, 98%) !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1 !important;
+}
+
+/* Page header slim */
+.page-header {
+  height: 56px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 24px !important;
+  border-bottom: 1px solid hsl(0 0% 100% / 0.07) !important;
+  background: hsl(220 18% 5% / 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* Page content padding */
+.page-content {
+  padding: 24px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 24px !important;
+}
+
+/* KPI row grid */
+.executive-kpi-row, .kpi-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 16px !important;
+}
+
+/* Sidebar sin section labels */
+.sidebar-section-label {
+  display: none !important;
+}
+
+/* Sidebar link limpio */
+.sidebar-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 9px 12px !important;
+  margin: 1px 8px !important;
+  border-radius: 4px !important;
+  border: 1px solid transparent !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.75rem !important;
+  color: hsl(215, 15%, 55%) !important;
+  transition: all 200ms ease !important;
+  text-decoration: none !important;
+}
+
+.sidebar-link:hover {
+  background: hsl(0 0% 100% / 0.04) !important;
+  color: hsl(0, 0%, 90%) !important;
+  border-color: transparent !important;
+}
+
+.sidebar-link.active {
+  background: hsl(180 100% 50% / 0.1) !important;
+  color: hsl(180, 100%, 50%) !important;
+  border-color: hsl(180 100% 50% / 0.2) !important;
+}
