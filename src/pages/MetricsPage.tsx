@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { BarChart } from '../components/charts/BarChart';
 import { LineChart } from '../components/charts/LineChart';
-import { MonthSelector } from '../components/MonthSelector';
 import { useAuth } from '../hooks/useAuth';
 import { useMonthlyOperatingKpis, useAdMetrics } from '../hooks/useData';
 import { useClients } from '../hooks/useClients';
@@ -41,9 +40,79 @@ import {
   sumSales,
   summarizeAdDataOrigin,
 } from '../lib/utils';
-import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
+import { getMonthKey, listAvailableMonthKeys } from '../utils/monthLabel';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
+
+type RangeKey =
+  | 'today' | 'yesterday' | 'last7' | 'last14' | 'last28' | 'last30'
+  | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'all' | 'custom';
+
+const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
+  { key: 'today', label: 'Hoy' },
+  { key: 'yesterday', label: 'Ayer' },
+  { key: 'last7', label: 'Últ. 7 días' },
+  { key: 'last14', label: 'Últ. 14 días' },
+  { key: 'last28', label: 'Últ. 28 días' },
+  { key: 'last30', label: 'Últ. 30 días' },
+  { key: 'thisWeek', label: 'Esta semana' },
+  { key: 'lastWeek', label: 'Sem. pasada' },
+  { key: 'thisMonth', label: 'Este mes' },
+  { key: 'lastMonth', label: 'Mes pasado' },
+  { key: 'all', label: 'Máximo' },
+  { key: 'custom', label: 'Personalizado' },
+];
+
+function getRangeDates(
+  key: RangeKey,
+  customFrom: string,
+  customTo: string,
+): { start: string; end: string; label: string } {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const shift = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  switch (key) {
+    case 'today': return { start: todayStr, end: todayStr, label: 'Hoy' };
+    case 'yesterday': { const y = shift(-1); return { start: y, end: y, label: 'Ayer' }; }
+    case 'last7': return { start: shift(-6), end: todayStr, label: 'Últimos 7 días' };
+    case 'last14': return { start: shift(-13), end: todayStr, label: 'Últimos 14 días' };
+    case 'last28': return { start: shift(-27), end: todayStr, label: 'Últimos 28 días' };
+    case 'last30': return { start: shift(-29), end: todayStr, label: 'Últimos 30 días' };
+    case 'thisWeek': {
+      const now = new Date();
+      const mon = new Date(now);
+      mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+      return { start: mon.toISOString().slice(0, 10), end: todayStr, label: 'Esta semana' };
+    }
+    case 'lastWeek': {
+      const now = new Date();
+      const lastMon = new Date(now);
+      lastMon.setDate(now.getDate() - ((now.getDay() + 6) % 7) - 7);
+      const lastSun = new Date(lastMon);
+      lastSun.setDate(lastMon.getDate() + 6);
+      return { start: lastMon.toISOString().slice(0, 10), end: lastSun.toISOString().slice(0, 10), label: 'Semana pasada' };
+    }
+    case 'thisMonth': {
+      const now = new Date();
+      return { start: `${now.toISOString().slice(0, 7)}-01`, end: todayStr, label: 'Este mes' };
+    }
+    case 'lastMonth': {
+      const now = new Date();
+      const firstOfPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastOfPrev = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { start: firstOfPrev.toISOString().slice(0, 10), end: lastOfPrev.toISOString().slice(0, 10), label: 'Mes pasado' };
+    }
+    case 'all': return { start: '2020-01-01', end: todayStr, label: 'Máximo histórico' };
+    case 'custom': {
+      const from = customFrom || todayStr;
+      const to = customTo || todayStr;
+      return { start: from, end: to, label: `${from} → ${to}` };
+    }
+  }
+}
 
 export function MetricsPage() {
   const { clients } = useClients();
@@ -62,7 +131,9 @@ export function MetricsPage() {
   const [selectedClient, setSelectedClient] = useState(
     !isInternal && defaultClientId ? defaultClientId : 'all',
   );
-  const [selectedMonth, setSelectedMonth] = useState('');
+  const [rangeKey, setRangeKey] = useState<RangeKey>('thisMonth');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;
   const canSelectAllClients = isInternal || visibleClients.length > 1;
   const queryClientId =
@@ -70,10 +141,13 @@ export function MetricsPage() {
       ? defaultClientId ?? EMPTY_CLIENT_SCOPE
       : selectedClientId;
 
-  const { metrics } = useAdMetrics(queryClientId, 450);
-  const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, 11);
-  const { sales } = useDailySales({ clientId: queryClientId, days: 450 });
-  const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(queryClientId, 12);
+  const queryDays = rangeKey === 'all' ? 1825 : 450;
+  const queryMonths = rangeKey === 'all' ? 36 : 12;
+
+  const { metrics } = useAdMetrics(queryClientId, queryDays);
+  const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, queryMonths);
+  const { sales } = useDailySales({ clientId: queryClientId, days: queryDays });
+  const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(queryClientId, queryMonths);
   const { strategies } = useStrategies(queryClientId);
   const scopedMetrics = useMemo(
     () =>
@@ -105,19 +179,6 @@ export function MetricsPage() {
         : strategies.filter((strategy) => visibleClientIds.has(strategy.client_id)),
     [isInternal, strategies, visibleClientIds],
   );
-  const availableMonths = useMemo(
-    () =>
-      listAvailableMonthKeys([
-        ...scopedMonthlyKpis.map((row) => row.month),
-        ...scopedMetrics.map((row) => row.date),
-        ...scopedSales.map((row) => row.date),
-        ...scopedSocialMonthlyMetrics.map((row) => row.month),
-        ...scopedStrategies.map((row) => row.month),
-      ]),
-    [scopedMetrics, scopedMonthlyKpis, scopedSales, scopedSocialMonthlyMetrics, scopedStrategies],
-  );
-  const fallbackMonth = availableMonths[0] ?? new Date().toISOString().slice(0, 7);
-
   useEffect(() => {
     if (!isInternal) {
       if (defaultClientId && !canSelectAllClients) {
@@ -131,47 +192,44 @@ export function MetricsPage() {
     }
   }, [canSelectAllClients, defaultClientId, isInternal, selectedClient, visibleClientIds]);
 
-  useEffect(() => {
-    if (!selectedMonth) {
-      setSelectedMonth(fallbackMonth);
-      return;
-    }
-
-    if (availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
-      setSelectedMonth(availableMonths[0]);
-    }
-  }, [availableMonths, fallbackMonth, selectedMonth]);
-
-  const activeMonth = selectedMonth || fallbackMonth;
-  const activeMonthLabel = getMonthLabel(activeMonth);
+  const { start: rangeStart, end: rangeEnd, label: rangeLabel } = getRangeDates(rangeKey, customFrom, customTo);
+  const rangeStartMonth = rangeStart.slice(0, 7);
+  const rangeEndMonth = rangeEnd.slice(0, 7);
+  const activeMonth = rangeEndMonth; // used for buildBudgetSummary compatibility
   const selectedClientName =
     selectedClient === 'all'
       ? (isInternal ? 'Todos los clientes' : visibleClients.length > 0 ? 'Mis empresas' : 'Sin empresa asignada')
       : visibleClients.find((client) => client.id === selectedClient)?.name ?? 'Cliente';
 
   const monthMetrics = useMemo(
-    () => scopedMetrics.filter((metric) => getMonthKey(metric.date) === activeMonth),
-    [activeMonth, scopedMetrics],
+    () => scopedMetrics.filter((m) => m.date >= rangeStart && m.date <= rangeEnd),
+    [rangeStart, rangeEnd, scopedMetrics],
   );
   const monthOperatingRows = useMemo(
-    () => scopedMonthlyKpis.filter((row) => getMonthKey(row.month) === activeMonth),
-    [activeMonth, scopedMonthlyKpis],
+    () => scopedMonthlyKpis.filter((row) => {
+      const m = getMonthKey(row.month);
+      return m >= rangeStartMonth && m <= rangeEndMonth;
+    }),
+    [rangeStartMonth, rangeEndMonth, scopedMonthlyKpis],
   );
   const monthSales = useMemo(
-    () => scopedSales.filter((row) => getMonthKey(row.date) === activeMonth),
-    [activeMonth, scopedSales],
+    () => scopedSales.filter((row) => row.date >= rangeStart && row.date <= rangeEnd),
+    [rangeStart, rangeEnd, scopedSales],
   );
   const monthSocialMetrics = useMemo(
-    () => scopedSocialMonthlyMetrics.filter((row) => getMonthKey(row.month) === activeMonth),
-    [activeMonth, scopedSocialMonthlyMetrics],
+    () => scopedSocialMonthlyMetrics.filter((row) => {
+      const m = getMonthKey(row.month);
+      return m >= rangeStartMonth && m <= rangeEndMonth;
+    }),
+    [rangeStartMonth, rangeEndMonth, scopedSocialMonthlyMetrics],
   );
   const monthStrategies = useMemo(
     () =>
-      scopedStrategies.filter(
-        (strategy) =>
-          getMonthKey(strategy.month ?? '') === activeMonth && strategy.status !== 'archived',
-      ),
-    [activeMonth, scopedStrategies],
+      scopedStrategies.filter((strategy) => {
+        const m = getMonthKey(strategy.month ?? '');
+        return m >= rangeStartMonth && m <= rangeEndMonth && strategy.status !== 'archived';
+      }),
+    [rangeStartMonth, rangeEndMonth, scopedStrategies],
   );
 
   const operatingTotals = monthOperatingRows.length
@@ -332,9 +390,9 @@ export function MetricsPage() {
   const primaryMetricCards = [
     {
       icon: <DollarSign size={18} />,
-      label: 'Inversión del mes',
+      label: 'Inversión del período',
       value: formatCop(operatingTotals.spend),
-      note: 'Inversión real del mes seleccionado',
+      note: 'Inversión real del período seleccionado',
     },
     {
       icon: <MessageSquare size={18} />,
@@ -503,16 +561,40 @@ export function MetricsPage() {
               </span>
             </div>
           )}
-          <MonthSelector
-            label="Mes visible"
-            value={activeMonth}
-            options={availableMonths.length > 0 ? availableMonths : [fallbackMonth]}
-            helper="Se listan meses con datos reales en Ads, ventas, estrategias o cierres mensuales."
-            onChange={setSelectedMonth}
-          />
+          <div className="form-field">
+            <span className="form-label">Período</span>
+            <div className="filter-row" style={{ flexWrap: 'wrap', gap: 6 }}>
+              {RANGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  className={`filter-chip ${rangeKey === opt.key ? 'active' : ''}`}
+                  onClick={() => setRangeKey(opt.key)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {rangeKey === 'custom' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                />
+                <span style={{ color: 'var(--gs-text-soft)' }}>→</span>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
         </div>
         <div className="period-chip-row">
-          <span className="meta-chip">{activeMonthLabel}</span>
+          <span className="meta-chip">{rangeLabel}</span>
           <span className="meta-chip">{selectedClientName}</span>
           <span className={`meta-chip ${adDataOriginClass(adSourceOrigin)}`}>
             {adDataOriginLabel(adSourceOrigin)}

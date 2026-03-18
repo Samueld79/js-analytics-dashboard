@@ -1,14 +1,52 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
-import { Plus, Search, Users, Building2, MapPin, ExternalLink } from 'lucide-react';
-import { statusLabel } from '../lib/utils';
+import { useMonthlyOperatingKpis, useMetaSyncRows, useAlerts } from '../hooks/useData';
+import { Plus, Search, Users, Building2, MapPin, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
+import { formatCop, formatRoas, statusLabel } from '../lib/utils';
 
 export function ClientsPage() {
   const { clients, loading, saving, error, createClient } = useClients();
+  const { monthlyKpis } = useMonthlyOperatingKpis(undefined, 1);
+  const { syncRows } = useMetaSyncRows();
+  const { alerts } = useAlerts();
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
+  const kpiByClient = useMemo(() => {
+    const map = new Map<string, { spend: number; roas: number }>();
+    for (const row of monthlyKpis) {
+      const m = typeof row.month === 'string' ? row.month.slice(0, 7) : '';
+      if (m === currentMonth) {
+        map.set(row.client_id, { spend: row.spend ?? 0, roas: row.real_roas ?? 0 });
+      }
+    }
+    return map;
+  }, [monthlyKpis, currentMonth]);
+
+  const alertsByClient = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const alert of alerts) {
+      if (!alert.client_id) continue;
+      if (!['unread', 'read'].includes(alert.status)) continue;
+      map.set(alert.client_id, (map.get(alert.client_id) ?? 0) + 1);
+    }
+    return map;
+  }, [alerts]);
+
+  const syncByClient = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const row of syncRows) {
+      const existing = map.get(row.client_id);
+      if (!existing || (row.last_sync_at ?? '') > existing) {
+        map.set(row.client_id, row.last_sync_at ?? null);
+      }
+    }
+    return map;
+  }, [syncRows]);
 
   const filtered = clients.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -78,6 +116,38 @@ export function ClientsPage() {
                   )}
                 </div>
                 {client.notes && <p className="client-notes-preview">{client.notes}</p>}
+                <div className="client-list-kpis">
+                  {(() => {
+                    const kpi = kpiByClient.get(client.id);
+                    const openAlerts = alertsByClient.get(client.id) ?? 0;
+                    const lastSync = syncByClient.get(client.id);
+                    const syncAge = lastSync
+                      ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 86400000)
+                      : null;
+                    return (
+                      <>
+                        {kpi ? (
+                          <>
+                            <span className="meta-chip">{formatCop(kpi.spend)}</span>
+                            <span className="meta-chip">{formatRoas(kpi.roas)} ROAS</span>
+                          </>
+                        ) : (
+                          <span className="meta-chip source-unknown">Sin KPI mensual</span>
+                        )}
+                        {openAlerts > 0 && (
+                          <span className="meta-chip" style={{ color: '#ff5252' }}>
+                            <AlertTriangle size={11} style={{ display:'inline', marginRight:3 }} />
+                            {openAlerts} alerta{openAlerts > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        <span className={`meta-chip ${syncAge === null ? 'source-unknown' : syncAge <= 1 ? 'source-automatic' : syncAge <= 3 ? '' : 'source-manual'}`}>
+                          <RefreshCw size={11} style={{ display:'inline', marginRight:3 }} />
+                          {syncAge === null ? 'Sin sync' : syncAge === 0 ? 'Sync hoy' : `Sync hace ${syncAge}d`}
+                        </span>
+                      </>
+                    );
+                  })()}
+                </div>
               </Link>
               <div className="client-list-actions">
                 <Link to={`/clients/${client.id}`} className="btn-secondary client-card-action">

@@ -1755,6 +1755,7 @@ tbody tr:hover td {
 .client-niche { font-size: 0.78rem; color: #8ea8d8; display: block; margin-top: 2px; }
 
 .client-list-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.client-list-kpis { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--gs-border); }
 .meta-chip {
   display: inline-flex;
   align-items: center;
@@ -5246,6 +5247,13 @@ tbody tr:hover td {
 }
 .alert-actions-compact .alert-action-pill svg {
   display: none;
+}
+
+/* ─── Pause animations when tab is in background ─────────── */
+body.tab-hidden .hero-heading-group::before,
+body.tab-hidden .skeleton-card,
+body.tab-hidden .spin {
+  animation-play-state: paused;
 }
 
 /* ─── Tasa de cierre Mensajes vs Ventas ──────────── */

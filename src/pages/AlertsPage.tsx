@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useClients } from '../hooks/useClients';
 import { useTasks } from '../hooks/useData';
+import { createTasks } from '../services/tasks';
 import { Bell, CheckCircle2, Clock3, AlertTriangle, Info, XCircle } from 'lucide-react';
 import {
   alertStateClass,
@@ -278,9 +279,44 @@ export function AlertsPage() {
 }
 
 function TasksPanel({ clients }: { clients: import('../lib/supabase').Client[] }) {
-  const { tasks, updateTask } = useTasks();
+  const { tasks, updateTask, reload } = useTasks();
   const [filterClient, setFilterClient] = useState('all');
   const [showDone, setShowDone] = useState(false);
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newClient, setNewClient] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [saving, setSaving] = useState(false);
+  const [taskNotice, setTaskNotice] = useState<string | null>(null);
+
+  async function handleCreateTask() {
+    if (!newTitle.trim()) {
+      setTaskNotice('El título es obligatorio.');
+      return;
+    }
+    setSaving(true);
+    const result = await createTasks([{
+      title: newTitle.trim(),
+      client_id: newClient || null,
+      due_date: newDueDate || null,
+      priority: newPriority,
+      type: 'general',
+      status: 'pending',
+    }]);
+    setSaving(false);
+    if (!result.error) {
+      setNewTitle('');
+      setNewClient('');
+      setNewDueDate('');
+      setNewPriority('medium');
+      setShowNewTask(false);
+      setTaskNotice('Tarea creada.');
+      void reload();
+    } else {
+      setTaskNotice(result.error);
+    }
+  }
 
   const filtered = tasks.filter(t =>
     (filterClient === 'all' || t.client_id === filterClient) &&
@@ -310,7 +346,56 @@ function TasksPanel({ clients }: { clients: import('../lib/supabase').Client[] }
             Mostrar completadas
           </label>
           <span className="badge-count">{pending} pendientes</span>
+          <button className="btn-primary" style={{ marginLeft:'auto' }}
+            onClick={() => { setShowNewTask(v => !v); setTaskNotice(null); }}>
+            + Nueva tarea
+          </button>
         </div>
+
+        {taskNotice && (
+          <p className="empty-note" style={{ marginTop: 10 }}>{taskNotice}</p>
+        )}
+
+        {showNewTask && (
+          <div style={{ display:'grid', gap:10, marginTop:14, paddingTop:14, borderTop:'1px solid var(--gs-border)' }}>
+            <input
+              className="form-input"
+              placeholder="Título de la tarea *"
+              value={newTitle}
+              onChange={e => setNewTitle(e.target.value)}
+            />
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <select className="form-select" value={newClient}
+                onChange={e => setNewClient(e.target.value)} style={{ minWidth:180 }}>
+                <option value="">Sin cliente</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <select className="form-select" value={newPriority}
+                onChange={e => setNewPriority(e.target.value as 'high' | 'medium' | 'low')}>
+                <option value="high">Alta</option>
+                <option value="medium">Media</option>
+                <option value="low">Baja</option>
+              </select>
+              <input
+                type="date"
+                className="form-input"
+                value={newDueDate}
+                onChange={e => setNewDueDate(e.target.value)}
+                style={{ minWidth:150 }}
+              />
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="btn-primary" onClick={() => void handleCreateTask()} disabled={saving}>
+                {saving ? 'Guardando...' : 'Guardar tarea'}
+              </button>
+              <button className="btn-secondary" onClick={() => setShowNewTask(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card section-block">
