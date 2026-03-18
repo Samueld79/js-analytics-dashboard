@@ -6107,3 +6107,79 @@ table tbody td {
   color: hsl(180, 100%, 50%) !important;
   border-color: hsl(180 100% 50% / 0.2) !important;
 }
+
+/* ============================================================
+   DASHBOARD V3 — LAYOUT & UTILITY CLASSES
+   ============================================================ */
+
+.number-label {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.65rem !important;
+  letter-spacing: 0.15em !important;
+  text-transform: uppercase !important;
+  color: hsl(215, 15%, 55%) !important;
+}
+
+.font-display {
+  font-family: 'Outfit', sans-serif !important;
+}
+
+.card-glass {
+  background: hsl(220, 18%, 7%) !important;
+  border: 1px solid hsl(0 0% 100% / 0.08) !important;
+  backdrop-filter: blur(40px) !important;
+  transition: all 300ms ease !important;
+}
+
+.card-glass:hover {
+  border-color: hsl(180 100% 50% / 0.25) !important;
+}
+
+/* Dashboard v3 layout grids */
+.dashboard-v3 {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+}
+
+.dashboard-v3 > *:not(.page-header) {
+  margin: 0 !important;
+}
+
+.dashboard-main {
+  padding: 24px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 24px !important;
+}
+
+.dashboard-kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 16px !important;
+  padding: 24px 24px 0 !important;
+}
+
+@media (min-width: 1280px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(6, 1fr) !important;
+  }
+}
+
+.dashboard-charts-row {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 24px !important;
+  padding: 24px 24px 0 !important;
+}
+
+.dashboard-v3 > .card-glass {
+  margin: 24px !important;
+  margin-top: 24px !important;
+}
+
+/* Override page-content padding for v3 */
+.page-content.dashboard-v3 {
+  padding: 0 !important;
+  gap: 0 !important;
+}

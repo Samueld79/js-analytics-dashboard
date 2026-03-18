@@ -1,16 +1,28 @@
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import { motion, type Transition } from 'framer-motion';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
-  ArrowRight,
   BarChart3,
+  Bell,
   DollarSign,
-  MessageSquare,
-  ShieldAlert,
+  MessageCircle,
+  ShoppingCart,
+  TrendingDown,
   TrendingUp,
-  Users,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
@@ -24,19 +36,11 @@ import {
 import { useSocialMonthlyMetrics } from '../hooks/useSocialMonthlyMetrics';
 import type { AdMetric, DailySale } from '../lib/supabase';
 import {
-  adDataOriginClass,
-  adDataOriginLabel,
-  alertStateLabel,
   buildMarketingActionSummary,
-  buildMonthlySpecialMetricsSummary,
   formatCop,
-  formatDateTime,
   formatNumber,
   formatRoas,
   isAlertSnoozed,
-  metaSyncStatusClass,
-  metaSyncStatusLabel,
-  resolveMonthlyProfileVisits,
   sumMetrics,
   sumOperatingKpis,
   sumSales,
@@ -46,7 +50,56 @@ import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/mon
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
+type ChartPayloadEntry = {
+  dataKey: string;
+  name: string;
+  value: number;
+  color: string;
+};
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: ChartPayloadEntry[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        background: 'hsl(220,18%,9%)',
+        border: '1px solid hsl(0 0% 100% / 0.1)',
+        borderRadius: '4px',
+        padding: '10px 14px',
+        fontFamily: 'JetBrains Mono',
+      }}
+    >
+      <p
+        style={{
+          fontSize: '0.65rem',
+          color: 'hsl(215,15%,55%)',
+          marginBottom: '6px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+          margin: '0 0 6px',
+        }}
+      >
+        {label}
+      </p>
+      {payload.map((entry) => (
+        <p key={entry.dataKey} style={{ fontSize: '0.72rem', color: entry.color, margin: '2px 0' }}>
+          {entry.name}: {entry.value.toLocaleString('es-CO')}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 export function DashboardPage() {
+  // ── Data hooks ──────────────────────────────────────────────────────────────
   const { clients } = useClients();
   const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
   const { alerts, unreadCount } = useAlerts();
@@ -60,121 +113,125 @@ export function DashboardPage() {
   const { sales } = useDailySales({ clientId: scopedClientId, days: 180 });
   const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(scopedClientId, 12);
   const { syncRows } = useMetaSyncRows(scopedClientId);
+
+  // ── Scoping ─────────────────────────────────────────────────────────────────
   const visibleClientIds = useMemo(
-    () => new Set(isInternal ? clients.map((client) => client.id) : accessibleClientIds),
+    () => new Set(isInternal ? clients.map((c) => c.id) : accessibleClientIds),
     [accessibleClientIds, clients, isInternal],
   );
   const visibleClients = useMemo(
     () =>
-      isInternal
-        ? clients
-        : clients.filter((client) => visibleClientIds.has(client.id)),
+      isInternal ? clients : clients.filter((c) => visibleClientIds.has(c.id)),
     [clients, isInternal, visibleClientIds],
   );
   const scopedMonthlyKpis = useMemo(
     () =>
       isInternal
         ? monthlyKpis
-        : monthlyKpis.filter((row) => visibleClientIds.has(row.client_id)),
+        : monthlyKpis.filter((r) => visibleClientIds.has(r.client_id)),
     [isInternal, monthlyKpis, visibleClientIds],
   );
   const scopedAdMetrics = useMemo(
     () =>
       isInternal
         ? rawAdMetrics
-        : rawAdMetrics.filter((row) => visibleClientIds.has(row.client_id)),
+        : rawAdMetrics.filter((r) => visibleClientIds.has(r.client_id)),
     [isInternal, rawAdMetrics, visibleClientIds],
   );
   const scopedSales = useMemo(
     () =>
-      isInternal
-        ? sales
-        : sales.filter((row) => visibleClientIds.has(row.client_id)),
+      isInternal ? sales : sales.filter((r) => visibleClientIds.has(r.client_id)),
     [isInternal, sales, visibleClientIds],
   );
   const scopedSocialMonthlyMetrics = useMemo(
     () =>
       isInternal
         ? socialMonthlyMetrics
-        : socialMonthlyMetrics.filter((row) => visibleClientIds.has(row.client_id)),
+        : socialMonthlyMetrics.filter((r) => visibleClientIds.has(r.client_id)),
     [isInternal, socialMonthlyMetrics, visibleClientIds],
   );
   const scopedSyncRows = useMemo(
     () =>
-      isInternal
-        ? syncRows
-        : syncRows.filter((row) => visibleClientIds.has(row.client_id)),
+      isInternal ? syncRows : syncRows.filter((r) => visibleClientIds.has(r.client_id)),
     [isInternal, syncRows, visibleClientIds],
   );
   const scopedAlerts = useMemo(
     () =>
       isInternal
         ? alerts
-        : alerts.filter((alert) => alert.client_id && visibleClientIds.has(alert.client_id)),
+        : alerts.filter((a) => a.client_id && visibleClientIds.has(a.client_id)),
     [alerts, isInternal, visibleClientIds],
   );
   const scopedTasks = useMemo(
     () =>
       isInternal
         ? tasks
-        : tasks.filter((task) => task.client_id && visibleClientIds.has(task.client_id)),
+        : tasks.filter((t) => t.client_id && visibleClientIds.has(t.client_id)),
     [isInternal, tasks, visibleClientIds],
   );
 
+  // ── Executive month ─────────────────────────────────────────────────────────
   const executiveMonth =
     listAvailableMonthKeys([
-      ...scopedMonthlyKpis.map((row) => row.month),
-      ...scopedAdMetrics.map((row) => row.date),
-      ...scopedSales.map((row) => row.date),
-      ...scopedSocialMonthlyMetrics.map((row) => row.month),
+      ...scopedMonthlyKpis.map((r) => r.month),
+      ...scopedAdMetrics.map((r) => r.date),
+      ...scopedSales.map((r) => r.date),
+      ...scopedSocialMonthlyMetrics.map((r) => r.month),
     ])[0] ?? new Date().toISOString().slice(0, 7);
   const executiveMonthLabel = getMonthLabel(executiveMonth);
   const portalClientName =
-    !isInternal && visibleClients.length === 1 ? visibleClients[0]?.name ?? 'Mi empresa' : null;
+    !isInternal && visibleClients.length === 1
+      ? visibleClients[0]?.name ?? 'Mi empresa'
+      : null;
 
-  const executiveRows = scopedMonthlyKpis.filter((row) => getMonthKey(row.month) === executiveMonth);
-  const executiveAdMetrics = scopedAdMetrics.filter((row) => getMonthKey(row.date) === executiveMonth);
-  const executiveSales = scopedSales.filter((row) => getMonthKey(row.date) === executiveMonth);
+  // ── Filtered by executive month ─────────────────────────────────────────────
+  const executiveRows = scopedMonthlyKpis.filter(
+    (r) => getMonthKey(r.month) === executiveMonth,
+  );
+  const executiveAdMetrics = scopedAdMetrics.filter(
+    (r) => getMonthKey(r.date) === executiveMonth,
+  );
+  const executiveSales = scopedSales.filter(
+    (r) => getMonthKey(r.date) === executiveMonth,
+  );
   const executiveSocialMetrics = scopedSocialMonthlyMetrics.filter(
-    (row) => getMonthKey(row.month) === executiveMonth,
+    (r) => getMonthKey(r.month) === executiveMonth,
   );
 
+  // ── Meta overview ────────────────────────────────────────────────────────────
   const metaByClient = useMemo(
     () =>
       buildClientMetaOverviewByClient({
-        clientIds: visibleClients.map((client) => client.id),
+        clientIds: visibleClients.map((c) => c.id),
         monthlyKpis: scopedMonthlyKpis,
         syncRows: scopedSyncRows,
       }),
     [scopedMonthlyKpis, scopedSyncRows, visibleClients],
   );
 
+  // ── Aggregates ───────────────────────────────────────────────────────────────
   const overall = executiveRows.length
     ? sumOperatingKpis(executiveRows)
     : buildCombinedMonthTotals(executiveAdMetrics, executiveSales);
   const marketing = buildMarketingActionSummary(executiveAdMetrics);
-  const specialSummary = buildMonthlySpecialMetricsSummary(executiveSocialMetrics);
 
-  const clientNameById = useMemo(
-    () => new Map(visibleClients.map((client) => [client.id, client.name])),
-    [visibleClients],
-  );
-
+  // ── Alerts ───────────────────────────────────────────────────────────────────
   const visibleOpenAlerts = useMemo(
     () =>
       scopedAlerts.filter(
-        (alert) => ['unread', 'read'].includes(alert.status) && !isAlertSnoozed(alert),
+        (a) => ['unread', 'read'].includes(a.status) && !isAlertSnoozed(a),
       ),
     [scopedAlerts],
   );
 
   const clientAlertCount = new Map<string, number>();
   const clientCriticalAlertCount = new Map<string, number>();
-
   visibleOpenAlerts.forEach((alert) => {
     if (!alert.client_id) return;
-    clientAlertCount.set(alert.client_id, (clientAlertCount.get(alert.client_id) ?? 0) + 1);
-
+    clientAlertCount.set(
+      alert.client_id,
+      (clientAlertCount.get(alert.client_id) ?? 0) + 1,
+    );
     if (alert.severity === 'critical') {
       clientCriticalAlertCount.set(
         alert.client_id,
@@ -183,217 +240,103 @@ export function DashboardPage() {
     }
   });
 
-  const recentAlerts = [...visibleOpenAlerts].sort(sortAlertsBySeverity).slice(0, 5);
-  const criticalAlerts = visibleOpenAlerts.filter((alert) => alert.severity === 'critical');
-  const clientsWithAlerts = new Set(visibleOpenAlerts.map((alert) => alert.client_id).filter(Boolean)).size;
-  const pendingTasks = scopedTasks.filter((task) => task.status === 'pending').length;
-
-  const socialRows = visibleClients
-    .map((client) => {
-      const socialMetric =
-        executiveSocialMetrics.find((metric) => metric.client_id === client.id) ?? null;
-      const profileVisits = resolveMonthlyProfileVisits({
-        socialMetric,
-        adMetrics: executiveAdMetrics.filter((metric) => metric.client_id === client.id),
-      });
-
-      return {
-        clientId: client.id,
-        clientName: client.name,
-        socialMetric,
-        profileVisits,
-        followerConversion:
-          socialMetric && profileVisits.value && profileVisits.value > 0
-            ? (socialMetric.new_followers / profileVisits.value) * 100
-            : null,
-      };
-    })
-    .filter((entry) => entry.socialMetric || entry.profileVisits.value != null)
-    .sort(
-      (left, right) =>
-        (right.socialMetric?.new_followers ?? 0) - (left.socialMetric?.new_followers ?? 0),
-    );
-
-  const socialFollowersTotal = socialRows.reduce(
-    (total, entry) => total + (entry.socialMetric?.new_followers ?? 0),
-    0,
-  );
-  const socialProfileVisitsTotal = socialRows.reduce(
-    (total, entry) => total + (entry.profileVisits.value ?? 0),
-    0,
-  );
-  const socialConversion =
-    socialFollowersTotal > 0 && socialProfileVisitsTotal > 0
-      ? (socialFollowersTotal / socialProfileVisitsTotal) * 100
-      : null;
+  // ── KPI values ───────────────────────────────────────────────────────────────
+  const clientsWithAlerts = new Set(
+    visibleOpenAlerts.map((a) => a.client_id).filter(Boolean),
+  ).size;
   const salesRecordCount = executiveSales.length;
   const costPerConversation =
-    marketing.messagingStarted > 0 ? overall.spend / marketing.messagingStarted : null;
+    marketing.messagingStarted > 0
+      ? overall.spend / marketing.messagingStarted
+      : null;
   const averageTicket =
     salesRecordCount > 0 ? overall.total_sales / salesRecordCount : null;
-  const specialClickSignals = specialSummary.whatsappClicks + specialSummary.linkClicks;
-  const commercialSignalRows = [
-    {
-      label: 'Seguidores nuevos',
-      value: socialFollowersTotal > 0 ? formatNumber(socialFollowersTotal) : 'Sin dato',
-      muted: socialFollowersTotal <= 0,
-    },
-    {
-      label: 'Visitas al perfil',
-      value:
-        socialProfileVisitsTotal > 0 ? formatNumber(socialProfileVisitsTotal) : 'Sin dato',
-      muted: socialProfileVisitsTotal <= 0,
-    },
-    {
-      label: 'Clicks WhatsApp + link',
-      value: specialClickSignals > 0 ? formatNumber(specialClickSignals) : 'Sin cierre',
-      muted: specialClickSignals <= 0,
-    },
-    {
-      label: 'Registros de venta',
-      value: formatNumber(salesRecordCount),
-      muted: salesRecordCount === 0,
-    },
-  ];
+  const pendingTasks = scopedTasks.filter((t) => t.status === 'pending').length;
 
+  // ── Client executive rows ────────────────────────────────────────────────────
   const clientExecutiveRows = visibleClients
     .map((client) => {
-      const monthRow = executiveRows.find((row) => row.client_id === client.id) ?? null;
+      const monthRow = executiveRows.find((r) => r.client_id === client.id) ?? null;
       const monthTotals =
         monthRow ??
         buildCombinedMonthTotals(
-          executiveAdMetrics.filter((row) => row.client_id === client.id),
-          executiveSales.filter((row) => row.client_id === client.id),
+          executiveAdMetrics.filter((r) => r.client_id === client.id),
+          executiveSales.filter((r) => r.client_id === client.id),
         );
       const meta = metaByClient[client.id] ?? null;
-      const socialMetric = executiveSocialMetrics.find((row) => row.client_id === client.id) ?? null;
+      const socialMetric =
+        executiveSocialMetrics.find((r) => r.client_id === client.id) ?? null;
       const alertCount = clientAlertCount.get(client.id) ?? 0;
       const criticalCount = clientCriticalAlertCount.get(client.id) ?? 0;
-
-      return {
-        client,
-        monthTotals,
-        meta,
-        socialMetric,
-        alertCount,
-        criticalCount,
-      };
+      return { client, monthTotals, meta, socialMetric, alertCount, criticalCount };
     })
     .filter(
-      (entry) =>
-        entry.monthTotals.spend > 0 ||
-        entry.monthTotals.total_sales > 0 ||
-        entry.alertCount > 0 ||
-        Boolean(entry.socialMetric) ||
-        Boolean(entry.meta?.active_accounts),
+      (e) =>
+        e.monthTotals.spend > 0 ||
+        e.monthTotals.total_sales > 0 ||
+        e.alertCount > 0 ||
+        Boolean(e.socialMetric) ||
+        Boolean(e.meta?.active_accounts),
     )
-    .sort((left, right) => {
-      if (right.monthTotals.real_roas !== left.monthTotals.real_roas) {
-        return right.monthTotals.real_roas - left.monthTotals.real_roas;
-      }
-      if (right.monthTotals.total_sales !== left.monthTotals.total_sales) {
-        return right.monthTotals.total_sales - left.monthTotals.total_sales;
-      }
-      return right.monthTotals.spend - left.monthTotals.spend;
+    .sort((a, b) => {
+      if (b.monthTotals.real_roas !== a.monthTotals.real_roas)
+        return b.monthTotals.real_roas - a.monthTotals.real_roas;
+      if (b.monthTotals.total_sales !== a.monthTotals.total_sales)
+        return b.monthTotals.total_sales - a.monthTotals.total_sales;
+      return b.monthTotals.spend - a.monthTotals.spend;
     });
 
-  const topClients = clientExecutiveRows.slice(0, 5);
-  const topSalesClients = [...clientExecutiveRows]
-    .filter((entry) => entry.monthTotals.total_sales > 0)
-    .sort((left, right) => {
-      if (right.monthTotals.total_sales !== left.monthTotals.total_sales) {
-        return right.monthTotals.total_sales - left.monthTotals.total_sales;
-      }
-      if (right.monthTotals.real_roas !== left.monthTotals.real_roas) {
-        return right.monthTotals.real_roas - left.monthTotals.real_roas;
-      }
-      return right.monthTotals.spend - left.monthTotals.spend;
-    })
-    .slice(0, 4);
-  const topRoasClients = [...clientExecutiveRows]
-    .filter((entry) => entry.monthTotals.spend > 0 && entry.monthTotals.total_sales > 0)
-    .sort((left, right) => {
-      if (right.monthTotals.real_roas !== left.monthTotals.real_roas) {
-        return right.monthTotals.real_roas - left.monthTotals.real_roas;
-      }
-      if (right.monthTotals.total_sales !== left.monthTotals.total_sales) {
-        return right.monthTotals.total_sales - left.monthTotals.total_sales;
-      }
-      return right.monthTotals.spend - left.monthTotals.spend;
-    })
-    .slice(0, 4);
-  const clientsAtRisk = clientExecutiveRows
-    .map((entry) => {
-      const reasons: string[] = [];
-      let score = 0;
+  // ── Chart data ───────────────────────────────────────────────────────────────
+  const dailyChartData = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const byDate = new Map<string, { spend: number; messages: number }>();
+    scopedAdMetrics
+      .filter((m) => new Date(m.date + 'T00:00:00') >= cutoff)
+      .forEach((m) => {
+        const prev = byDate.get(m.date) ?? { spend: 0, messages: 0 };
+        byDate.set(m.date, {
+          spend: prev.spend + m.spend,
+          messages: prev.messages + m.messages,
+        });
+      });
+    return Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, vals]) => ({
+        date: new Date(date + 'T00:00:00').toLocaleDateString('es-CO', {
+          day: '2-digit',
+          month: 'short',
+        }),
+        spend: Math.round(vals.spend),
+        messages: vals.messages,
+      }));
+  }, [scopedAdMetrics]);
 
-      if (entry.criticalCount > 0) {
-        score += 70;
-        reasons.push(
-          `${entry.criticalCount} alerta${entry.criticalCount !== 1 ? 's críticas' : ' crítica'}`,
-        );
-      } else if (entry.alertCount > 0) {
-        score += Math.min(entry.alertCount * 18, 54);
-        reasons.push(`${entry.alertCount} alerta(s) abierta(s)`);
-      }
+  const clientSpendData = useMemo(
+    () =>
+      [...clientExecutiveRows]
+        .filter((e) => e.monthTotals.spend > 0)
+        .sort((a, b) => b.monthTotals.spend - a.monthTotals.spend)
+        .slice(0, 6)
+        .map((e) => ({
+          name:
+            e.client.name.length > 14
+              ? e.client.name.slice(0, 14) + '…'
+              : e.client.name,
+          spend: Math.round(e.monthTotals.spend),
+        })),
+    [clientExecutiveRows],
+  );
 
-      if (entry.meta?.sync_status === 'stale') {
-        score += 26;
-        reasons.push('Meta desactualizado');
-      } else if (entry.meta?.sync_status === 'no_data' && entry.meta.active_accounts > 0) {
-        score += 18;
-        reasons.push('Sin sync reciente');
-      }
+  const tableClients = useMemo(
+    () =>
+      [...clientExecutiveRows]
+        .sort((a, b) => b.monthTotals.spend - a.monthTotals.spend)
+        .slice(0, 8),
+    [clientExecutiveRows],
+  );
 
-      if (entry.monthTotals.spend > 0 && entry.monthTotals.real_roas > 0 && entry.monthTotals.real_roas < 2) {
-        score += entry.monthTotals.real_roas < 1 ? 32 : 18;
-        reasons.push(`ROAS ${formatRoas(entry.monthTotals.real_roas)}`);
-      }
-
-      if (entry.monthTotals.spend > 0 && entry.monthTotals.total_sales === 0) {
-        score += 16;
-        reasons.push('Sin ventas reportadas');
-      }
-
-      return { ...entry, riskScore: score, reasons };
-    })
-    .filter((entry) => entry.riskScore > 0)
-    .sort((left, right) => right.riskScore - left.riskScore)
-    .slice(0, 6);
-
-  const metaEntries = clients
-    .map((client) => ({
-      client,
-      meta: metaByClient[client.id] ?? null,
-    }))
-    .filter((entry) => Boolean(entry.meta))
-    .sort((left, right) => {
-      const statusWeight =
-        getMetaStatusWeight(left.meta?.sync_status) - getMetaStatusWeight(right.meta?.sync_status);
-      if (statusWeight !== 0) return statusWeight;
-      return left.client.name.localeCompare(right.client.name);
-    });
-  const metaStaleCount = metaEntries.filter((entry) => entry.meta?.sync_status === 'stale').length;
-
-  const focusFeed = [
-    ...criticalAlerts.slice(0, 2).map((alert) => ({
-      id: `alert-${alert.id}`,
-      href: alert.client_id ? `/clients/${alert.client_id}` : '/alerts',
-      title: alert.title,
-      subtitle: alert.client_id ? clientNameById.get(alert.client_id) ?? 'Cliente' : 'General',
-      statusLabel: alertStateLabel(alert),
-      tone: alert.severity === 'critical' ? 'red' : alert.severity === 'warning' ? 'amber' : 'blue',
-    })),
-    ...clientsAtRisk.slice(0, 3).map((entry) => ({
-      id: `risk-${entry.client.id}`,
-      href: `/clients/${entry.client.id}`,
-      title: entry.client.name,
-      subtitle: entry.reasons.join(' · ') || 'Cliente con riesgo operativo',
-      statusLabel: `${entry.riskScore} pts`,
-      tone: entry.riskScore >= 60 ? 'red' : 'amber',
-    })),
-  ].slice(0, 5);
-
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   const currentMonthLabel = new Date()
     .toLocaleString('es-ES', { month: 'long', year: 'numeric' })
     .toUpperCase();
@@ -404,324 +347,436 @@ export function DashboardPage() {
     transition: { duration: 0.4, ease: 'easeOut', delay } as Transition,
   });
 
+  const kpiItems: Array<{ label: string; value: string; Icon: LucideIcon }> = [
+    {
+      label: `Inversión ${executiveMonthLabel}`,
+      value: formatCop(overall.spend),
+      Icon: DollarSign,
+    },
+    {
+      label: `Conversaciones ${executiveMonthLabel}`,
+      value: formatNumber(marketing.messagingStarted),
+      Icon: MessageCircle,
+    },
+    {
+      label: 'Costo / Conv.',
+      value: costPerConversation != null ? formatCop(costPerConversation) : '—',
+      Icon: TrendingDown,
+    },
+    {
+      label: `Ventas ${executiveMonthLabel}`,
+      value: formatCop(overall.total_sales),
+      Icon: ShoppingCart,
+    },
+    {
+      label: 'Ticket promedio',
+      value: averageTicket != null ? formatCop(averageTicket) : '—',
+      Icon: BarChart3,
+    },
+    {
+      label: 'Clientes con alertas',
+      value: String(clientsWithAlerts),
+      Icon: Bell,
+    },
+  ];
+
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="page-content reporting-page executive-dashboard-page">
+    <div className="page-content dashboard-v3">
+      {/* ── Header ── */}
       <motion.div className="page-header" {...fadeUp(0)}>
         <div>
-          <h1 className="page-title">{portalClientName ? `Resultados de ${portalClientName}` : 'Dashboard General'}</h1>
+          <h1 className="page-title">
+            {portalClientName ? `Resultados de ${portalClientName}` : 'Dashboard General'}
+          </h1>
           <p className="page-subtitle">
             {portalClientName
               ? `PANEL DE RESULTADOS · ${currentMonthLabel}`
               : `RESUMEN GENERAL · ${currentMonthLabel}`}
           </p>
         </div>
-        <div className="header-actions">
-          {isInternal && unreadCount > 0 && (
-            <Link to="/alerts" className="alert-banner">
-              <AlertTriangle size={14} />
-              {unreadCount} alerta{unreadCount !== 1 ? 's' : ''} sin revisar
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {pendingTasks > 0 && (
+            <span
+              style={{
+                fontFamily: 'JetBrains Mono',
+                fontSize: '0.65rem',
+                letterSpacing: '0.08em',
+                color: 'hsl(215,15%,55%)',
+              }}
+            >
+              {pendingTasks} tarea{pendingTasks !== 1 ? 's' : ''} pendiente
+              {pendingTasks !== 1 ? 's' : ''}
+            </span>
+          )}
+          {unreadCount > 0 && (
+            <Link to="/alerts" className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <AlertTriangle size={13} />
+              {unreadCount} alerta{unreadCount !== 1 ? 's' : ''}
             </Link>
           )}
-          <Link to="/metrics" className="btn-secondary">
-            <BarChart3 size={14} />
-            Ver desempeño mensual
+          <Link to="/metrics" className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <BarChart3 size={13} />
+            Ver desempeño
           </Link>
         </div>
       </motion.div>
 
-      <motion.div className="kpi-row executive-kpi-row" {...fadeUp(0.1)}>
-        <KpiBox
-          icon={<DollarSign size={18} />}
-          label={`Inversión ${executiveMonthLabel}`}
-          value={formatCop(overall.spend)}
-          color="blue"
-        />
-        <KpiBox
-          icon={<MessageSquare size={18} />}
-          label={`Conversaciones ${executiveMonthLabel}`}
-          value={formatNumber(marketing.messagingStarted)}
-          color="purple"
-        />
-        <KpiBox
-          icon={<BarChart3 size={18} />}
-          label="Costo por conversación"
-          value={costPerConversation != null ? formatCop(costPerConversation) : 'Sin dato'}
-          color="amber"
-        />
-        <KpiBox
-          icon={<TrendingUp size={18} />}
-          label={`Ventas manuales ${executiveMonthLabel}`}
-          value={formatCop(overall.total_sales)}
-          color="green"
-        />
-        <KpiBox
-          icon={<Users size={18} />}
-          label="Ticket promedio"
-          value={averageTicket != null ? formatCop(averageTicket) : 'Sin dato'}
-          color="blue"
-        />
-        <KpiBox
-          icon={<ShieldAlert size={18} />}
-          label="Clientes con alertas"
-          value={String(clientsWithAlerts)}
-          color="red"
-        />
-      </motion.div>
+      {/* ── KPI Grid ── */}
+      <div className="dashboard-kpi-grid">
+        {kpiItems.map((kpi, i) => (
+          <motion.div
+            key={kpi.label}
+            className="card-glass"
+            style={{ padding: '20px', borderRadius: '4px' }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05, duration: 0.4, ease: 'easeOut' } as Transition}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '16px',
+              }}
+            >
+              <span className="number-label">{kpi.label}</span>
+              <kpi.Icon size={14} style={{ color: 'hsl(215,15%,40%)' }} />
+            </div>
+            <div
+              className="font-display"
+              style={{
+                fontSize: '1.75rem',
+                fontWeight: 700,
+                color: 'hsl(0,0%,98%)',
+                letterSpacing: '-0.03em',
+                lineHeight: 1,
+              }}
+            >
+              {kpi.value}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginTop: '10px',
+              }}
+            >
+              <TrendingUp size={11} style={{ color: 'hsl(180,100%,50%)' }} />
+              <span
+                style={{
+                  fontFamily: 'JetBrains Mono',
+                  fontSize: '0.62rem',
+                  color: 'hsl(215,15%,50%)',
+                }}
+              >
+                vs mes anterior
+              </span>
+            </div>
+          </motion.div>
+        ))}
+      </div>
 
-      <motion.div className="executive-focus-grid" {...fadeUp(0.2)}>
-        <section className="card section-block executive-spotlight-card">
-          <div className="section-heading">
-            <h2>Clientes destacados</h2>
-            <Link to={isInternal ? '/clients' : '/mi-espacio'} className="link-small">
-              {isInternal ? 'Ver clientes' : 'Ver mi empresa'} <ArrowRight size={12} />
-            </Link>
-          </div>
-          <p className="source-note">
-            Dos cortes rápidos del mes visible: quién más vende y quién mejor convierte inversión
-            en ventas reales.
-          </p>
-
-          {topClients.length === 0 ? (
-            <p className="empty-note">No hay clientes con data suficiente para destacar este mes.</p>
-          ) : (
-            <div className="executive-duo-grid">
-              <div className="executive-list-block">
-                <div className="section-heading section-heading-mini">
-                  <h3>Top ventas</h3>
-                </div>
-                <div className="executive-client-list">
-                  {topSalesClients.map(({ client, monthTotals, alertCount }) => (
-                    <Link key={`sales-${client.id}`} to={`/clients/${client.id}`} className="executive-client-row">
-                      <div className="executive-client-main">
-                        <div className="table-primary-cell">
-                          <strong>{client.name}</strong>
-                          <span className="table-secondary-note">
-                            {formatCop(monthTotals.total_sales)} ventas · {formatCop(monthTotals.spend)} inversión
-                          </span>
-                        </div>
-                        {alertCount > 0 && (
-                          <div className="period-chip-row">
-                            <span className="status-pill status-red">{alertCount} alerta(s)</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="executive-client-metrics">
-                        <span className={roasClass(monthTotals.real_roas)}>
-                          {formatRoas(monthTotals.real_roas)}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+      {/* ── Charts Row ── */}
+      <div className="dashboard-charts-row">
+        {/* Area Chart — Inversión & Mensajes */}
+        <motion.div
+          className="card-glass"
+          style={{ padding: '24px', borderRadius: '4px' }}
+          {...fadeUp(0.25)}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginBottom: '24px',
+            }}
+          >
+            <div>
+              <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
+                Rendimiento
+              </span>
+              <h3
+                className="font-display"
+                style={{
+                  fontSize: '1.1rem',
+                  fontWeight: 600,
+                  color: 'hsl(0,0%,98%)',
+                  letterSpacing: '-0.02em',
+                  margin: 0,
+                }}
+              >
+                Inversión &amp; Mensajes
+              </h3>
+            </div>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <div
+                  style={{
+                    width: '9px',
+                    height: '9px',
+                    borderRadius: '50%',
+                    background: 'hsl(180,100%,50%)',
+                  }}
+                />
+                <span className="number-label">Inversión</span>
               </div>
-              <div className="executive-list-block">
-                <div className="section-heading section-heading-mini">
-                  <h3>Top ROAS operativo</h3>
-                </div>
-                <div className="executive-client-list">
-                  {topRoasClients.map(({ client, monthTotals, meta }) => (
-                    <Link key={`roas-${client.id}`} to={`/clients/${client.id}`} className="executive-client-row">
-                      <div className="executive-client-main">
-                        <div className="table-primary-cell">
-                          <strong>{client.name}</strong>
-                          <span className="table-secondary-note">
-                            {formatCop(monthTotals.total_sales)} ventas · {formatCop(monthTotals.spend)} inversión
-                          </span>
-                        </div>
-                        {meta && (
-                          <div className="period-chip-row">
-                            <span className={`status-pill ${metaSyncStatusClass(meta.sync_status)}`}>
-                              {metaSyncStatusLabel(meta.sync_status)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="executive-client-metrics">
-                        <span className={roasClass(monthTotals.real_roas)}>
-                          {formatRoas(monthTotals.real_roas)}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <div
+                  style={{
+                    width: '9px',
+                    height: '9px',
+                    borderRadius: '50%',
+                    background: 'hsl(280,80%,60%)',
+                  }}
+                />
+                <span className="number-label">Mensajes</span>
               </div>
             </div>
-          )}
-        </section>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={dailyChartData}>
+              <defs>
+                <linearGradient id="colorInversion" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(180,100%,50%)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(180,100%,50%)" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorMensajes" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(280,80%,60%)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(280,80%,60%)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 100% / 0.05)" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="spend"
+                name="Inversión"
+                stroke="hsl(180,100%,50%)"
+                strokeWidth={2}
+                fill="url(#colorInversion)"
+              />
+              <Area
+                type="monotone"
+                dataKey="messages"
+                name="Mensajes"
+                stroke="hsl(280,80%,60%)"
+                strokeWidth={2}
+                fill="url(#colorMensajes)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </motion.div>
 
-        <section className="card section-block executive-signals-card">
-          <div className="section-heading">
-            <h2>Señales comerciales del mes</h2>
-          </div>
-          <p className="source-note">
-            Cierres sociales, clicks reportados y tracción comercial real del mes visible.
-          </p>
-          <div className="executive-micro-grid">
-            {commercialSignalRows.map((item) => (
-              <MetricBoxMini key={item.label} label={item.label} value={item.value} muted={item.muted} />
-            ))}
-          </div>
-          <div className="period-chip-row">
-            <span className="meta-chip source-automatic">
-              ROAS operativo {formatRoas(overall.real_roas)}
+        {/* Bar Chart — Inversión por cliente */}
+        <motion.div
+          className="card-glass"
+          style={{ padding: '24px', borderRadius: '4px' }}
+          {...fadeUp(0.3)}
+        >
+          <div style={{ marginBottom: '24px' }}>
+            <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
+              Top clientes
             </span>
-            {socialFollowersTotal > 0 && (
-              <span className="meta-chip source-manual">
-                Conversión visita → seguidor {socialConversion != null ? `${socialConversion.toFixed(1)}%` : '—'}
-              </span>
-            )}
-            {specialSummary.newCustomersReported > 0 && (
-              <span className="meta-chip source-manual">
-                {formatNumber(specialSummary.newCustomersReported)} nuevos clientes reportados
-              </span>
-            )}
-            <span className={`meta-chip ${adDataOriginClass(marketing.sourceOrigin)}`}>
-              Ads {adDataOriginLabel(marketing.sourceOrigin)}
-            </span>
+            <h3
+              className="font-display"
+              style={{
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                color: 'hsl(0,0%,98%)',
+                letterSpacing: '-0.02em',
+                margin: 0,
+              }}
+            >
+              Inversión por cliente
+            </h3>
           </div>
-        </section>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={clientSpendData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 100% / 0.05)" />
+              <XAxis
+                type="number"
+                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={100}
+                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar
+                dataKey="spend"
+                name="Inversión"
+                fill="hsl(180,100%,50%)"
+                radius={[0, 2, 2, 0]}
+                fillOpacity={0.85}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </motion.div>
+      </div>
 
-        {isInternal && (
-        <section className="card section-block executive-radar-card">
-          <div className="section-heading">
-            <h2>Radar operativo</h2>
-            <Link to="/alerts" className="link-small">
-              Ver alertas <ArrowRight size={12} />
-            </Link>
-          </div>
-          <p className="source-note">
-            Lo que requiere atención hoy: alertas abiertas, riesgo operativo y sincronización.
-          </p>
-
-          <div className="executive-micro-grid">
-            <MetricBoxMini label="Alertas críticas" value={String(criticalAlerts.length)} />
-            <MetricBoxMini label="Clientes en riesgo" value={String(clientsAtRisk.length)} />
-            <MetricBoxMini label="Meta desactualizado" value={String(metaStaleCount)} />
-            <MetricBoxMini label="Tareas pendientes" value={String(pendingTasks)} />
-          </div>
-
-          <div className="task-list-compact">
-            {focusFeed.length === 0 ? (
-              <p className="empty-note">No hay frentes críticos abiertos ahora mismo.</p>
-            ) : (
-              focusFeed.map((item) => (
-                <Link key={item.id} to={item.href} className="client-risk-row">
-                  <div className="task-info-compact">
-                    <span className="task-title-compact">{item.title}</span>
-                    <span className="task-due">{item.subtitle}</span>
-                  </div>
-                  <span className={`status-pill status-${item.tone}`}>{item.statusLabel}</span>
-                </Link>
-              ))
-            )}
-          </div>
-        </section>
-        )}
-      </motion.div>
-
-      {isInternal && (
-      <motion.div className="dashboard-grid dashboard-secondary-grid" {...fadeUp(0.3)}>
-        <section className="card section-block">
-          <div className="section-heading">
-            <h2>Clientes en riesgo</h2>
-            <span className="badge-count">{clientsAtRisk.length}</span>
-          </div>
-          <p className="source-note">
-            Riesgo operativo combinado: alertas abiertas, estado Meta y señales obvias del mes
-            actual.
-          </p>
-          <div className="task-list-compact">
-            {clientsAtRisk.length === 0 ? (
-              <p className="empty-note">No hay clientes en riesgo ahora mismo.</p>
-            ) : (
-              clientsAtRisk.map(({ client, riskScore, reasons }) => (
-                <Link key={client.id} to={`/clients/${client.id}`} className="client-risk-row">
-                  <div className="task-info-compact">
-                    <span className="task-title-compact">{client.name}</span>
-                    <span className="task-due">{reasons.join(' · ') || 'Sin detalle'}</span>
-                  </div>
-                  <span className={`status-pill ${riskScore >= 60 ? 'status-red' : 'status-amber'}`}>
-                    {riskScore} pts
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="card section-block">
-          <div className="section-heading">
-            <h2>Alertas recientes</h2>
-            <span className="badge-count">{visibleOpenAlerts.length}</span>
-          </div>
-          <p className="source-note">Alertas abiertas ordenadas por severidad y creación.</p>
-          <div className="task-list-compact">
-            {recentAlerts.length === 0 ? (
-              <p className="empty-note">No hay alertas abiertas ahora mismo.</p>
-            ) : (
-              recentAlerts.map((alert) => (
-                <Link
-                  key={alert.id}
-                  to={alert.client_id ? `/clients/${alert.client_id}` : '/alerts'}
-                  className="client-risk-row"
-                >
-                  <div className="task-info-compact">
-                    <span className="task-title-compact">{alert.title}</span>
-                    <span className="task-due">
-                      {alert.client_id ? clientNameById.get(alert.client_id) ?? 'Cliente' : 'General'}
-                    </span>
-                  </div>
-                  <span
-                    className={`status-pill ${
-                      alert.severity === 'critical'
-                        ? 'status-red'
-                        : alert.severity === 'warning'
-                          ? 'status-amber'
-                          : 'status-blue'
-                    }`}
+      {/* ── Client Table ── */}
+      <motion.div
+        className="card-glass"
+        style={{ borderRadius: '4px', overflow: 'hidden' }}
+        {...fadeUp(0.35)}
+      >
+        <div
+          style={{
+            padding: '24px',
+            borderBottom: '1px solid hsl(0 0% 100% / 0.08)',
+          }}
+        >
+          <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
+            Clientes activos
+          </span>
+          <h3
+            className="font-display"
+            style={{
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              color: 'hsl(0,0%,98%)',
+              letterSpacing: '-0.02em',
+              margin: 0,
+            }}
+          >
+            Rendimiento del mes
+          </h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.08)' }}>
+                {['Cliente', 'Inversión', 'Ventas', 'ROAS Op.', 'Estado'].map((h) => (
+                  <th
+                    key={h}
+                    className="number-label"
+                    style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 400 }}
                   >
-                    {alertStateLabel(alert)}
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="card section-block">
-          <div className="section-heading">
-            <h2>Estado Meta</h2>
-            <span className="badge-count">{metaStaleCount}</span>
-          </div>
-          <p className="source-note">Estado actual de sincronización y lectura MTD por cliente.</p>
-          <div className="task-list-compact">
-            {metaEntries.length === 0 ? (
-              <p className="empty-note">No hay clientes activos para revisar sincronización Meta.</p>
-            ) : (
-              metaEntries.slice(0, 6).map(({ client, meta }) => (
-                <Link key={client.id} to={`/clients/${client.id}`} className="client-risk-row">
-                  <div className="task-info-compact">
-                    <span className="task-title-compact">{client.name}</span>
-                    <span className="task-due">
-                      {meta?.last_sync_at
-                        ? `Última sync ${formatDateTime(meta.last_sync_at)}`
-                        : 'Sin sincronización registrada'}
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tableClients.map(({ client, monthTotals, alertCount }) => (
+                <tr
+                  key={client.id}
+                  style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.05)' }}
+                >
+                  <td style={{ padding: '14px 24px' }}>
+                    <Link
+                      to={`/clients/${client.id}`}
+                      style={{
+                        fontFamily: 'Outfit, sans-serif',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: 'hsl(0,0%,92%)',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      {client.name}
+                    </Link>
+                  </td>
+                  <td
+                    style={{
+                      padding: '14px 24px',
+                      fontFamily: 'JetBrains Mono',
+                      fontSize: '0.78rem',
+                      color: 'hsl(0,0%,85%)',
+                    }}
+                  >
+                    {formatCop(monthTotals.spend)}
+                  </td>
+                  <td
+                    style={{
+                      padding: '14px 24px',
+                      fontFamily: 'JetBrains Mono',
+                      fontSize: '0.78rem',
+                      color: 'hsl(0,0%,85%)',
+                    }}
+                  >
+                    {monthTotals.total_sales > 0 ? formatCop(monthTotals.total_sales) : '—'}
+                  </td>
+                  <td style={{ padding: '14px 24px' }}>
+                    <span className={roasClass(monthTotals.real_roas)}>
+                      {formatRoas(monthTotals.real_roas)}
                     </span>
-                  </div>
-                  <span className={`status-pill ${metaSyncStatusClass(meta?.sync_status ?? 'no_data')}`}>
-                    {metaSyncStatusLabel(meta?.sync_status ?? 'no_data')}
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-        </section>
-
+                  </td>
+                  <td style={{ padding: '14px 24px' }}>
+                    <span
+                      style={{
+                        fontFamily: 'JetBrains Mono',
+                        fontSize: '0.62rem',
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        ...(alertCount > 0
+                          ? {
+                              background: 'hsl(0 84% 60% / 0.12)',
+                              color: 'hsl(0,84%,65%)',
+                              border: '1px solid hsl(0 84% 60% / 0.2)',
+                            }
+                          : {
+                              background: 'hsl(145 100% 45% / 0.12)',
+                              color: 'hsl(145,100%,45%)',
+                              border: '1px solid hsl(145 100% 45% / 0.2)',
+                            }),
+                      }}
+                    >
+                      {alertCount > 0
+                        ? `${alertCount} alerta${alertCount > 1 ? 's' : ''}`
+                        : 'OK'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {tableClients.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    style={{
+                      padding: '32px 24px',
+                      textAlign: 'center',
+                      fontFamily: 'JetBrains Mono',
+                      fontSize: '0.72rem',
+                      color: 'hsl(215,15%,40%)',
+                    }}
+                  >
+                    No hay clientes con datos para el mes actual.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </motion.div>
-      )}
     </div>
   );
 }
+
+// ── Helper functions ──────────────────────────────────────────────────────────
 
 function buildCombinedMonthTotals(metrics: AdMetric[], sales: DailySale[]) {
   const metricTotals = sumMetrics(metrics);
@@ -741,67 +796,8 @@ function buildCombinedMonthTotals(metrics: AdMetric[], sales: DailySale[]) {
   };
 }
 
-function sortAlertsBySeverity(left: { severity: string; created_at: string }, right: { severity: string; created_at: string }) {
-  const severityWeight = (value: string) =>
-    value === 'critical' ? 0 : value === 'warning' ? 1 : 2;
-  const severityDiff = severityWeight(left.severity) - severityWeight(right.severity);
-  if (severityDiff !== 0) return severityDiff;
-  return right.created_at.localeCompare(left.created_at);
-}
-
-function getMetaStatusWeight(status?: 'ok' | 'stale' | 'no_data' | null): number {
-  switch (status) {
-    case 'stale':
-      return 0;
-    case 'no_data':
-      return 1;
-    case 'ok':
-      return 2;
-    default:
-      return 1;
-  }
-}
-
 function roasClass(roas: number): string {
   if (roas >= 3) return 'roas-pill roas-good';
   if (roas >= 2) return 'roas-pill roas-ok';
   return 'roas-pill roas-low';
-}
-
-function KpiBox({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  color?: string;
-}) {
-  return (
-    <div className="executive-kpi-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <span className="executive-kpi-label">{label}</span>
-        <span style={{ color: 'hsl(215,15%,40%)', display: 'flex' }}>{icon}</span>
-      </div>
-      <div className="executive-kpi-value">{value}</div>
-    </div>
-  );
-}
-
-function MetricBoxMini({
-  label,
-  value,
-  muted,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-}) {
-  return (
-    <div className={`metric-box ${muted ? 'metric-box-muted' : ''}`}>
-      <span className="metric-box-label">{label}</span>
-      <span className="metric-box-value">{value}</span>
-    </div>
-  );
 }
