@@ -34,7 +34,7 @@ import {
   sumOperatingKpis,
   sumSales,
 } from '../lib/utils';
-import { getMonthKey, listAvailableMonthKeys } from '../utils/monthLabel';
+import { getMonthKey } from '../utils/monthLabel';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
@@ -114,6 +114,46 @@ function formatCopCompact(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
   return `$${value.toFixed(0)}`;
+}
+
+type HealthStatus = 'great' | 'good' | 'warning' | 'bad' | 'neutral';
+
+function costStatus(cost: number): HealthStatus {
+  if (cost === 0) return 'neutral';
+  if (cost < 3_000) return 'great';
+  if (cost < 8_000) return 'good';
+  if (cost < 15_000) return 'warning';
+  return 'bad';
+}
+
+function roasStatus(roas: number): HealthStatus {
+  if (roas === 0) return 'neutral';
+  if (roas > 10) return 'great';
+  if (roas >= 3) return 'good';
+  if (roas >= 1) return 'warning';
+  return 'bad';
+}
+
+const COST_BADGE: Record<HealthStatus, { label: string; cls: string } | null> = {
+  great:   { label: '✓ Excelente', cls: 'badge-great' },
+  good:    { label: '~ Bueno',     cls: 'badge-good' },
+  warning: { label: '⚠ Regular',   cls: 'badge-warning' },
+  bad:     { label: '✗ Alto',      cls: 'badge-bad' },
+  neutral: null,
+};
+
+const ROAS_BADGE: Record<HealthStatus, { label: string; cls: string } | null> = {
+  great:   { label: '✓ Excelente', cls: 'badge-great' },
+  good:    { label: '~ Saludable', cls: 'badge-good' },
+  warning: { label: '⚠ Bajo',      cls: 'badge-warning' },
+  bad:     { label: '✗ Pérdida',   cls: 'badge-bad' },
+  neutral: null,
+};
+
+function costSub(status: HealthStatus): string {
+  if (status === 'warning') return 'Revisar segmentación y creativos';
+  if (status === 'bad') return 'Optimizar urgente — revisar públicos';
+  return 'Inversión / conversaciones detectadas';
 }
 
 export function MetricsPage() {
@@ -227,44 +267,51 @@ export function MetricsPage() {
     return map;
   }, [campaignByMonth]);
 
-  const historyMonths = useMemo(
-    () =>
-      listAvailableMonthKeys([
-        ...scopedMonthlyKpis.map((row) => row.month),
-        ...scopedMetrics.map((row) => row.date),
-        ...scopedSales.map((row) => row.date),
-        // Include months that only exist in ad_campaign_metrics
-        ...[...campaignMonthMap.keys()].map((m) => `${m}-01`),
-      ])
-        .slice(0, 6)
-        .reverse(),
-    [scopedMetrics, scopedMonthlyKpis, scopedSales, campaignMonthMap],
-  );
+  // Union of ALL month keys from ad_metrics + ad_campaign_metrics (no range filter)
+  const historyRows = useMemo(() => {
+    const allMonths = new Set<string>([
+      ...scopedMetrics.map((r) => getMonthKey(r.date)),
+      ...scopedMonthlyKpis.map((r) => getMonthKey(r.month)),
+      ...scopedSales.map((r) => getMonthKey(r.date)),
+      ...campaignMonthMap.keys(),
+    ]);
 
-  const historyRows = useMemo(
-    () =>
-      historyMonths.map((monthKey) => {
+    return [...allMonths]
+      .sort()       // YYYY-MM ascending
+      .reverse()    // most recent first
+      .slice(0, 6)  // last 6 months
+      .reverse()    // ascending again (left → right in chart)
+      .map((monthKey) => {
         const totals = getMonthOperatingTotals({
           monthKey,
           monthlyKpis: scopedMonthlyKpis,
           metrics: scopedMetrics,
           sales: scopedSales,
         });
-        const adMetricsMessages = buildMarketingActionSummary(
-          scopedMetrics.filter((row) => getMonthKey(row.date) === monthKey),
+        const adMessages = buildMarketingActionSummary(
+          scopedMetrics.filter((r) => getMonthKey(r.date) === monthKey),
         ).messagingStarted;
-        // Prefer ad_metrics if it has spend; fall back to ad_campaign_metrics
         const campaign = campaignMonthMap.get(monthKey);
+        // Prefer ad_metrics when it has spend; else fall back to ad_campaign_metrics
         const spend = totals.spend > 0 ? totals.spend : (campaign?.spend ?? 0);
-        const messages = adMetricsMessages > 0 ? adMetricsMessages : (campaign?.messages ?? 0);
+        const messages = adMessages > 0 ? adMessages : (campaign?.messages ?? 0);
         return { monthKey, spend, messages, roas: totals.real_roas };
-      }),
-    [historyMonths, scopedMetrics, scopedMonthlyKpis, scopedSales, campaignMonthMap],
-  );
+      });
+  }, [scopedMetrics, scopedMonthlyKpis, scopedSales, campaignMonthMap]);
 
   const chartData = historyRows.map((row) => ({ month: row.monthKey, spend: row.spend }));
 
-  const kpiCards: Array<{ icon: ReactNode; label: string; value: string; sub: string; muted?: boolean }> = [
+  const cStatus = costPerConversation != null ? costStatus(costPerConversation) : 'neutral' as HealthStatus;
+  const rStatus = roasStatus(operatingTotals.real_roas);
+
+  const kpiCards: Array<{
+    icon: ReactNode;
+    label: string;
+    value: string;
+    sub: string;
+    muted?: boolean;
+    badge?: { label: string; cls: string } | null;
+  }> = [
     {
       icon: <DollarSign size={15} />,
       label: 'INVERSIÓN',
@@ -281,8 +328,9 @@ export function MetricsPage() {
       icon: <TrendingDown size={15} />,
       label: 'COSTO POR CONV',
       value: costPerConversation != null ? formatCop(costPerConversation) : '—',
-      sub: costPerConversation != null ? 'Inversión / conversaciones' : 'Sin conversaciones',
+      sub: costPerConversation != null ? costSub(cStatus) : 'Sin conversaciones',
       muted: costPerConversation == null,
+      badge: COST_BADGE[cStatus],
     },
     {
       icon: <ShoppingCart size={15} />,
@@ -296,6 +344,7 @@ export function MetricsPage() {
       value: formatRoas(operatingTotals.real_roas),
       sub: 'Ventas manuales / inversión',
       muted: operatingTotals.real_roas === 0,
+      badge: ROAS_BADGE[rStatus],
     },
     {
       icon: <Percent size={15} />,
@@ -391,6 +440,9 @@ export function MetricsPage() {
             <strong className={`font-display metrics-kpi-value ${card.muted ? 'is-muted' : ''}`}>
               {card.value}
             </strong>
+            {card.badge && (
+              <span className={`metrics-health-badge ${card.badge.cls}`}>{card.badge.label}</span>
+            )}
             <span className="metrics-kpi-sub">{card.sub}</span>
           </motion.div>
         ))}
