@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listAdMetrics } from '../services/adMetrics';
+import { listAdCampaignMetrics } from '../services/adCampaignMetrics';
 import { listMonthlyOperatingKpis } from '../services/dashboard';
 import { listMetaAccountSyncRows } from '../services/meta';
 import { listTasks, updateTask as saveTask, deleteTask as removeTask } from '../services/tasks';
 import type {
+  AdCampaignMetric,
   AdMetric,
   AdAccountSyncRow,
   ClientMonthlyOperatingKpi,
@@ -130,4 +132,29 @@ export function useTasks(clientId?: string) {
   };
 
   return { tasks, loading, updateTask, deleteTask, reload: load };
+}
+
+export function useAdCampaignMetrics(clientId?: string, days = 90) {
+  const [rows, setRows] = useState<AdCampaignMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<AdCampaignMetric[] | null>(null);
+
+  const load = useCallback(async () => {
+    if (!prevDataRef.current) setLoading(true);
+    try {
+      const data = await listAdCampaignMetrics({ clientId, days });
+      prevDataRef.current = data;
+      setRows(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId, days]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { rows, loading, reload: load };
 }

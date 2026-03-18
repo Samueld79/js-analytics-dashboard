@@ -12,7 +12,8 @@ import {
 import { BarChart } from '../components/charts/BarChart';
 import { LineChart } from '../components/charts/LineChart';
 import { useAuth } from '../hooks/useAuth';
-import { useMonthlyOperatingKpis, useAdMetrics } from '../hooks/useData';
+import { useMonthlyOperatingKpis, useAdMetrics, useAdCampaignMetrics } from '../hooks/useData';
+import { aggregateCampaignMetricsByCampaign } from '../services/adCampaignMetrics';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import { useSocialMonthlyMetrics } from '../hooks/useSocialMonthlyMetrics';
@@ -134,6 +135,7 @@ export function MetricsPage() {
   const [rangeKey, setRangeKey] = useState<RangeKey>('thisMonth');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [viewMode, setViewMode] = useState<'resumen' | 'campanas' | 'diagnostico'>('resumen');
   const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;
   const canSelectAllClients = isInternal || visibleClients.length > 1;
   const queryClientId =
@@ -149,6 +151,7 @@ export function MetricsPage() {
   const { sales } = useDailySales({ clientId: queryClientId, days: queryDays });
   const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(queryClientId, queryMonths);
   const { strategies } = useStrategies(queryClientId);
+  const { rows: campaignRows } = useAdCampaignMetrics(queryClientId, queryDays);
   const scopedMetrics = useMemo(
     () =>
       isInternal ? metrics : metrics.filter((metric) => visibleClientIds.has(metric.client_id)),
@@ -178,6 +181,13 @@ export function MetricsPage() {
         ? strategies
         : strategies.filter((strategy) => visibleClientIds.has(strategy.client_id)),
     [isInternal, strategies, visibleClientIds],
+  );
+  const scopedCampaignRows = useMemo(
+    () =>
+      isInternal
+        ? campaignRows
+        : campaignRows.filter((row) => visibleClientIds.has(row.client_id)),
+    [isInternal, campaignRows, visibleClientIds],
   );
   useEffect(() => {
     if (!isInternal) {
@@ -308,6 +318,32 @@ export function MetricsPage() {
     }).value,
   }));
   const dailySalesRows = buildDailySalesRows(monthSales);
+
+  const filteredCampaignRows = useMemo(
+    () => scopedCampaignRows.filter((row) => row.date >= rangeStart && row.date <= rangeEnd),
+    [scopedCampaignRows, rangeStart, rangeEnd],
+  );
+  const campaigns = useMemo(
+    () => aggregateCampaignMetricsByCampaign(filteredCampaignRows),
+    [filteredCampaignRows],
+  );
+  const diagTotals = useMemo(() => {
+    const totalSpend = filteredCampaignRows.reduce((s, r) => s + r.spend, 0);
+    const totalImpressions = filteredCampaignRows.reduce((s, r) => s + r.impressions, 0);
+    const totalClicks = filteredCampaignRows.reduce((s, r) => s + r.clicks, 0);
+    const totalReach = filteredCampaignRows.reduce((s, r) => s + r.reach, 0);
+    const totalMessagingStarted = filteredCampaignRows.reduce((s, r) => s + r.messaging_started, 0);
+    const totalLinkClicks = filteredCampaignRows.reduce((s, r) => s + r.link_clicks, 0);
+    const totalPurchaseValue = filteredCampaignRows.reduce((s, r) => s + r.purchase_value, 0);
+    return {
+      avgCpm: totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : null,
+      avgCtr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : null,
+      avgFreq: totalReach > 0 ? totalImpressions / totalReach : null,
+      msgConvRate: totalLinkClicks > 0 ? (totalMessagingStarted / totalLinkClicks) * 100 : null,
+      adRoas: totalSpend > 0 ? totalPurchaseValue / totalSpend : 0,
+      costPerConv: totalMessagingStarted > 0 ? totalSpend / totalMessagingStarted : null,
+    };
+  }, [filteredCampaignRows]);
 
   const clientComparison = useMemo(
     () =>
@@ -603,7 +639,19 @@ export function MetricsPage() {
         </div>
       </div>
 
-      {!hasRealMetrics ? (
+      <div className="view-mode-tabs">
+        {(['resumen', 'campanas', 'diagnostico'] as const).map((mode) => (
+          <button
+            key={mode}
+            className={`view-tab ${viewMode === mode ? 'active' : ''}`}
+            onClick={() => setViewMode(mode)}
+          >
+            {mode === 'resumen' ? 'Resumen' : mode === 'campanas' ? 'Campañas' : 'Diagnóstico 3Q'}
+          </button>
+        ))}
+      </div>
+
+      {viewMode === 'resumen' && (!hasRealMetrics ? (
         <div className="card section-block">
           <p className="empty-note">
             No hay data suficiente para el mes seleccionado. Ajusta cliente/mes o espera la próxima
@@ -984,6 +1032,132 @@ export function MetricsPage() {
             )}
           </div>
         </>
+      ))}
+
+      {viewMode === 'campanas' && (
+        <div className="card section-block">
+          <div className="section-heading">
+            <h2>Campañas del período</h2>
+          </div>
+          <p className="source-note">
+            Métricas agregadas por campaña para el período seleccionado. CTR, CPM y tasa de conversación coloreados por salud 3Q.
+          </p>
+          {campaigns.length === 0 ? (
+            <p className="empty-note">No hay métricas de campañas para el período y cliente seleccionados.</p>
+          ) : (
+            <div className="table-wrap responsive-card-table">
+              <table className="metrics-summary-table">
+                <thead>
+                  <tr>
+                    <th>Campaña</th>
+                    <th>Estado</th>
+                    <th className="num-col">Inversión</th>
+                    <th className="num-col">Impr.</th>
+                    <th className="num-col">CTR</th>
+                    <th className="num-col">CPM</th>
+                    <th className="num-col">Msg conv</th>
+                    <th className="num-col">ROAS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((row) => {
+                    const ctr = row.impressions > 0 ? (row.clicks / row.impressions) * 100 : 0;
+                    const cpm = row.impressions > 0 ? (row.spend / row.impressions) * 1000 : 0;
+                    const msgConv = row.linkClicks > 0 ? (row.messagingStarted / row.linkClicks) * 100 : 0;
+                    return (
+                      <tr key={row.campaignId}>
+                        <td data-label="Campaña">
+                          <div className="table-primary-cell">
+                            <strong>{row.campaignName}</strong>
+                            <span className="table-secondary-note">{row.objective ?? 'Sin objetivo'}</span>
+                          </div>
+                        </td>
+                        <td data-label="Estado">
+                          <span className="meta-chip">{row.effectiveStatus ?? '—'}</span>
+                        </td>
+                        <td className="num-col" data-label="Inversión">{formatCop(row.spend)}</td>
+                        <td className="num-col" data-label="Impr.">{formatNumber(row.impressions)}</td>
+                        <td className="num-col" data-label="CTR">
+                          <HealthCell value={formatPct(ctr)} health={ctrHealth(ctr)} />
+                        </td>
+                        <td className="num-col" data-label="CPM">
+                          <HealthCell value={formatCop(cpm)} health={cpmHealth(cpm)} />
+                        </td>
+                        <td className="num-col" data-label="Msg conv">
+                          {row.linkClicks > 0
+                            ? <HealthCell value={formatPct(msgConv)} health={msgConvHealth(msgConv)} />
+                            : <span className="health-pill health-na">—</span>}
+                        </td>
+                        <td className="num-col" data-label="ROAS">
+                          <HealthCell value={formatRoas(row.adRoas)} health={roasHealthStatus(row.adRoas)} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {viewMode === 'diagnostico' && (
+        <div className="diag-grid">
+          <DiagnosticoCard
+            title="Q1 — Alcance"
+            icon={<Eye size={18} />}
+            metrics={[
+              {
+                label: 'CPM promedio',
+                value: diagTotals.avgCpm != null ? formatCop(diagTotals.avgCpm) : 'Sin dato',
+                health: diagTotals.avgCpm != null ? cpmHealth(diagTotals.avgCpm) : 'na',
+                note: 'Costo por 1 000 impresiones — bueno ≤ $8 000',
+              },
+              {
+                label: 'Frecuencia promedio',
+                value: diagTotals.avgFreq != null ? diagTotals.avgFreq.toFixed(2) : 'Sin dato',
+                health: diagTotals.avgFreq != null ? freqHealth(diagTotals.avgFreq) : 'na',
+                note: 'Impresiones / Alcance — bueno ≤ 3',
+              },
+            ]}
+          />
+          <DiagnosticoCard
+            title="Q2 — Conversación"
+            icon={<MessageSquare size={18} />}
+            metrics={[
+              {
+                label: 'CTR promedio',
+                value: diagTotals.avgCtr != null ? formatPct(diagTotals.avgCtr) : 'Sin dato',
+                health: diagTotals.avgCtr != null ? ctrHealth(diagTotals.avgCtr) : 'na',
+                note: 'Clics / Impresiones × 100 — bueno ≥ 3 %',
+              },
+              {
+                label: 'Tasa de conversación',
+                value: diagTotals.msgConvRate != null ? formatPct(diagTotals.msgConvRate) : 'Sin dato',
+                health: diagTotals.msgConvRate != null ? msgConvHealth(diagTotals.msgConvRate) : 'na',
+                note: 'Conversaciones / Clicks × 100 — bueno ≥ 60 %',
+              },
+            ]}
+          />
+          <DiagnosticoCard
+            title="Q3 — Negocio"
+            icon={<CircleDollarSign size={18} />}
+            metrics={[
+              {
+                label: 'ROAS de Ads',
+                value: diagTotals.adRoas > 0 ? formatRoas(diagTotals.adRoas) : 'Sin dato',
+                health: diagTotals.adRoas > 0 ? roasHealthStatus(diagTotals.adRoas) : 'na',
+                note: 'Valor de compras / Inversión — bueno ≥ 2',
+              },
+              {
+                label: 'Costo por conversación',
+                value: diagTotals.costPerConv != null ? formatCop(diagTotals.costPerConv) : 'Sin dato',
+                health: diagTotals.costPerConv != null ? convCostHealth(diagTotals.costPerConv) : 'na',
+                note: 'Inversión / Conversaciones — bueno ≤ $50 000',
+              },
+            ]}
+          />
+        </div>
       )}
     </div>
   );
@@ -1338,6 +1512,89 @@ function MetricBoxInline({
     <div className={`metric-box report-inline-metric ${muted ? 'is-muted' : ''}`}>
       <span className="metric-box-label">{label}</span>
       <span className="metric-box-value">{value}</span>
+    </div>
+  );
+}
+
+// ─── 3Q Health helpers ────────────────────────────────────────────────────────
+
+type HealthStatus = 'great' | 'good' | 'bad' | 'na';
+
+function ctrHealth(ctr: number): HealthStatus {
+  if (ctr >= 5) return 'great';
+  if (ctr >= 3) return 'good';
+  return 'bad';
+}
+
+function cpmHealth(cpm: number): HealthStatus {
+  if (cpm <= 4000) return 'great';
+  if (cpm <= 8000) return 'good';
+  return 'bad';
+}
+
+function freqHealth(freq: number): HealthStatus {
+  if (freq <= 2) return 'great';
+  if (freq <= 3) return 'good';
+  return 'bad';
+}
+
+function msgConvHealth(rate: number): HealthStatus {
+  if (rate >= 75) return 'great';
+  if (rate >= 60) return 'good';
+  return 'bad';
+}
+
+function roasHealthStatus(roas: number): HealthStatus {
+  if (roas >= 4) return 'great';
+  if (roas >= 2) return 'good';
+  return 'bad';
+}
+
+function convCostHealth(cost: number): HealthStatus {
+  if (cost <= 30000) return 'great';
+  if (cost <= 50000) return 'good';
+  return 'bad';
+}
+
+function healthClass(health: HealthStatus): string {
+  switch (health) {
+    case 'great': return 'health-great';
+    case 'good': return 'health-good';
+    case 'bad': return 'health-bad';
+    default: return 'health-na';
+  }
+}
+
+function HealthCell({ value, health }: { value: string; health: HealthStatus }) {
+  return <span className={`health-pill ${healthClass(health)}`}>{value}</span>;
+}
+
+function DiagnosticoCard({
+  title,
+  icon,
+  metrics,
+}: {
+  title: string;
+  icon: ReactNode;
+  metrics: Array<{ label: string; value: string; health: HealthStatus; note: string }>;
+}) {
+  return (
+    <div className="card section-block diag-card">
+      <div className="section-heading">
+        <div className="diag-card-icon">{icon}</div>
+        <h2>{title}</h2>
+      </div>
+      <div className="diag-metrics">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="diag-metric-row">
+            <div className="diag-metric-copy">
+              <span className="diag-metric-label">{metric.label}</span>
+              <span className="diag-metric-note">{metric.note}</span>
+            </div>
+            <HealthCell value={metric.value} health={metric.health} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

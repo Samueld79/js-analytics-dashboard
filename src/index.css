@@ -6232,3 +6232,78 @@ table tbody td {
   background: hsl(180 100% 50% / 0.2);
   border-color: hsl(180 100% 50% / 0.4);
 }
+
+/* ─── 3Q View tabs ─────────────────────────────────────────────────────────── */
+.view-mode-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: hsl(220 20% 6%);
+  border-radius: 10px;
+  width: fit-content;
+  margin-bottom: 16px;
+}
+.view-tab {
+  padding: 6px 18px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: hsl(215 15% 55%);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.view-tab:hover { background: hsl(0 0% 100% / 0.05); color: hsl(215 15% 80%); }
+.view-tab.active { background: hsl(220 20% 12%); color: hsl(180, 100%, 50%); }
+
+/* ─── Health pills ─────────────────────────────────────────────────────────── */
+.health-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.health-great { background: hsl(160 80% 50% / 0.15); color: hsl(160, 80%, 60%); }
+.health-good  { background: hsl(180 100% 50% / 0.12); color: hsl(180, 100%, 55%); }
+.health-bad   { background: hsl(0 84% 60% / 0.15);   color: hsl(0, 84%, 65%); }
+.health-na    { background: hsl(220 15% 20% / 0.5);  color: hsl(215, 15%, 50%); }
+
+/* ─── Diagnóstico 3Q grid ──────────────────────────────────────────────────── */
+.diag-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) { .diag-grid { grid-template-columns: 1fr; } }
+
+.diag-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: hsl(180 100% 50% / 0.1);
+  color: hsl(180, 100%, 50%);
+  flex-shrink: 0;
+}
+.diag-card .section-heading { align-items: center; gap: 10px; }
+
+.diag-metrics { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+
+.diag-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: hsl(220 20% 6%);
+  border-radius: 8px;
+}
+.diag-metric-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.diag-metric-label { font-size: 0.82rem; font-weight: 600; color: hsl(215, 15%, 80%); }
+.diag-metric-note  { font-size: 0.72rem; color: hsl(215, 15%, 50%); }
