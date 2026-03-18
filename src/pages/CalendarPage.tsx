@@ -37,11 +37,19 @@ function useGoogleCalendarEvents() {
     try {
       const res = await fetch(READ_URL);
       const data: unknown = await res.json();
-      setEvents(
-        Array.isArray(data)
-          ? (data as CalEvent[])
-          : ((data as { events?: CalEvent[] }).events ?? [])
-      );
+      // Normalizar: puede ser objeto, array, o array de objetos con .json
+      const normalize = (d: unknown): CalEvent[] => {
+        if (!d) return [];
+        if (Array.isArray(d)) {
+          // n8n a veces devuelve [{json: {...}}, {json: {...}}]
+          if ((d as { json?: unknown }[])[0]?.json) return (d as { json: CalEvent }[]).map((item) => item.json);
+          return d as CalEvent[];
+        }
+        // objeto único
+        if ((d as { json?: CalEvent }).json) return [(d as { json: CalEvent }).json];
+        return [d as CalEvent];
+      };
+      setEvents(normalize(data));
       setError(null);
       setLastFetch(new Date());
     } catch {
