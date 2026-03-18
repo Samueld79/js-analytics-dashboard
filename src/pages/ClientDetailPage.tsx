@@ -22,29 +22,34 @@ import { HistoricalMonthlyModal } from '../components/HistoricalMonthlyModal';
 import { MonthSelector } from '../components/MonthSelector';
 import { SalesModal } from '../components/SalesModal';
 import { useAuth } from '../hooks/useAuth';
-import { useAdCampaignMetrics } from '../hooks/useData';
+import { useAdCampaignMetrics, useCampaignMonthlyHistory } from '../hooks/useData';
 import { useClientWorkspace } from '../hooks/useClientWorkspace';
 import {
   aggregateCampaignMetricsByCampaign,
   aggregateCampaignMetricsByObjective,
-  aggregateCampaignMetricsByMonth,
 } from '../services/adCampaignMetrics';
 import { formatCop, formatRoas, formatNumber } from '../lib/utils';
 import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
 
 const FADE = { duration: 0.3, ease: 'easeOut' } as Transition;
 
-const OBJECTIVE_COLORS: Record<string, string> = {
-  Mensajes: 'hsl(280,80%,60%)',
-  Tráfico: 'hsl(180,100%,50%)',
-  Conversiones: 'hsl(140,60%,50%)',
-  Leads: 'hsl(40,90%,55%)',
-  Alcance: 'hsl(200,80%,55%)',
-  Otro: 'hsl(220,15%,45%)',
-};
-
-function objectiveColor(name: string | null | undefined): string {
-  return OBJECTIVE_COLORS[name ?? ''] ?? OBJECTIVE_COLORS['Otro'];
+// Maps result_type / objective raw values → human label + color
+type ObjectiveInfo = { label: string; color: string };
+function objectiveInfo(raw: string | null | undefined): ObjectiveInfo {
+  switch (raw) {
+    case 'messages':
+      return { label: 'Mensajes', color: 'hsl(280,80%,60%)' };
+    case 'profile_visit':
+      return { label: 'Tráfico', color: 'hsl(180,100%,50%)' };
+    case 'reach':
+      return { label: 'Reconocimiento', color: 'hsl(40,90%,55%)' };
+    case 'purchases':
+      return { label: 'Ventas', color: 'hsl(140,60%,50%)' };
+    case 'leads':
+      return { label: 'Leads', color: 'hsl(200,80%,55%)' };
+    default:
+      return { label: raw && raw !== 'Sin objetivo real' ? raw : 'Otro', color: 'hsl(220,15%,45%)' };
+  }
 }
 
 export function ClientDetailPage() {
@@ -70,7 +75,10 @@ export function ClientDetailPage() {
     strategies,
   } = useClientWorkspace(id, 400);
 
-  const { rows: campaignRows } = useAdCampaignMetrics(client?.id, 730);
+  // BUG 1 FIX: use useCampaignMonthlyHistory for the area chart (all historical months)
+  const { byMonth: campaignByMonth } = useCampaignMonthlyHistory(client?.id);
+  // Separate hook for campaign table / pie: only needs recent 90 days
+  const { rows: campaignRows } = useAdCampaignMetrics(client?.id, 90);
 
   const [selectedMonth, setSelectedMonth] = useState('');
   const [showSalesModal, setShowSalesModal] = useState(false);
@@ -83,9 +91,9 @@ export function ClientDetailPage() {
         ...monthlyKpis.map((r) => r.month),
         ...metrics.map((r) => r.date),
         ...sales.map((r) => r.date),
-        ...campaignRows.map((r) => r.date),
+        ...campaignByMonth.map((m) => m.month),
       ]),
-    [metrics, monthlyKpis, sales, campaignRows],
+    [metrics, monthlyKpis, sales, campaignByMonth],
   );
 
   const fallbackMonth = availableMonths[0] ?? new Date().toISOString().slice(0, 7);
@@ -99,12 +107,7 @@ export function ClientDetailPage() {
     }
   }, [availableMonths, fallbackMonth, selectedMonth]);
 
-  // Campaign aggregations
-  const campaignByMonth = useMemo(
-    () => aggregateCampaignMetricsByMonth(campaignRows),
-    [campaignRows],
-  );
-
+  // Campaign aggregations for selected month (from 90-day raw rows)
   const selectedMonthCampaignRows = useMemo(
     () => campaignRows.filter((r) => getMonthKey(r.date) === activeMonth),
     [campaignRows, activeMonth],
@@ -120,23 +123,31 @@ export function ClientDetailPage() {
     [selectedMonthCampaignRows],
   );
 
-  // KPI values: prefer monthly consolidated row, fall back to campaign data
+  // BUG 2 FIX: KPI spend + messages come from ad_metrics (daily, accurate)
+  const selectedMonthAdMetrics = useMemo(
+    () => metrics.filter((r) => getMonthKey(r.date) === activeMonth),
+    [metrics, activeMonth],
+  );
+
+  const kpiSpend = useMemo(
+    () => selectedMonthAdMetrics.reduce((sum, r) => sum + r.spend, 0),
+    [selectedMonthAdMetrics],
+  );
+
+  const kpiMessages = useMemo(
+    () => selectedMonthAdMetrics.reduce((sum, r) => sum + r.messages, 0),
+    [selectedMonthAdMetrics],
+  );
+
+  // ROAS and sales from monthly KPI consolidated row (more authoritative)
   const selectedKpiRow = useMemo(
     () => monthlyKpis.find((r) => getMonthKey(r.month) === activeMonth) ?? null,
     [monthlyKpis, activeMonth],
   );
-
-  const selectedCampaignMonth = useMemo(
-    () => campaignByMonth.find((m) => m.month === activeMonth) ?? null,
-    [campaignByMonth, activeMonth],
-  );
-
-  const kpiSpend = selectedKpiRow?.spend ?? selectedCampaignMonth?.spend ?? 0;
-  const kpiMessages = selectedCampaignMonth?.messages ?? selectedKpiRow?.messages ?? 0;
   const kpiRoas = selectedKpiRow?.real_roas ?? 0;
   const kpiSales = selectedKpiRow?.total_sales ?? 0;
 
-  // Charts data
+  // Area chart: all historical months from useCampaignMonthlyHistory
   const areaChartData = useMemo(
     () =>
       [...campaignByMonth]
@@ -146,6 +157,7 @@ export function ClientDetailPage() {
     [campaignByMonth],
   );
 
+  // Bar chart: year view combining campaign spend + manual sales
   const salesByMonth = useMemo(() => {
     const map = new Map<string, number>();
     sales.forEach((s) => {
@@ -204,7 +216,7 @@ export function ClientDetailPage() {
       : client.status === 'paused'
         ? 'hsl(40,90%,55%)'
         : 'hsl(0,70%,60%)';
-  const statusLabel =
+  const statusText =
     client.status === 'active' ? 'Activo' : client.status === 'paused' ? 'Pausado' : 'Inactivo';
 
   return (
@@ -230,9 +242,13 @@ export function ClientDetailPage() {
             </h1>
             <span
               className="status-pill"
-              style={{ background: `${statusColor}22`, color: statusColor, borderColor: statusColor }}
+              style={{
+                background: `${statusColor}22`,
+                color: statusColor,
+                borderColor: statusColor,
+              }}
             >
-              {statusLabel}
+              {statusText}
             </span>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
@@ -241,6 +257,7 @@ export function ClientDetailPage() {
           </div>
         </div>
 
+        {/* BUG 4 FIX: actions flush-right */}
         <div className="portal-header-actions">
           <MonthSelector
             label="Periodo"
@@ -274,25 +291,23 @@ export function ClientDetailPage() {
           {
             label: 'ROAS Operativo',
             value: formatRoas(kpiRoas),
-            sub: kpiRoas >= 3 ? 'Saludable' : kpiRoas >= 1 ? 'Revisar' : kpiRoas > 0 ? 'Bajo' : '—',
+            sub:
+              kpiRoas >= 3 ? 'Saludable' : kpiRoas >= 1 ? 'Revisar' : kpiRoas > 0 ? 'Bajo' : '—',
           },
           { label: 'Ventas', value: formatCop(kpiSales), sub: getMonthLabel(activeMonth) },
         ].map((card, i) => (
           <motion.div
             key={card.label}
-            className="card-glass"
+            className="card-glass portal-kpi-card"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...FADE, delay: i * 0.06 } as Transition}
-            style={{ padding: '20px 24px' }}
           >
-            <div className="number-label" style={{ marginBottom: 4 }}>
+            <div className="number-label" style={{ marginBottom: 6 }}>
               {card.label}
             </div>
-            <div className="font-display" style={{ fontSize: 28, fontWeight: 700 }}>
-              {card.value}
-            </div>
-            <div className="number-label" style={{ marginTop: 6, opacity: 0.55 }}>
+            <div className="font-display portal-kpi-value">{card.value}</div>
+            <div className="number-label" style={{ marginTop: 8, opacity: 0.5 }}>
               {card.sub}
             </div>
           </motion.div>
@@ -301,13 +316,13 @@ export function ClientDetailPage() {
 
       {/* ── Charts Row ── */}
       <div className="portal-charts-grid">
-        {/* Area chart: spend + messages over time */}
+        {/* Area chart: spend + messages over all historical months */}
         <div className="card-glass" style={{ padding: '20px 24px' }}>
           <div className="number-label" style={{ marginBottom: 16 }}>
             Inversión mensual {new Date().getFullYear()}
           </div>
           {areaChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={areaChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="cdpGradSpend" x1="0" y1="0" x2="0" y2="1">
@@ -330,11 +345,7 @@ export function ClientDetailPage() {
                   tick={{ fill: '#888', fontSize: 11 }}
                   tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
                 />
-                <YAxis
-                  yAxisId="msgs"
-                  orientation="right"
-                  tick={{ fill: '#888', fontSize: 11 }}
-                />
+                <YAxis yAxisId="msgs" orientation="right" tick={{ fill: '#888', fontSize: 11 }} />
                 <Tooltip
                   labelFormatter={(label: unknown) => getMonthLabel(String(label))}
                   formatter={(value: unknown, name: unknown) => [
@@ -372,26 +383,33 @@ export function ClientDetailPage() {
           )}
         </div>
 
-        {/* Pie chart: objective mix */}
+        {/* BUG 3 FIX: Pie chart uses objectiveInfo for labels + colors */}
         <div className="card-glass" style={{ padding: '20px 24px' }}>
           <div className="number-label" style={{ marginBottom: 16 }}>
             Mix de campañas — {getMonthLabel(activeMonth)}
           </div>
           {campaignsByObjective.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
-                    data={campaignsByObjective.map((o) => ({ name: o.objective, value: o.spend }))}
+                    data={campaignsByObjective.map((o) => ({
+                      name: objectiveInfo(o.objective).label,
+                      value: o.spend,
+                      raw: o.objective,
+                    }))}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
+                    innerRadius={55}
+                    outerRadius={85}
                     paddingAngle={3}
                     dataKey="value"
                   >
                     {campaignsByObjective.map((o, idx) => (
-                      <Cell key={`${o.objective}-${idx}`} fill={objectiveColor(o.objective)} />
+                      <Cell
+                        key={`${o.objective}-${idx}`}
+                        fill={objectiveInfo(o.objective).color}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
@@ -404,24 +422,34 @@ export function ClientDetailPage() {
                   />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                {campaignsByObjective.map((o) => (
-                  <span
-                    key={o.objective}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#aaa' }}
-                  >
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                {campaignsByObjective.map((o) => {
+                  const info = objectiveInfo(o.objective);
+                  return (
                     <span
+                      key={o.objective}
                       style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: objectiveColor(o.objective),
-                        display: 'inline-block',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        fontSize: 11,
+                        color: '#aaa',
                       }}
-                    />
-                    {o.objective} ({o.shareOfSpend.toFixed(0)}%)
-                  </span>
-                ))}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: info.color,
+                          display: 'inline-block',
+                          flexShrink: 0,
+                        }}
+                      />
+                      {info.label} ({o.shareOfSpend.toFixed(0)}%)
+                    </span>
+                  );
+                })}
               </div>
             </>
           ) : (
@@ -456,6 +484,7 @@ export function ClientDetailPage() {
             </thead>
             <tbody>
               {campaignsByCampaign.map((c) => {
+                const obj = objectiveInfo(c.objective);
                 const results =
                   c.messages > 0
                     ? `${formatNumber(c.messages)} msgs`
@@ -486,12 +515,12 @@ export function ClientDetailPage() {
                           display: 'inline-block',
                           padding: '2px 8px',
                           borderRadius: 4,
-                          background: `${objectiveColor(c.objective)}22`,
-                          color: objectiveColor(c.objective),
+                          background: `${obj.color}22`,
+                          color: obj.color,
                           fontSize: 11,
                         }}
                       >
-                        {c.objective ?? 'Otro'}
+                        {obj.label}
                       </span>
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'right' }}>
@@ -545,7 +574,10 @@ export function ClientDetailPage() {
               />
               <Tooltip
                 labelFormatter={(label: unknown) => getMonthLabel(String(label))}
-                formatter={(value: unknown, name: unknown) => [formatCop(Number(value)), String(name)]}
+                formatter={(value: unknown, name: unknown) => [
+                  formatCop(Number(value)),
+                  String(name),
+                ]}
                 contentStyle={{
                   background: 'hsl(220,20%,8%)',
                   border: '1px solid rgba(255,255,255,0.1)',

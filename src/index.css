@@ -6481,7 +6481,18 @@ table tbody td {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
+}
+
+.portal-kpi-card {
+  padding: 20px 24px;
+}
+
+.portal-kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 .portal-charts-grid {
