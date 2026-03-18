@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { BrandSignature } from './components/BrandSignature';
 import { Sidebar } from './components/Sidebar';
@@ -18,6 +19,14 @@ import { StrategiesPage } from './pages/StrategiesPage';
 import { CalendarPage } from './pages/CalendarPage';
 
 function App() {
+  useEffect(() => {
+    const handleVisibility = () => {
+      document.body.classList.toggle('tab-hidden', document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
