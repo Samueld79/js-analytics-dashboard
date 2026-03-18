@@ -714,149 +714,11 @@ export function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* ── Client Table ── */}
-      <motion.div
-        className="card-glass"
-        style={{ borderRadius: '4px', overflow: 'hidden' }}
-        {...fadeUp(0.35)}
-      >
-        <div
-          style={{
-            padding: '24px',
-            borderBottom: '1px solid hsl(0 0% 100% / 0.08)',
-          }}
-        >
-          <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
-            Clientes activos
-          </span>
-          <h3
-            className="font-display"
-            style={{
-              fontSize: '1.1rem',
-              fontWeight: 600,
-              color: 'hsl(0,0%,98%)',
-              letterSpacing: '-0.02em',
-              margin: 0,
-            }}
-          >
-            Rendimiento del mes
-          </h3>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.08)' }}>
-                {['Cliente', 'Inversión', 'Ventas', 'ROAS Op.', 'Estado'].map((h) => (
-                  <th
-                    key={h}
-                    className="number-label"
-                    style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 400 }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tableClients.map(({ client, monthTotals, alertCount }) => (
-                <tr
-                  key={client.id}
-                  style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.05)' }}
-                >
-                  <td style={{ padding: '14px 24px' }}>
-                    <Link
-                      to={`/clients/${client.id}`}
-                      style={{
-                        fontFamily: 'Outfit, sans-serif',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        color: 'hsl(0,0%,92%)',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      {client.name}
-                    </Link>
-                  </td>
-                  <td
-                    style={{
-                      padding: '14px 24px',
-                      fontFamily: 'JetBrains Mono',
-                      fontSize: '0.78rem',
-                      color: 'hsl(0,0%,85%)',
-                    }}
-                  >
-                    {formatCop(monthTotals.spend)}
-                  </td>
-                  <td
-                    style={{
-                      padding: '14px 24px',
-                      fontFamily: 'JetBrains Mono',
-                      fontSize: '0.78rem',
-                      color: 'hsl(0,0%,85%)',
-                    }}
-                  >
-                    {monthTotals.total_sales > 0 ? formatCop(monthTotals.total_sales) : '—'}
-                  </td>
-                  <td style={{ padding: '14px 24px' }}>
-                    <span className={roasClass(monthTotals.real_roas)}>
-                      {formatRoas(monthTotals.real_roas)}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 24px' }}>
-                    <span
-                      style={{
-                        fontFamily: 'JetBrains Mono',
-                        fontSize: '0.62rem',
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        ...(alertCount > 0
-                          ? {
-                              background: 'hsl(0 84% 60% / 0.12)',
-                              color: 'hsl(0,84%,65%)',
-                              border: '1px solid hsl(0 84% 60% / 0.2)',
-                            }
-                          : {
-                              background: 'hsl(145 100% 45% / 0.12)',
-                              color: 'hsl(145,100%,45%)',
-                              border: '1px solid hsl(145 100% 45% / 0.2)',
-                            }),
-                      }}
-                    >
-                      {alertCount > 0
-                        ? `${alertCount} alerta${alertCount > 1 ? 's' : ''}`
-                        : 'OK'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {tableClients.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    style={{
-                      padding: '32px 24px',
-                      textAlign: 'center',
-                      fontFamily: 'JetBrains Mono',
-                      fontSize: '0.72rem',
-                      color: 'hsl(215,15%,40%)',
-                    }}
-                  >
-                    No hay clientes con datos para el mes actual.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
-
       {/* ── Year Sales ── */}
       <motion.div
         className="card-glass"
         style={{ borderRadius: '4px', overflow: 'hidden' }}
-        {...fadeUp(0.4)}
+        {...fadeUp(0.35)}
       >
         {/* Card header */}
         <div
@@ -1044,6 +906,144 @@ export function DashboardPage() {
               </div>
             )}
           </div>
+        </div>
+      </motion.div>
+
+      {/* ── Client Table ── */}
+      <motion.div
+        className="card-glass"
+        style={{ borderRadius: '4px', overflow: 'hidden' }}
+        {...fadeUp(0.4)}
+      >
+        <div
+          style={{
+            padding: '24px',
+            borderBottom: '1px solid hsl(0 0% 100% / 0.08)',
+          }}
+        >
+          <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
+            Clientes activos
+          </span>
+          <h3
+            className="font-display"
+            style={{
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              color: 'hsl(0,0%,98%)',
+              letterSpacing: '-0.02em',
+              margin: 0,
+            }}
+          >
+            Rendimiento del mes
+          </h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.08)' }}>
+                {['Cliente', 'Inversión', 'Ventas', 'ROAS Op.', 'Estado'].map((h) => (
+                  <th
+                    key={h}
+                    className="number-label"
+                    style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 400 }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tableClients.map(({ client, monthTotals, alertCount }) => (
+                <tr
+                  key={client.id}
+                  style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.05)' }}
+                >
+                  <td style={{ padding: '14px 24px' }}>
+                    <Link
+                      to={`/clients/${client.id}`}
+                      style={{
+                        fontFamily: 'Outfit, sans-serif',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: 'hsl(0,0%,92%)',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      {client.name}
+                    </Link>
+                  </td>
+                  <td
+                    style={{
+                      padding: '14px 24px',
+                      fontFamily: 'JetBrains Mono',
+                      fontSize: '0.78rem',
+                      color: 'hsl(0,0%,85%)',
+                    }}
+                  >
+                    {formatCop(monthTotals.spend)}
+                  </td>
+                  <td
+                    style={{
+                      padding: '14px 24px',
+                      fontFamily: 'JetBrains Mono',
+                      fontSize: '0.78rem',
+                      color: 'hsl(0,0%,85%)',
+                    }}
+                  >
+                    {monthTotals.total_sales > 0 ? formatCop(monthTotals.total_sales) : '—'}
+                  </td>
+                  <td style={{ padding: '14px 24px' }}>
+                    <span className={roasClass(monthTotals.real_roas)}>
+                      {formatRoas(monthTotals.real_roas)}
+                    </span>
+                  </td>
+                  <td style={{ padding: '14px 24px' }}>
+                    <span
+                      style={{
+                        fontFamily: 'JetBrains Mono',
+                        fontSize: '0.62rem',
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        ...(alertCount > 0
+                          ? {
+                              background: 'hsl(0 84% 60% / 0.12)',
+                              color: 'hsl(0,84%,65%)',
+                              border: '1px solid hsl(0 84% 60% / 0.2)',
+                            }
+                          : {
+                              background: 'hsl(145 100% 45% / 0.12)',
+                              color: 'hsl(145,100%,45%)',
+                              border: '1px solid hsl(145 100% 45% / 0.2)',
+                            }),
+                      }}
+                    >
+                      {alertCount > 0
+                        ? `${alertCount} alerta${alertCount > 1 ? 's' : ''}`
+                        : 'OK'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {tableClients.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    style={{
+                      padding: '32px 24px',
+                      textAlign: 'center',
+                      fontFamily: 'JetBrains Mono',
+                      fontSize: '0.72rem',
+                      color: 'hsl(215,15%,40%)',
+                    }}
+                  >
+                    No hay clientes con datos para el mes actual.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </motion.div>
     </div>
