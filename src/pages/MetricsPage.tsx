@@ -258,46 +258,56 @@ export function MetricsPage() {
       ? (monthSales.length / marketingSummary.messagingStarted) * 100
       : null;
 
-  // Map YYYY-MM → { spend, messages } from ad_campaign_metrics (historical fallback)
-  const campaignMonthMap = useMemo(() => {
-    const map = new Map<string, { spend: number; messages: number }>();
-    campaignByMonth.forEach((agg) => {
-      map.set(agg.month, { spend: agg.spend, messages: agg.messages });
-    });
-    return map;
-  }, [campaignByMonth]);
-
-  // Union of ALL month keys from ad_metrics + ad_campaign_metrics (no range filter)
+  // Definitive historical merge: ad_campaign_metrics (Excel) + ad_metrics (n8n daily)
   const historyRows = useMemo(() => {
+    // Step 1: campaign map from Excel import — most complete for older months
+    const campaignMap = new Map<string, { spend: number; messages: number }>();
+    for (const row of campaignByMonth) {
+      campaignMap.set(row.month, { spend: row.spend, messages: row.messages });
+    }
+
+    // Step 2: ad_metrics map — accurate for recent months (n8n daily sync)
+    const adMetricsMap = new Map<string, { spend: number; messages: number }>();
+    for (const row of scopedMetrics) {
+      const key = getMonthKey(row.date);
+      const prev = adMetricsMap.get(key) ?? { spend: 0, messages: 0 };
+      adMetricsMap.set(key, {
+        spend: prev.spend + (row.spend ?? 0),
+        messages: prev.messages + (row.messages ?? 0),
+      });
+    }
+
+    // Step 3: union of all known month keys
     const allMonths = new Set<string>([
-      ...scopedMetrics.map((r) => getMonthKey(r.date)),
+      ...campaignMap.keys(),
+      ...adMetricsMap.keys(),
       ...scopedMonthlyKpis.map((r) => getMonthKey(r.month)),
       ...scopedSales.map((r) => getMonthKey(r.date)),
-      ...campaignMonthMap.keys(),
     ]);
 
     return [...allMonths]
-      .sort()       // YYYY-MM ascending
-      .reverse()    // most recent first
-      .slice(0, 6)  // last 6 months
-      .reverse()    // ascending again (left → right in chart)
+      .sort()      // YYYY-MM ascending
+      .slice(-6)   // last 6 months
       .map((monthKey) => {
-        const totals = getMonthOperatingTotals({
+        const campaign = campaignMap.get(monthKey) ?? { spend: 0, messages: 0 };
+        const adM = adMetricsMap.get(monthKey) ?? { spend: 0, messages: 0 };
+
+        // Prefer ad_metrics (daily sync) if it has data; else fall back to Excel
+        const spend = adM.spend > 0 ? adM.spend : campaign.spend;
+        const messages = adM.messages > 0 ? adM.messages : campaign.messages;
+
+        // ROAS from consolidated monthly KPI rows (best available)
+        const roas = getMonthOperatingTotals({
           monthKey,
           monthlyKpis: scopedMonthlyKpis,
           metrics: scopedMetrics,
           sales: scopedSales,
-        });
-        const adMessages = buildMarketingActionSummary(
-          scopedMetrics.filter((r) => getMonthKey(r.date) === monthKey),
-        ).messagingStarted;
-        const campaign = campaignMonthMap.get(monthKey);
-        // Prefer ad_metrics when it has spend; else fall back to ad_campaign_metrics
-        const spend = totals.spend > 0 ? totals.spend : (campaign?.spend ?? 0);
-        const messages = adMessages > 0 ? adMessages : (campaign?.messages ?? 0);
-        return { monthKey, spend, messages, roas: totals.real_roas };
-      });
-  }, [scopedMetrics, scopedMonthlyKpis, scopedSales, campaignMonthMap]);
+        }).real_roas;
+
+        return { monthKey, spend, messages, roas };
+      })
+      .filter((r) => r.spend > 0 || r.messages > 0);
+  }, [campaignByMonth, scopedMetrics, scopedMonthlyKpis, scopedSales]);
 
   const chartData = historyRows.map((row) => ({ month: row.monthKey, spend: row.spend }));
 

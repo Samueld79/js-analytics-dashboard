@@ -136,14 +136,14 @@ export function useTasks(clientId?: string) {
 }
 
 // Fetches 2 years of ad_campaign_metrics and aggregates them by month.
-// Waits for a real clientId UUID before fetching — never fires without one.
+// clientId=undefined → all clients (MetricsPage "Todos los clientes" mode).
+// clientId=UUID      → filtered to that client.
 export function useCampaignMonthlyHistory(clientId?: string) {
   const [byMonth, setByMonth] = useState<CampaignAggregateByMonth[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const prevDataRef = useRef<CampaignAggregateByMonth[] | null>(null);
 
   const load = useCallback(async () => {
-    if (!clientId) return; // wait for real UUID — do not fetch without client scope
     if (!prevDataRef.current) setLoading(true);
     try {
       const rows = await listAdCampaignMetrics({ clientId, days: 730 });
