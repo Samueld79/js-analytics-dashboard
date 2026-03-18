@@ -398,6 +398,10 @@ export function DashboardPage() {
     })),
   ].slice(0, 5);
 
+  const currentMonthLabel = new Date()
+    .toLocaleString('es-ES', { month: 'long', year: 'numeric' })
+    .toUpperCase();
+
   const fadeUp = (delay = 0) => ({
     initial: { opacity: 0, y: 10 },
     animate: { opacity: 1, y: 0 },
@@ -411,8 +415,8 @@ export function DashboardPage() {
           <h1 className="page-title">{portalClientName ? `Resultados de ${portalClientName}` : 'Dashboard General'}</h1>
           <p className="page-subtitle">
             {portalClientName
-              ? `Panel de resultados · ${executiveMonthLabel}`
-              : `Tablero ejecutivo · ${executiveMonthLabel}`}
+              ? `PANEL DE RESULTADOS · ${currentMonthLabel}`
+              : `RESUMEN GENERAL · ${currentMonthLabel}`}
           </p>
         </div>
         <div className="header-actions">

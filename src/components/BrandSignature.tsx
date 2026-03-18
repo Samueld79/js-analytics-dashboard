@@ -21,7 +21,9 @@ export function BrandSignature({
         className="brand-mark"
       />
       <div className="brand-copy">
-        <span className="brand-wordmark">Growth Strategy JS</span>
+        <span className="brand-wordmark">
+          Growth Strategy JS<span style={{ color: 'hsl(180,100%,50%)' }}>.</span>
+        </span>
         {showSubtitle && <span className="brand-subline">{subtitle}</span>}
       </div>
     </div>

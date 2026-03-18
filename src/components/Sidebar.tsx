@@ -161,7 +161,7 @@ export function Sidebar() {
       <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-brand">
           <BrandSignature
-            subtitle={isInternal ? 'Panel de crecimiento' : 'Workspace privado'}
+            subtitle="AGENCIA / META ADS"
             className="sidebar-brand-signature"
           />
           <button
