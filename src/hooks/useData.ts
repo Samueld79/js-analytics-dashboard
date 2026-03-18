@@ -146,6 +146,7 @@ export function useCampaignMonthlyHistory(clientId?: string) {
     if (!prevDataRef.current) setLoading(true);
     try {
       const rows = await listAdCampaignMetrics({ clientId, days: 730 });
+      console.log('[useCampaignMonthlyHistory] clientId:', clientId, 'rows returned:', rows.length, 'months:', [...new Set(rows.map((r) => r.date.slice(0, 7)))]);
       const agg = aggregateCampaignMetricsByMonth(rows);
       prevDataRef.current = agg;
       setByMonth(agg);

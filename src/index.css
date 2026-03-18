@@ -6437,3 +6437,62 @@ table tbody td {
 .metrics-health-badge.badge-good    { background: hsl(45 90% 55% / 0.15);   color: hsl(45, 90%, 60%); }
 .metrics-health-badge.badge-warning { background: hsl(25 90% 55% / 0.15);   color: hsl(25, 90%, 65%); }
 .metrics-health-badge.badge-bad     { background: hsl(0 84% 60% / 0.15);    color: hsl(0, 84%, 65%); }
+
+/* ─── Client Portal layout ─────────────────────────────────────────────────── */
+.portal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--gs-border);
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.portal-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.portal-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.portal-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.portal-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.portal-charts-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  .portal-kpi-grid    { grid-template-columns: repeat(2, 1fr); }
+  .portal-charts-grid { grid-template-columns: 1fr; }
+  .portal-header-actions { margin-left: 0; }
+}
