@@ -6183,3 +6183,52 @@ table tbody td {
   padding: 0 !important;
   gap: 0 !important;
 }
+
+/* ── CALENDAR GRID ──────────────────────────────────────────────────────────── */
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 150ms ease;
+  position: relative;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: hsl(215, 15%, 70%);
+  border: 1px solid transparent;
+}
+
+.calendar-day:hover {
+  background: hsl(0 0% 100% / 0.05);
+}
+
+.calendar-day.today {
+  background: hsl(180 100% 50% / 0.15);
+  color: hsl(180, 100%, 50%);
+  font-weight: 700;
+}
+
+.calendar-day.has-event::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: hsl(180, 100%, 50%);
+}
+
+.calendar-day.selected {
+  background: hsl(180 100% 50% / 0.2);
+  border-color: hsl(180 100% 50% / 0.4);
+}

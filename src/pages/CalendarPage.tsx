@@ -1,5 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Calendar, RefreshCw, Plus, X, Clock, AlignLeft } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence, type Transition } from 'framer-motion';
+import {
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameMonth,
+  isSameDay,
+  isToday,
+  format,
+  addMonths,
+  subMonths,
+} from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Calendar, ChevronLeft, ChevronRight, Plus, X, Clock, AlignLeft } from 'lucide-react';
 
 type CalEvent = {
   id: string;
@@ -84,22 +99,24 @@ function useGoogleCalendarEvents() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return { events, loading, error, refetch: load, lastFetch, createEvent };
 }
 
 function NewEventModal({
   onClose,
   onSave,
+  initialDate,
 }: {
   onClose: () => void;
   onSave: (form: NewEventForm) => Promise<void>;
+  initialDate?: string;
 }) {
   const today = new Date().toISOString().split('T')[0];
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<NewEventForm>({
     title: '',
-    date: today,
+    date: initialDate ?? today,
     timeStart: '09:00',
     timeEnd: '10:00',
     description: '',
@@ -129,7 +146,7 @@ function NewEventModal({
             <label>Título</label>
             <input className="form-input" value={form.title}
               onChange={e => setField('title', e.target.value)}
-              placeholder="Ej. Reunión con Libell Joyería" autoFocus />
+              placeholder="Ej. Reunión con cliente" autoFocus />
           </div>
           <div className="form-field required">
             <label>Fecha</label>
@@ -138,18 +155,18 @@ function NewEventModal({
           </div>
           <div className="form-row-2">
             <div className="form-field">
-              <label><Clock size={13} style={{ display:'inline', marginRight:4 }} />Inicio</label>
+              <label><Clock size={13} style={{ display: 'inline', marginRight: 4 }} />Inicio</label>
               <input className="form-input" type="time" value={form.timeStart}
                 onChange={e => setField('timeStart', e.target.value)} />
             </div>
             <div className="form-field">
-              <label><Clock size={13} style={{ display:'inline', marginRight:4 }} />Fin</label>
+              <label><Clock size={13} style={{ display: 'inline', marginRight: 4 }} />Fin</label>
               <input className="form-input" type="time" value={form.timeEnd}
                 onChange={e => setField('timeEnd', e.target.value)} />
             </div>
           </div>
           <div className="form-field">
-            <label><AlignLeft size={13} style={{ display:'inline', marginRight:4 }} />Descripción</label>
+            <label><AlignLeft size={13} style={{ display: 'inline', marginRight: 4 }} />Descripción</label>
             <textarea className="form-textarea" rows={3} value={form.description}
               onChange={e => setField('description', e.target.value)}
               placeholder="Notas del evento..." />
@@ -166,104 +183,503 @@ function NewEventModal({
   );
 }
 
+const WEEK_LABELS = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'];
+
 export function CalendarPage() {
-  const { events, loading, error, refetch, lastFetch, createEvent } = useGoogleCalendarEvents();
-  const [viewMode, setViewMode] = useState<'upcoming' | 'all'>('upcoming');
-  const [showModal, setShowModal] = useState(false);
-  const today = new Date();
-  const displayEvents = viewMode === 'upcoming'
-    ? events.filter(e => new Date(e.start) >= today)
-    : events;
+  const { events, loading, error, lastFetch, createEvent } = useGoogleCalendarEvents();
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [modalDate, setModalDate] = useState<string | null>(null);
+  const [now, setNow] = useState(new Date());
+
+  // Update countdown every second
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Build calendar grid (Mon–Sun weeks)
+  const gridDays = useMemo(() => {
+    const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
+    const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [currentMonth]);
+
+  const eventsOnDay = (day: Date) =>
+    events.filter(e => isSameDay(new Date(e.start), day));
+
+  // All events in the currently viewed month, sorted
+  const monthEvents = useMemo(() =>
+    events
+      .filter(e => isSameMonth(new Date(e.start), currentMonth))
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
+    [events, currentMonth],
+  );
+
+  // Events for selected day
+  const selectedDayEvents = useMemo(() =>
+    selectedDay ? events.filter(e => isSameDay(new Date(e.start), selectedDay)) : [],
+    [events, selectedDay],
+  );
+
+  // Next future event for countdown
+  const nextEvent = useMemo(() =>
+    events
+      .filter(e => new Date(e.start) > now)
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())[0] ?? null,
+    [events, now],
+  );
+
+  const countdown = useMemo(() => {
+    if (!nextEvent) return null;
+    const diff = new Date(nextEvent.start).getTime() - now.getTime();
+    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
+    return {
+      days: Math.floor(diff / 86400000),
+      hours: Math.floor((diff % 86400000) / 3600000),
+      minutes: Math.floor((diff % 3600000) / 60000),
+      seconds: Math.floor((diff % 60000) / 1000),
+    };
+  }, [nextEvent, now]);
+
+  const handleDayClick = (day: Date) => {
+    if (!isSameMonth(day, currentMonth)) return;
+    const dayEvents = eventsOnDay(day);
+    if (dayEvents.length > 0) {
+      setSelectedDay(prev => (prev && isSameDay(prev, day) ? null : day));
+    } else {
+      setModalDate(format(day, 'yyyy-MM-dd'));
+    }
+  };
+
+  const displayEvents = selectedDay && selectedDayEvents.length > 0 ? selectedDayEvents : monthEvents;
+  const listLabel = selectedDay && selectedDayEvents.length > 0
+    ? format(selectedDay, "d 'de' MMMM", { locale: es })
+    : format(currentMonth, 'MMMM yyyy', { locale: es });
 
   return (
     <div className="page-content">
+      {/* ── Header ── */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">
-            <Calendar size={20} style={{ display:'inline', marginRight:8, verticalAlign:'middle' }} />
-            Calendario
-          </h1>
+          <h1 className="page-title">Calendario</h1>
           <p className="page-subtitle">
-            Sincronizado con Google Calendar
+            SINCRONIZADO CON GOOGLE CALENDAR
             {lastFetch && ` · ${lastFetch.toLocaleTimeString('es-CO')}`}
+            {loading && ' · Actualizando...'}
           </p>
         </div>
-        <div className="header-actions">
-          <button className="btn-secondary" onClick={() => void refetch()} disabled={loading}>
-            <RefreshCw size={14} className={loading ? 'spin' : ''} /> Actualizar
-          </button>
-          <button className="btn-primary" onClick={() => setShowModal(true)}>
-            <Plus size={14} /> Nuevo evento
-          </button>
-        </div>
-      </div>
-
-      {error && <div className="card section-block"><p className="empty-note">{error}</p></div>}
-
-      <div className="filter-row">
-        <button className={`filter-chip ${viewMode==='upcoming'?'active':''}`}
-          onClick={() => setViewMode('upcoming')}>
-          Próximos ({events.filter(e => new Date(e.start) >= today).length})
-        </button>
-        <button className={`filter-chip ${viewMode==='all'?'active':''}`}
-          onClick={() => setViewMode('all')}>
-          Todos ({events.length})
+        <button
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          onClick={() => setModalDate(format(new Date(), 'yyyy-MM-dd'))}
+        >
+          <Plus size={14} />
+          Nuevo evento
         </button>
       </div>
 
-      <div className="card section-block">
-        <div className="section-heading">
-          <h2>Eventos</h2>
-          <span className="badge-count">{displayEvents.length}</span>
+      {error && (
+        <div style={{ padding: '0 24px 16px' }}>
+          <p style={{
+            fontFamily: 'JetBrains Mono',
+            fontSize: '0.72rem',
+            color: 'hsl(0,84%,65%)',
+            padding: '10px 14px',
+            background: 'hsl(0 84% 60% / 0.08)',
+            border: '1px solid hsl(0 84% 60% / 0.15)',
+            borderRadius: '4px',
+          }}>
+            {error}
+          </p>
         </div>
-        {loading ? (
-          <p className="empty-note">Cargando eventos...</p>
-        ) : displayEvents.length === 0 ? (
-          <div className="empty-state">
-            <Calendar size={32} />
-            <h3>Sin eventos</h3>
-            <p>Crea uno con el botón "Nuevo evento".</p>
+      )}
+
+      {/* ── Two-column layout ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '65% 35%',
+        gap: '16px',
+        padding: '0 24px 24px',
+      }}>
+
+        {/* ── Left: Monthly grid ── */}
+        <motion.div
+          className="card-glass"
+          style={{ padding: '24px', borderRadius: '4px' }}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' } as Transition}
+        >
+          {/* Month nav */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '24px',
+          }}>
+            <button
+              onClick={() => { setCurrentMonth(m => subMonths(m, 1)); setSelectedDay(null); }}
+              style={{
+                background: 'none',
+                border: '1px solid hsl(0 0% 100% / 0.08)',
+                borderRadius: '4px',
+                padding: '6px 8px',
+                color: 'hsl(215,15%,60%)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            <h2 style={{
+              fontFamily: 'Outfit, sans-serif',
+              fontSize: '1rem',
+              fontWeight: 600,
+              color: 'hsl(0,0%,92%)',
+              textTransform: 'capitalize',
+              letterSpacing: '-0.01em',
+              margin: 0,
+            }}>
+              {format(currentMonth, 'MMMM yyyy', { locale: es })}
+            </h2>
+
+            <button
+              onClick={() => { setCurrentMonth(m => addMonths(m, 1)); setSelectedDay(null); }}
+              style={{
+                background: 'none',
+                border: '1px solid hsl(0 0% 100% / 0.08)',
+                borderRadius: '4px',
+                padding: '6px 8px',
+                color: 'hsl(215,15%,60%)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
-        ) : (
-          <div className="cal-event-list">
-            {[...displayEvents]
-              .sort((a,b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-              .map(event => (
-              <div key={event.id} className="cal-event-row-full">
-                <div className="cal-event-dot" style={{ background: event.color ?? '#57efff' }} />
-                <div className="cal-event-body">
-                  <span className="cal-event-title">{event.title}</span>
-                  {event.description && (
-                    <span className="cal-event-date">{event.description}</span>
-                  )}
-                  <span className="cal-event-date">
-                    {new Date(event.start).toLocaleDateString('es-CO', {
-                      weekday:'long', day:'numeric', month:'long',
-                      hour:'2-digit', minute:'2-digit'
-                    })}
-                    {event.end && ` → ${new Date(event.end).toLocaleTimeString('es-CO', {
-                      hour:'2-digit', minute:'2-digit'
-                    })}`}
-                  </span>
-                </div>
-                {event.htmlLink && (
-                  <a href={event.htmlLink} target="_blank" rel="noreferrer"
-                    className="btn-ghost" style={{ padding:'4px 10px', fontSize:'0.76rem' }}>
-                    Abrir
-                  </a>
-                )}
+
+          {/* Week day headers */}
+          <div className="calendar-grid" style={{ marginBottom: '4px' }}>
+            {WEEK_LABELS.map(d => (
+              <div
+                key={d}
+                style={{
+                  textAlign: 'center',
+                  fontFamily: 'JetBrains Mono',
+                  fontSize: '0.6rem',
+                  letterSpacing: '0.08em',
+                  color: 'hsl(215,15%,45%)',
+                  paddingBottom: '8px',
+                }}
+              >
+                {d}
               </div>
             ))}
           </div>
-        )}
+
+          {/* Day cells */}
+          <div className="calendar-grid">
+            {gridDays.map((day, idx) => {
+              const weekRow = Math.floor(idx / 7);
+              const inMonth = isSameMonth(day, currentMonth);
+              const isCurrentDay = isToday(day);
+              const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
+              const hasEvents = eventsOnDay(day).length > 0;
+
+              const classes = [
+                'calendar-day',
+                isCurrentDay ? 'today' : '',
+                hasEvents ? 'has-event' : '',
+                isSelected ? 'selected' : '',
+              ].filter(Boolean).join(' ');
+
+              return (
+                <motion.div
+                  key={day.toISOString()}
+                  className={classes}
+                  onClick={() => handleDayClick(day)}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: inMonth ? 1 : 0.2, y: 0 }}
+                  transition={{ delay: weekRow * 0.06, duration: 0.25 } as Transition}
+                  style={{ cursor: inMonth ? 'pointer' : 'default' }}
+                >
+                  {format(day, 'd')}
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* ── Right panel ── */}
+        <motion.div
+          style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut', delay: 0.1 } as Transition}
+        >
+          {/* Section A: Countdown */}
+          <div className="card-glass" style={{ padding: '20px', borderRadius: '4px' }}>
+            {nextEvent && countdown ? (
+              <>
+                <span className="number-label" style={{ display: 'block', marginBottom: '12px' }}>
+                  PRÓXIMO EVENTO
+                </span>
+                <h3 style={{
+                  fontFamily: 'Outfit, sans-serif',
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  color: 'hsl(0,0%,98%)',
+                  letterSpacing: '-0.01em',
+                  margin: '0 0 4px',
+                  lineHeight: 1.3,
+                }}>
+                  {nextEvent.title}
+                </h3>
+                <p className="number-label" style={{ marginBottom: '16px' }}>
+                  {format(new Date(nextEvent.start), "d 'de' MMMM · HH:mm", { locale: es })}
+                </p>
+
+                {/* Countdown grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: '6px',
+                  marginBottom: '16px',
+                }}>
+                  {([
+                    { value: countdown.days, label: 'DÍAS' },
+                    { value: countdown.hours, label: 'HRS' },
+                    { value: countdown.minutes, label: 'MIN' },
+                    { value: countdown.seconds, label: 'SEG' },
+                  ] as const).map(unit => (
+                    <div
+                      key={unit.label}
+                      style={{
+                        background: 'hsl(220,18%,9%)',
+                        border: '1px solid hsl(0 0% 100% / 0.06)',
+                        borderRadius: '4px',
+                        padding: '10px 6px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <AnimatePresence mode="popLayout">
+                        <motion.div
+                          key={`${unit.label}-${unit.value}`}
+                          initial={{ scale: 1.15, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.85, opacity: 0 }}
+                          transition={{ duration: 0.15 } as Transition}
+                          style={{
+                            fontFamily: 'Outfit, sans-serif',
+                            fontSize: '1.4rem',
+                            fontWeight: 700,
+                            color: 'hsl(180,100%,50%)',
+                            lineHeight: 1,
+                          }}
+                        >
+                          {String(unit.value).padStart(2, '0')}
+                        </motion.div>
+                      </AnimatePresence>
+                      <div
+                        className="number-label"
+                        style={{ marginTop: '4px', fontSize: '0.58rem' }}
+                      >
+                        {unit.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {nextEvent.htmlLink && (
+                  <a
+                    href={nextEvent.htmlLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-secondary"
+                    style={{
+                      display: 'block',
+                      textAlign: 'center',
+                      fontSize: '0.7rem',
+                      padding: '7px',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Ver en Google Calendar ↗
+                  </a>
+                )}
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                <Calendar
+                  size={28}
+                  style={{ color: 'hsl(215,15%,35%)', margin: '0 auto 12px', display: 'block' }}
+                />
+                <p className="number-label" style={{ marginBottom: '12px' }}>
+                  SIN EVENTOS PRÓXIMOS
+                </p>
+                <button
+                  className="btn-primary"
+                  style={{ fontSize: '0.72rem', padding: '6px 14px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => setModalDate(format(new Date(), 'yyyy-MM-dd'))}
+                >
+                  <Plus size={12} />
+                  Crear primer evento
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Section B: Event list */}
+          <div className="card-glass" style={{ borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{
+              padding: '14px 20px',
+              borderBottom: '1px solid hsl(0 0% 100% / 0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <span className="number-label" style={{ textTransform: 'capitalize' }}>
+                {listLabel}
+              </span>
+              {selectedDay && (
+                <button
+                  onClick={() => setSelectedDay(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'hsl(215,15%,45%)',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {displayEvents.length === 0 ? (
+              <div style={{
+                padding: '24px',
+                textAlign: 'center',
+                fontFamily: 'JetBrains Mono',
+                fontSize: '0.72rem',
+                color: 'hsl(215,15%,40%)',
+              }}>
+                Sin eventos en este período
+              </div>
+            ) : (
+              <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                {displayEvents.map(event => (
+                  <div
+                    key={event.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      padding: '12px 20px',
+                      borderBottom: '1px solid hsl(0 0% 100% / 0.04)',
+                      transition: 'background 150ms ease',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'hsl(0 0% 100% / 0.03)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    {/* Day badge */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      minWidth: '28px',
+                      flexShrink: 0,
+                    }}>
+                      <span style={{
+                        fontFamily: 'JetBrains Mono',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        color: 'hsl(180,100%,50%)',
+                        lineHeight: 1,
+                      }}>
+                        {format(new Date(event.start), 'd')}
+                      </span>
+                      <span className="number-label" style={{ fontSize: '0.55rem', marginTop: '2px', textTransform: 'uppercase' }}>
+                        {format(new Date(event.start), 'MMM', { locale: es })}
+                      </span>
+                    </div>
+
+                    {/* Event info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontFamily: 'Outfit, sans-serif',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        color: 'hsl(0,0%,92%)',
+                        margin: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {event.title}
+                      </p>
+                      <p className="number-label" style={{ marginTop: '2px', fontSize: '0.62rem' }}>
+                        {format(new Date(event.start), 'HH:mm')}
+                        {event.end && ` → ${format(new Date(event.end), 'HH:mm')}`}
+                      </p>
+                      {event.description && (
+                        <p style={{
+                          fontFamily: 'JetBrains Mono',
+                          fontSize: '0.62rem',
+                          color: 'hsl(215,15%,45%)',
+                          margin: '4px 0 0',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {event.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {event.htmlLink && (
+                      <a
+                        href={event.htmlLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          color: 'hsl(215,15%,45%)',
+                          textDecoration: 'none',
+                          fontSize: '0.78rem',
+                          flexShrink: 0,
+                          transition: 'color 150ms ease',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'hsl(180,100%,50%)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'hsl(215,15%,45%)')}
+                      >
+                        ↗
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
       </div>
 
-      {showModal && (
+      {/* ── Create event modal ── */}
+      {modalDate !== null && (
         <NewEventModal
-          onClose={() => setShowModal(false)}
+          initialDate={modalDate}
+          onClose={() => setModalDate(null)}
           onSave={async form => {
             const ok = await createEvent(form);
-            if (ok) setShowModal(false);
+            if (ok) setModalDate(null);
           }}
         />
       )}
