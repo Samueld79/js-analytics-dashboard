@@ -44,7 +44,6 @@ import {
   formatRoas,
   isAlertSnoozed,
   sumMetrics,
-  sumOperatingKpis,
   sumSales,
 } from '../lib/utils';
 import { buildClientMetaOverviewByClient } from '../services/meta';
@@ -234,11 +233,6 @@ export function DashboardPage() {
       }),
     [scopedMonthlyKpis, scopedSyncRows, visibleClients],
   );
-
-  // ── Aggregates (operating KPIs — for bottom table Ventas/ROAS) ───────────────
-  const overall = executiveRows.length
-    ? sumOperatingKpis(executiveRows)
-    : buildCombinedMonthTotals(executiveAdMetrics, executiveSales);
 
   // ── Campaign KPIs — canonical source for cards, chart, top clients ────────────
   // Rows filtered to the active period

@@ -3,7 +3,6 @@ import { listAdMetrics } from '../services/adMetrics';
 import {
   listAdCampaignMetrics,
   aggregateCampaignMetricsByMonth,
-  aggregateCampaignKpisByClient,
 } from '../services/adCampaignMetrics';
 import { listMonthlyOperatingKpis } from '../services/dashboard';
 import { listMetaAccountSyncRows } from '../services/meta';
