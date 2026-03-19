@@ -245,17 +245,36 @@ export function MetricsPage() {
     [rangeStart, rangeEnd, scopedSales],
   );
 
+  // Campaign (Excel) spend+messages for the selected range.
+  // Used as fallback when ad_metrics (n8n daily sync) has no data for historical periods.
+  const campaignPeriodData = useMemo(
+    () =>
+      campaignByMonth
+        .filter((r) => r.month >= rangeStartMonth && r.month <= rangeEndMonth)
+        .reduce(
+          (acc, r) => ({ spend: acc.spend + r.spend, messages: acc.messages + r.messages }),
+          { spend: 0, messages: 0 },
+        ),
+    [campaignByMonth, rangeStartMonth, rangeEndMonth],
+  );
+
+  const adMetricsHaveData = monthMetrics.length > 0;
+  const campaignFallback = adMetricsHaveData ? undefined : campaignPeriodData;
   const operatingTotals = monthOperatingRows.length
     ? sumOperatingKpis(monthOperatingRows)
-    : buildCombinedMonthTotals(monthMetrics, monthSales);
+    : buildCombinedMonthTotals(monthMetrics, monthSales, campaignFallback);
   const marketingSummary = buildMarketingActionSummary(monthMetrics);
-  const costPerConversation =
+  const effectiveMessages =
     marketingSummary.messagingStarted > 0
-      ? operatingTotals.spend / marketingSummary.messagingStarted
+      ? marketingSummary.messagingStarted
+      : (campaignFallback?.messages ?? 0);
+  const costPerConversation =
+    effectiveMessages > 0
+      ? operatingTotals.spend / effectiveMessages
       : null;
   const estimatedCloseRate =
-    marketingSummary.messagingStarted > 0 && monthSales.length > 0
-      ? (monthSales.length / marketingSummary.messagingStarted) * 100
+    effectiveMessages > 0 && monthSales.length > 0
+      ? (monthSales.length / effectiveMessages) * 100
       : null;
 
   // Definitive historical merge: ad_campaign_metrics (Excel) + ad_metrics (n8n daily)
@@ -331,7 +350,7 @@ export function MetricsPage() {
     {
       icon: <MessageCircle size={15} />,
       label: 'CONVERSACIONES',
-      value: formatNumber(marketingSummary.messagingStarted),
+      value: formatNumber(effectiveMessages),
       sub: 'Mensajes vía Meta Ads',
     },
     {
@@ -565,14 +584,20 @@ export function MetricsPage() {
   );
 }
 
-function buildCombinedMonthTotals(metrics: AdMetric[], sales: DailySale[]) {
+function buildCombinedMonthTotals(
+  metrics: AdMetric[],
+  sales: DailySale[],
+  campaignFallback?: { spend: number; messages: number },
+) {
   const metricTotals = sumMetrics(metrics);
   const salesTotals = sumSales(sales);
-  const spend = metricTotals.spend;
+  // Use ad_metrics spend if available; otherwise fall back to Excel campaign data
+  const spend = metricTotals.spend > 0 ? metricTotals.spend : (campaignFallback?.spend ?? 0);
   const totalSales = salesTotals.total;
 
   return {
     ...metricTotals,
+    spend,
     total_sales: totalSales,
     new_client_sales: salesTotals.newClient,
     repeat_sales: salesTotals.repeat,
