@@ -249,13 +249,30 @@ export function MetricsPage() {
     ? sumOperatingKpis(monthOperatingRows)
     : buildCombinedMonthTotals(monthMetrics, monthSales);
   const marketingSummary = buildMarketingActionSummary(monthMetrics);
+
+  // Campaign fallback: sum monthly aggregates when ad_metrics has no data for the range
+  const campaignRangeFallback = useMemo(() => {
+    if (monthMetrics.length > 0) return null;
+    let spend = 0;
+    let messages = 0;
+    let cur = rangeStartMonth;
+    while (cur <= rangeEndMonth) {
+      const row = campaignByMonth.find((r) => r.month === cur);
+      if (row) { spend += row.spend; messages += row.messages; }
+      const [y, m] = cur.split('-').map(Number);
+      cur = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+    }
+    return spend > 0 || messages > 0 ? { spend, messages } : null;
+  }, [monthMetrics, campaignByMonth, rangeStartMonth, rangeEndMonth]);
+
+  const effectiveSpend = operatingTotals.spend > 0 ? operatingTotals.spend : (campaignRangeFallback?.spend ?? 0);
+  const effectiveMessages = marketingSummary.messagingStarted > 0 ? marketingSummary.messagingStarted : (campaignRangeFallback?.messages ?? 0);
+
   const costPerConversation =
-    marketingSummary.messagingStarted > 0
-      ? operatingTotals.spend / marketingSummary.messagingStarted
-      : null;
+    effectiveMessages > 0 ? effectiveSpend / effectiveMessages : null;
   const estimatedCloseRate =
-    marketingSummary.messagingStarted > 0 && monthSales.length > 0
-      ? (monthSales.length / marketingSummary.messagingStarted) * 100
+    effectiveMessages > 0 && monthSales.length > 0
+      ? (monthSales.length / effectiveMessages) * 100
       : null;
 
   // Definitive historical merge: ad_campaign_metrics (Excel) + ad_metrics (n8n daily)
@@ -325,13 +342,13 @@ export function MetricsPage() {
     {
       icon: <DollarSign size={15} />,
       label: 'INVERSIÓN',
-      value: formatCop(operatingTotals.spend),
+      value: formatCop(effectiveSpend),
       sub: 'Inversión real del período',
     },
     {
       icon: <MessageCircle size={15} />,
       label: 'CONVERSACIONES',
-      value: formatNumber(marketingSummary.messagingStarted),
+      value: formatNumber(effectiveMessages),
       sub: 'Mensajes vía Meta Ads',
     },
     {

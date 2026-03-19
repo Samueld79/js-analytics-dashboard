@@ -30,6 +30,7 @@ import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import {
   useAdMetrics,
+  useCampaignMonthlyHistory,
   useMetaSyncRows,
   useMonthlyOperatingKpis,
   useTasks,
@@ -132,6 +133,7 @@ export function DashboardPage() {
   const { sales, loading: salesLoading } = useDailySales({ clientId: scopedClientId, days: 365 });
   const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(scopedClientId, 12);
   const { syncRows } = useMetaSyncRows(scopedClientId);
+  const { byMonth: campaignByMonth } = useCampaignMonthlyHistory(scopedClientId);
 
   // ── Scoping ─────────────────────────────────────────────────────────────────
   const visibleClientIds = useMemo(
@@ -196,6 +198,7 @@ export function DashboardPage() {
       ...scopedAdMetrics.map((r) => r.date),
       ...scopedSales.map((r) => r.date),
       ...scopedSocialMonthlyMetrics.map((r) => r.month),
+      ...campaignByMonth.map((r) => r.month),
     ])[0] ?? new Date().toISOString().slice(0, 7);
   const executiveMonthLabel = getMonthLabel(executiveMonth);
   const portalClientName =
@@ -234,6 +237,11 @@ export function DashboardPage() {
     : buildCombinedMonthTotals(executiveAdMetrics, executiveSales);
   const marketing = buildMarketingActionSummary(executiveAdMetrics);
 
+  // Campaign fallback for executive month when ad_metrics has no data
+  const campaignExecFallback = campaignByMonth.find((m) => m.month === executiveMonth) ?? null;
+  const effectiveSpend = overall.spend > 0 ? overall.spend : (campaignExecFallback?.spend ?? 0);
+  const effectiveMessages = marketing.messagingStarted > 0 ? marketing.messagingStarted : (campaignExecFallback?.messages ?? 0);
+
   // ── Alerts ───────────────────────────────────────────────────────────────────
   const visibleOpenAlerts = useMemo(
     () =>
@@ -265,9 +273,7 @@ export function DashboardPage() {
   ).size;
   const salesRecordCount = executiveSales.length;
   const costPerConversation =
-    marketing.messagingStarted > 0
-      ? overall.spend / marketing.messagingStarted
-      : null;
+    effectiveMessages > 0 ? effectiveSpend / effectiveMessages : null;
   const averageTicket =
     salesRecordCount > 0 ? overall.total_sales / salesRecordCount : null;
   const pendingTasks = scopedTasks.filter((t) => t.status === 'pending').length;
@@ -428,12 +434,12 @@ export function DashboardPage() {
   const kpiItems: Array<{ label: string; value: string; Icon: LucideIcon }> = [
     {
       label: `Inversión ${executiveMonthLabel}`,
-      value: formatCop(overall.spend),
+      value: formatCop(effectiveSpend),
       Icon: DollarSign,
     },
     {
       label: `Conversaciones ${executiveMonthLabel}`,
-      value: formatNumber(marketing.messagingStarted),
+      value: formatNumber(effectiveMessages),
       Icon: MessageCircle,
     },
     {

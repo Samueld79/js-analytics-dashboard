@@ -126,21 +126,26 @@ export function ClientDetailPage() {
     [selectedMonthCampaignRows],
   );
 
-  // BUG 2 FIX: KPI spend + messages come from ad_metrics (daily, accurate)
+  // KPI spend + messages: prefer ad_metrics (daily, accurate); fall back to campaign aggregates
   const selectedMonthAdMetrics = useMemo(
     () => metrics.filter((r) => getMonthKey(r.date) === activeMonth),
     [metrics, activeMonth],
   );
 
-  const kpiSpend = useMemo(
-    () => selectedMonthAdMetrics.reduce((sum, r) => sum + r.spend, 0),
-    [selectedMonthAdMetrics],
+  const campaignMonthFallback = useMemo(
+    () => campaignByMonth.find((m) => m.month === activeMonth) ?? null,
+    [campaignByMonth, activeMonth],
   );
 
-  const kpiMessages = useMemo(
-    () => selectedMonthAdMetrics.reduce((sum, r) => sum + r.messages, 0),
-    [selectedMonthAdMetrics],
-  );
+  const kpiSpend = useMemo(() => {
+    const adSpend = selectedMonthAdMetrics.reduce((sum, r) => sum + r.spend, 0);
+    return adSpend > 0 ? adSpend : (campaignMonthFallback?.spend ?? 0);
+  }, [selectedMonthAdMetrics, campaignMonthFallback]);
+
+  const kpiMessages = useMemo(() => {
+    const adMessages = selectedMonthAdMetrics.reduce((sum, r) => sum + r.messages, 0);
+    return adMessages > 0 ? adMessages : (campaignMonthFallback?.messages ?? 0);
+  }, [selectedMonthAdMetrics, campaignMonthFallback]);
 
   // ROAS and sales from monthly KPI consolidated row (more authoritative)
   const selectedKpiRow = useMemo(
