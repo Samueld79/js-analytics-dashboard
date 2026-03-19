@@ -2,34 +2,55 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
-import { useMonthlyOperatingKpis, useMetaSyncRows, useAlerts } from '../hooks/useData';
+import { useCampaignSummary, useMetaSyncRows, useAlerts } from '../hooks/useData';
+import {
+  aggregateCampaignKpisByClient,
+  sumCampaignMonthAggregates,
+} from '../services/adCampaignMetrics';
+import { getMonthLabel } from '../utils/monthLabel';
 import { Plus, Search, Users } from 'lucide-react';
-import { formatCop, formatRoas } from '../lib/utils';
+import { formatCop, formatNumber } from '../lib/utils';
 
 type StatusFilter = 'all' | 'active' | 'paused';
 
 export function ClientsPage() {
   const navigate = useNavigate();
   const { clients, loading, saving, error, createClient } = useClients();
-  const { monthlyKpis } = useMonthlyOperatingKpis(undefined, 1);
+  // Unified campaign source — same hook as DashboardPage
+  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary();
   const { syncRows } = useMetaSyncRows();
   const { alerts } = useAlerts();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  // Period selector — null = auto-select most recent
+  const [selectedPeriod, setSelectedPeriod] = useState<string | 'all' | null>(null);
+  const activePeriod = selectedPeriod ?? campaignByMonth[campaignByMonth.length - 1]?.month ?? '';
 
-  const kpiByClient = useMemo(() => {
-    const map = new Map<string, { spend: number; roas: number }>();
-    for (const row of monthlyKpis) {
-      const m = typeof row.month === 'string' ? row.month.slice(0, 7) : '';
-      if (m === currentMonth) {
-        map.set(row.client_id, { spend: row.spend ?? 0, roas: row.real_roas ?? 0 });
-      }
-    }
-    return map;
-  }, [monthlyKpis, currentMonth]);
+  // Rows filtered to active period
+  const periodRows = useMemo(
+    () =>
+      activePeriod === 'all' || activePeriod === ''
+        ? campaignRows
+        : campaignRows.filter((r) => r.date.startsWith(activePeriod)),
+    [campaignRows, activePeriod],
+  );
+
+  // Per-client KPIs for selected period
+  const campaignByClient = useMemo(
+    () => aggregateCampaignKpisByClient(periodRows),
+    [periodRows],
+  );
+
+  // Total KPIs for selected period (for header summary)
+  const totalKpis = useMemo(
+    () =>
+      activePeriod === 'all'
+        ? sumCampaignMonthAggregates(campaignByMonth, 'all')
+        : (campaignByMonth.find((m) => m.month === activePeriod) ?? null),
+    [campaignByMonth, activePeriod],
+  );
 
   const alertsByClient = useMemo(() => {
     const map = new Map<string, number>();
@@ -86,6 +107,70 @@ export function ClientsPage() {
           Nuevo cliente
         </button>
       </div>
+
+      {/* ── Period Selector ── */}
+      {campaignByMonth.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', padding: '0 24px 0' }}>
+          {campaignByMonth.map((m) => (
+            <button
+              key={m.month}
+              onClick={() => setSelectedPeriod(m.month)}
+              style={{
+                fontFamily: 'JetBrains Mono',
+                fontSize: '0.65rem',
+                letterSpacing: '0.08em',
+                padding: '5px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                border: activePeriod === m.month
+                  ? '1px solid hsl(180,100%,50%)'
+                  : '1px solid hsl(0 0% 100% / 0.1)',
+                background: activePeriod === m.month
+                  ? 'hsl(180 100% 50% / 0.1)'
+                  : 'transparent',
+                color: activePeriod === m.month
+                  ? 'hsl(180,100%,50%)'
+                  : 'hsl(215,15%,55%)',
+              }}
+            >
+              {getMonthLabel(m.month)}
+            </button>
+          ))}
+          <button
+            onClick={() => setSelectedPeriod('all')}
+            style={{
+              fontFamily: 'JetBrains Mono',
+              fontSize: '0.65rem',
+              letterSpacing: '0.08em',
+              padding: '5px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              border: activePeriod === 'all'
+                ? '1px solid hsl(180,100%,50%)'
+                : '1px solid hsl(0 0% 100% / 0.1)',
+              background: activePeriod === 'all'
+                ? 'hsl(180 100% 50% / 0.1)'
+                : 'transparent',
+              color: activePeriod === 'all'
+                ? 'hsl(180,100%,50%)'
+                : 'hsl(215,15%,55%)',
+            }}
+          >
+            Total año
+          </button>
+          {totalKpis && (
+            <span style={{
+              fontFamily: 'JetBrains Mono',
+              fontSize: '0.65rem',
+              color: 'hsl(215,15%,45%)',
+              alignSelf: 'center',
+              marginLeft: '8px',
+            }}>
+              {formatCop(totalKpis.spend)} · {formatNumber(totalKpis.messages)} conv.
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── Search + Filter row ── */}
       <div
@@ -195,7 +280,7 @@ export function ClientsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.08)' }}>
-                  {['Cliente', 'Nicho', 'Ciudad', 'Inversión', 'ROAS', 'Meta', 'Acciones'].map(
+                  {['Cliente', 'Nicho', 'Inversión', 'Mensajes', 'Reach', 'Impr.', 'CPM', 'Frec.', 'Meta', 'Acciones'].map(
                     (h) => (
                       <th
                         key={h}
@@ -215,7 +300,7 @@ export function ClientsPage() {
               </thead>
               <tbody>
                 {filtered.map((client) => {
-                  const kpi = kpiByClient.get(client.id);
+                  const kpi = campaignByClient.get(client.id);
                   const openAlerts = alertsByClient.get(client.id) ?? 0;
                   const lastSync = syncByClient.get(client.id);
                   const syncAge = lastSync
@@ -305,49 +390,49 @@ export function ClientsPage() {
 
                       {/* Nicho */}
                       <td style={{ padding: '13px 20px' }}>
-                        <span className="number-label">
-                          {client.niche ?? '—'}
-                        </span>
-                      </td>
-
-                      {/* Ciudad */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span className="number-label">
-                          {client.main_city ?? '—'}
-                        </span>
+                        <span className="number-label">{client.niche ?? '—'}</span>
                       </td>
 
                       {/* Inversión */}
                       <td style={{ padding: '13px 20px' }}>
-                        <span
-                          style={{
-                            fontFamily: 'JetBrains Mono',
-                            fontSize: '0.78rem',
-                            color: 'hsl(0,0%,85%)',
-                          }}
-                        >
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
                           {kpi ? formatCop(kpi.spend) : '—'}
                         </span>
                       </td>
 
-                      {/* ROAS */}
+                      {/* Mensajes */}
                       <td style={{ padding: '13px 20px' }}>
-                        {kpi ? (
-                          <span
-                            style={{
-                              fontFamily: 'JetBrains Mono',
-                              fontSize: '0.78rem',
-                              color:
-                                kpi.roas >= 1
-                                  ? 'hsl(180,100%,50%)'
-                                  : 'hsl(0,84%,65%)',
-                            }}
-                          >
-                            {formatRoas(kpi.roas)}
-                          </span>
-                        ) : (
-                          <span className="number-label">—</span>
-                        )}
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                          {kpi ? formatNumber(kpi.messages) : '—'}
+                        </span>
+                      </td>
+
+                      {/* Reach */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                          {kpi ? formatNumber(kpi.reach) : '—'}
+                        </span>
+                      </td>
+
+                      {/* Impresiones */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                          {kpi ? formatNumber(kpi.impressions) : '—'}
+                        </span>
+                      </td>
+
+                      {/* CPM */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                          {kpi && kpi.cpm > 0 ? formatCop(kpi.cpm) : '—'}
+                        </span>
+                      </td>
+
+                      {/* Frecuencia */}
+                      <td style={{ padding: '13px 20px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                          {kpi && kpi.frequency > 0 ? kpi.frequency.toFixed(2) : '—'}
+                        </span>
                       </td>
 
                       {/* Meta sync */}
@@ -423,7 +508,7 @@ export function ClientsPage() {
 
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center' }}>
+                    <td colSpan={10} style={{ padding: '48px 24px', textAlign: 'center' }}>
                       <div
                         style={{
                           display: 'flex',

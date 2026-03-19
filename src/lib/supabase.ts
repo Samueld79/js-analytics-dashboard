@@ -319,6 +319,10 @@ export type CampaignAggregateByObjective = {
 export type CampaignAggregateByMonth = {
   month: string;
   spend: number;
+  reach: number;
+  impressions: number;
+  cpm: number;
+  frequency: number;
   messages: number;
   profileVisits: number;
   leads: number;

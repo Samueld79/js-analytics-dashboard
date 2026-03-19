@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listAdMetrics } from '../services/adMetrics';
-import { listAdCampaignMetrics, aggregateCampaignMetricsByMonth } from '../services/adCampaignMetrics';
+import {
+  listAdCampaignMetrics,
+  aggregateCampaignMetricsByMonth,
+  aggregateCampaignKpisByClient,
+} from '../services/adCampaignMetrics';
 import { listMonthlyOperatingKpis } from '../services/dashboard';
 import { listMetaAccountSyncRows } from '../services/meta';
 import { listTasks, updateTask as saveTask, deleteTask as removeTask } from '../services/tasks';
@@ -163,6 +167,46 @@ export function useCampaignMonthlyHistory(clientId?: string) {
   }, [load]);
 
   return { byMonth, loading, reload: load };
+}
+
+/**
+ * Shared hook for Dashboard and ClientsPage.
+ * Primary source: ad_campaign_metrics (covers Jan/Feb/Mar excel imports).
+ * Returns:
+ *   - byMonth: all months aggregated (total across all / one client)
+ *   - currentPeriod: most recent month aggregate
+ *   - byClient: per-client aggregate for the current period (Map<clientId, KPIs>)
+ *   - loading
+ *
+ * Pass clientId to scope to a single client; omit for all clients.
+ * days=90 covers the three available periods (2026-01-31, 2026-02-28, 2026-03-17).
+ */
+export function useCampaignSummary(clientId?: string, days = 90) {
+  const [rows, setRows] = useState<AdCampaignMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<AdCampaignMetric[] | null>(null);
+
+  const load = useCallback(async () => {
+    if (!prevDataRef.current) setLoading(true);
+    try {
+      const data = await listAdCampaignMetrics({ clientId, days });
+      prevDataRef.current = data;
+      setRows(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId, days]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const byMonth = useMemo(() => aggregateCampaignMetricsByMonth(rows), [rows]);
+
+  // rows exposed so callers can filter by period and call aggregateCampaignKpisByClient
+  return { rows, byMonth, loading, reload: load };
 }
 
 export function useAdCampaignMetrics(clientId?: string, days = 90) {

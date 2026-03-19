@@ -1,6 +1,4 @@
 import {
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   Cell,
@@ -11,12 +9,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { motion, type Transition } from 'framer-motion';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   BarChart3,
-  Bell,
   DollarSign,
   MessageCircle,
   ShoppingCart,
@@ -30,15 +27,18 @@ import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import {
   useAdMetrics,
-  useCampaignMonthlyHistory,
+  useCampaignSummary,
   useMetaSyncRows,
   useMonthlyOperatingKpis,
   useTasks,
 } from '../hooks/useData';
+import {
+  aggregateCampaignKpisByClient,
+  sumCampaignMonthAggregates,
+} from '../services/adCampaignMetrics';
 import { useSocialMonthlyMetrics } from '../hooks/useSocialMonthlyMetrics';
 import type { AdMetric, DailySale } from '../lib/supabase';
 import {
-  buildMarketingActionSummary,
   formatCop,
   formatNumber,
   formatRoas,
@@ -48,7 +48,7 @@ import {
   sumSales,
 } from '../lib/utils';
 import { buildClientMetaOverviewByClient } from '../services/meta';
-import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
+import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
@@ -133,7 +133,14 @@ export function DashboardPage() {
   const { sales, loading: salesLoading } = useDailySales({ clientId: scopedClientId, days: 365 });
   const { metrics: socialMonthlyMetrics } = useSocialMonthlyMetrics(scopedClientId, 12);
   const { syncRows } = useMetaSyncRows(scopedClientId);
-  const { byMonth: campaignByMonth } = useCampaignMonthlyHistory(scopedClientId);
+  // Unified campaign source — primary data for KPIs, chart and top clients
+  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(scopedClientId);
+
+  // ── Period selector ───────────────────────────────────────────────────────────
+  // null = auto-select most recent available month
+  const [selectedPeriod, setSelectedPeriod] = useState<string | 'all' | null>(null);
+  // activePeriod falls back to the most recent month from campaign data
+  const activePeriod = selectedPeriod ?? campaignByMonth[campaignByMonth.length - 1]?.month ?? new Date().toISOString().slice(0, 7);
 
   // ── Scoping ─────────────────────────────────────────────────────────────────
   const visibleClientIds = useMemo(
@@ -191,20 +198,17 @@ export function DashboardPage() {
     [isInternal, tasks, visibleClientIds],
   );
 
-  // ── Executive month ─────────────────────────────────────────────────────────
-  const executiveMonth =
-    listAvailableMonthKeys([
-      ...scopedMonthlyKpis.map((r) => r.month),
-      ...scopedAdMetrics.map((r) => r.date),
-      ...scopedSales.map((r) => r.date),
-      ...scopedSocialMonthlyMetrics.map((r) => r.month),
-      ...campaignByMonth.map((r) => r.month),
-    ])[0] ?? new Date().toISOString().slice(0, 7);
-  const executiveMonthLabel = getMonthLabel(executiveMonth);
+  // ── Period labels ─────────────────────────────────────────────────────────────
+  const activePeriodLabel =
+    activePeriod === 'all' ? 'Año completo' : getMonthLabel(activePeriod);
   const portalClientName =
     !isInternal && visibleClients.length === 1
       ? visibleClients[0]?.name ?? 'Mi empresa'
       : null;
+  // executiveMonth kept for operating KPI table (ventas/roas uses monthly KPIs)
+  const executiveMonth = activePeriod === 'all'
+    ? (campaignByMonth[campaignByMonth.length - 1]?.month ?? new Date().toISOString().slice(0, 7))
+    : activePeriod;
 
   // ── Filtered by executive month ─────────────────────────────────────────────
   const executiveRows = scopedMonthlyKpis.filter(
@@ -231,16 +235,42 @@ export function DashboardPage() {
     [scopedMonthlyKpis, scopedSyncRows, visibleClients],
   );
 
-  // ── Aggregates ───────────────────────────────────────────────────────────────
+  // ── Aggregates (operating KPIs — for bottom table Ventas/ROAS) ───────────────
   const overall = executiveRows.length
     ? sumOperatingKpis(executiveRows)
     : buildCombinedMonthTotals(executiveAdMetrics, executiveSales);
-  const marketing = buildMarketingActionSummary(executiveAdMetrics);
 
-  // Campaign fallback for executive month when ad_metrics has no data
-  const campaignExecFallback = campaignByMonth.find((m) => m.month === executiveMonth) ?? null;
-  const effectiveSpend = overall.spend > 0 ? overall.spend : (campaignExecFallback?.spend ?? 0);
-  const effectiveMessages = marketing.messagingStarted > 0 ? marketing.messagingStarted : (campaignExecFallback?.messages ?? 0);
+  // ── Campaign KPIs — canonical source for cards, chart, top clients ────────────
+  // Rows filtered to the active period
+  const periodCampaignRows = useMemo(
+    () =>
+      activePeriod === 'all'
+        ? campaignRows
+        : campaignRows.filter((r) => r.date.startsWith(activePeriod)),
+    [campaignRows, activePeriod],
+  );
+
+  // Aggregate for KPI cards
+  const selectedKpis = useMemo(
+    () =>
+      activePeriod === 'all'
+        ? sumCampaignMonthAggregates(campaignByMonth, 'all')
+        : (campaignByMonth.find((m) => m.month === activePeriod) ?? null),
+    [campaignByMonth, activePeriod],
+  );
+
+  // Per-client breakdown for selected period (used in top-clients chart + table)
+  const selectedByClient = useMemo(
+    () => aggregateCampaignKpisByClient(periodCampaignRows),
+    [periodCampaignRows],
+  );
+
+  const kpiSpend = selectedKpis?.spend ?? 0;
+  const kpiMessages = selectedKpis?.messages ?? 0;
+  const kpiReach = selectedKpis?.reach ?? 0;
+  const kpiImpressions = selectedKpis?.impressions ?? 0;
+  const kpiCpm = selectedKpis?.cpm ?? 0;
+  const kpiFrequency = selectedKpis?.frequency ?? 0;
 
   // ── Alerts ───────────────────────────────────────────────────────────────────
   const visibleOpenAlerts = useMemo(
@@ -268,26 +298,23 @@ export function DashboardPage() {
   });
 
   // ── KPI values ───────────────────────────────────────────────────────────────
-  const clientsWithAlerts = new Set(
-    visibleOpenAlerts.map((a) => a.client_id).filter(Boolean),
-  ).size;
-  const salesRecordCount = executiveSales.length;
-  const costPerConversation =
-    effectiveMessages > 0 ? effectiveSpend / effectiveMessages : null;
-  const averageTicket =
-    salesRecordCount > 0 ? overall.total_sales / salesRecordCount : null;
   const pendingTasks = scopedTasks.filter((t) => t.status === 'pending').length;
 
   // ── Client executive rows ────────────────────────────────────────────────────
   const clientExecutiveRows = visibleClients
     .map((client) => {
+      const campaignRow = selectedByClient.get(client.id) ?? null;
       const monthRow = executiveRows.find((r) => r.client_id === client.id) ?? null;
-      const monthTotals =
+      const baseTotals =
         monthRow ??
         buildCombinedMonthTotals(
           executiveAdMetrics.filter((r) => r.client_id === client.id),
           executiveSales.filter((r) => r.client_id === client.id),
         );
+      // Campaign spend is the canonical source; operating KPIs used for ROAS/Ventas
+      const monthTotals = campaignRow
+        ? { ...baseTotals, spend: campaignRow.spend }
+        : baseTotals;
       const meta = metaByClient[client.id] ?? null;
       const socialMetric =
         executiveSocialMetrics.find((r) => r.client_id === client.id) ?? null;
@@ -312,45 +339,29 @@ export function DashboardPage() {
     });
 
   // ── Chart data ───────────────────────────────────────────────────────────────
-  const dailyChartData = useMemo(() => {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
-    const byDate = new Map<string, { spend: number; messages: number }>();
-    scopedAdMetrics
-      .filter((m) => new Date(m.date + 'T00:00:00') >= cutoff)
-      .forEach((m) => {
-        const prev = byDate.get(m.date) ?? { spend: 0, messages: 0 };
-        byDate.set(m.date, {
-          spend: prev.spend + m.spend,
-          messages: prev.messages + m.messages,
-        });
-      });
-    return Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, vals]) => ({
-        date: new Date(date + 'T00:00:00').toLocaleDateString('es-CO', {
-          day: '2-digit',
-          month: 'short',
-        }),
-        spend: Math.round(vals.spend),
-        messages: vals.messages,
-      }));
-  }, [scopedAdMetrics]);
+  // Monthly chart — replaces old daily area chart (which used ad_metrics)
+  const monthlyChartData = useMemo(
+    () =>
+      campaignByMonth.map((m) => ({
+        label: getMonthLabel(m.month),
+        spend: Math.round(m.spend),
+        messages: m.messages,
+        isSelected: m.month === activePeriod,
+      })),
+    [campaignByMonth, activePeriod],
+  );
 
   const clientSpendData = useMemo(
     () =>
-      [...clientExecutiveRows]
-        .filter((e) => e.monthTotals.spend > 0)
-        .sort((a, b) => b.monthTotals.spend - a.monthTotals.spend)
-        .slice(0, 6)
-        .map((e) => ({
-          name:
-            e.client.name.length > 14
-              ? e.client.name.slice(0, 14) + '…'
-              : e.client.name,
-          spend: Math.round(e.monthTotals.spend),
-        })),
-    [clientExecutiveRows],
+      [...selectedByClient.entries()]
+        .map(([cid, kpi]) => {
+          const raw = visibleClients.find((c) => c.id === cid)?.name ?? cid.slice(0, 8);
+          return { name: raw.length > 14 ? raw.slice(0, 14) + '…' : raw, spend: Math.round(kpi.spend) };
+        })
+        .filter((e) => e.spend > 0)
+        .sort((a, b) => b.spend - a.spend)
+        .slice(0, 6),
+    [selectedByClient, visibleClients],
   );
 
   const tableClients = useMemo(
@@ -433,34 +444,34 @@ export function DashboardPage() {
 
   const kpiItems: Array<{ label: string; value: string; Icon: LucideIcon }> = [
     {
-      label: `Inversión ${executiveMonthLabel}`,
-      value: formatCop(effectiveSpend),
+      label: `Inversión ${activePeriodLabel}`,
+      value: formatCop(kpiSpend),
       Icon: DollarSign,
     },
     {
-      label: `Conversaciones ${executiveMonthLabel}`,
-      value: formatNumber(effectiveMessages),
+      label: `Conversaciones ${activePeriodLabel}`,
+      value: formatNumber(kpiMessages),
       Icon: MessageCircle,
     },
     {
-      label: 'Costo / Conv.',
-      value: costPerConversation != null ? formatCop(costPerConversation) : '—',
-      Icon: TrendingDown,
+      label: 'Alcance (Reach)',
+      value: formatNumber(kpiReach),
+      Icon: TrendingUp,
     },
     {
-      label: `Ventas ${executiveMonthLabel}`,
-      value: formatCop(overall.total_sales),
-      Icon: ShoppingCart,
-    },
-    {
-      label: 'Ticket promedio',
-      value: averageTicket != null ? formatCop(averageTicket) : '—',
+      label: 'Impresiones',
+      value: formatNumber(kpiImpressions),
       Icon: BarChart3,
     },
     {
-      label: 'Clientes con alertas',
-      value: String(clientsWithAlerts),
-      Icon: Bell,
+      label: 'CPM',
+      value: kpiCpm > 0 ? formatCop(kpiCpm) : '—',
+      Icon: TrendingDown,
+    },
+    {
+      label: 'Frecuencia',
+      value: kpiFrequency > 0 ? kpiFrequency.toFixed(2) : '—',
+      Icon: ShoppingCart,
     },
   ];
 
@@ -506,6 +517,62 @@ export function DashboardPage() {
           </Link>
         </div>
       </motion.div>
+
+      {/* ── Period Selector ── */}
+      {campaignByMonth.length > 0 && (
+        <motion.div
+          style={{ display: 'flex', gap: '6px', padding: '0 0 4px' }}
+          {...fadeUp(0.05)}
+        >
+          {campaignByMonth.map((m) => (
+            <button
+              key={m.month}
+              onClick={() => setSelectedPeriod(m.month)}
+              style={{
+                fontFamily: 'JetBrains Mono',
+                fontSize: '0.65rem',
+                letterSpacing: '0.08em',
+                padding: '5px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                border: activePeriod === m.month
+                  ? '1px solid hsl(180,100%,50%)'
+                  : '1px solid hsl(0 0% 100% / 0.1)',
+                background: activePeriod === m.month
+                  ? 'hsl(180 100% 50% / 0.1)'
+                  : 'transparent',
+                color: activePeriod === m.month
+                  ? 'hsl(180,100%,50%)'
+                  : 'hsl(215,15%,55%)',
+              }}
+            >
+              {getMonthLabel(m.month)}
+            </button>
+          ))}
+          <button
+            onClick={() => setSelectedPeriod('all')}
+            style={{
+              fontFamily: 'JetBrains Mono',
+              fontSize: '0.65rem',
+              letterSpacing: '0.08em',
+              padding: '5px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              border: activePeriod === 'all'
+                ? '1px solid hsl(180,100%,50%)'
+                : '1px solid hsl(0 0% 100% / 0.1)',
+              background: activePeriod === 'all'
+                ? 'hsl(180 100% 50% / 0.1)'
+                : 'transparent',
+              color: activePeriod === 'all'
+                ? 'hsl(180,100%,50%)'
+                : 'hsl(215,15%,55%)',
+            }}
+          >
+            Total año
+          </button>
+        </motion.div>
+      )}
 
       {/* ── KPI Grid ── */}
       <div className="dashboard-kpi-grid">
@@ -566,7 +633,7 @@ export function DashboardPage() {
 
       {/* ── Charts Row ── */}
       <div className="dashboard-charts-row">
-        {/* Area Chart — Inversión & Mensajes */}
+        {/* Bar Chart — Inversión & Mensajes por mes (fuente: ad_campaign_metrics) */}
         <motion.div
           className="card-glass"
           style={{ padding: '24px', borderRadius: '4px' }}
@@ -582,7 +649,7 @@ export function DashboardPage() {
           >
             <div>
               <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
-                Rendimiento
+                Histórico mensual
               </span>
               <h3
                 className="font-display"
@@ -599,44 +666,20 @@ export function DashboardPage() {
             </div>
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <div
-                  style={{
-                    width: '9px',
-                    height: '9px',
-                    borderRadius: '50%',
-                    background: 'hsl(180,100%,50%)',
-                  }}
-                />
+                <div style={{ width: '9px', height: '9px', borderRadius: '2px', background: 'hsl(180,100%,50%)' }} />
                 <span className="number-label">Inversión</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <div
-                  style={{
-                    width: '9px',
-                    height: '9px',
-                    borderRadius: '50%',
-                    background: 'hsl(280,80%,60%)',
-                  }}
-                />
+                <div style={{ width: '9px', height: '9px', borderRadius: '2px', background: 'hsl(280,80%,60%)' }} />
                 <span className="number-label">Mensajes</span>
               </div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={dailyChartData}>
-              <defs>
-                <linearGradient id="colorInversion" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(180,100%,50%)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(180,100%,50%)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorMensajes" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(280,80%,60%)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(280,80%,60%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 100% / 0.05)" />
+            <BarChart data={monthlyChartData} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 100% / 0.05)" vertical={false} />
               <XAxis
-                dataKey="date"
+                dataKey="label"
                 tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
@@ -647,23 +690,25 @@ export function DashboardPage() {
                 tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Area
-                type="monotone"
-                dataKey="spend"
-                name="Inversión"
-                stroke="hsl(180,100%,50%)"
-                strokeWidth={2}
-                fill="url(#colorInversion)"
-              />
-              <Area
-                type="monotone"
-                dataKey="messages"
-                name="Mensajes"
-                stroke="hsl(280,80%,60%)"
-                strokeWidth={2}
-                fill="url(#colorMensajes)"
-              />
-            </AreaChart>
+              <Bar dataKey="spend" name="Inversión" radius={[2, 2, 0, 0]}>
+                {monthlyChartData.map((entry, idx) => (
+                  <Cell
+                    key={idx}
+                    fill="hsl(180,100%,50%)"
+                    fillOpacity={entry.isSelected || activePeriod === 'all' ? 1 : 0.35}
+                  />
+                ))}
+              </Bar>
+              <Bar dataKey="messages" name="Mensajes" radius={[2, 2, 0, 0]}>
+                {monthlyChartData.map((entry, idx) => (
+                  <Cell
+                    key={idx}
+                    fill="hsl(280,80%,60%)"
+                    fillOpacity={entry.isSelected || activePeriod === 'all' ? 1 : 0.35}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </motion.div>
 

@@ -43,7 +43,7 @@ type MutableObjectiveAggregate = Omit<
 
 type MutableMonthAggregate = Omit<
   CampaignAggregateByMonth,
-  'adRoas' | 'costPerConversation' | 'costPerProfileVisit' | 'campaignCount'
+  'adRoas' | 'costPerConversation' | 'costPerProfileVisit' | 'campaignCount' | 'cpm' | 'frequency'
 > & {
   campaignIds: Set<string>;
 };
@@ -264,9 +264,21 @@ function finalizeObjectiveAggregate(
 }
 
 function finalizeMonthAggregate(aggregate: MutableMonthAggregate): CampaignAggregateByMonth {
+  const cpm =
+    aggregate.impressions > 0
+      ? Math.round((aggregate.spend / aggregate.impressions) * 1000 * 100) / 100
+      : 0;
+  const frequency =
+    aggregate.reach > 0
+      ? Math.round((aggregate.impressions / aggregate.reach) * 100) / 100
+      : 0;
   return {
     month: aggregate.month,
     spend: aggregate.spend,
+    reach: aggregate.reach,
+    impressions: aggregate.impressions,
+    cpm,
+    frequency,
     messages: aggregate.messages,
     profileVisits: aggregate.profileVisits,
     leads: aggregate.leads,
@@ -590,6 +602,8 @@ export function aggregateCampaignMetricsByMonth(
 
     if (current) {
       current.spend += normalizeMoney(row.spend);
+      current.reach += normalizeInteger(row.reach);
+      current.impressions += normalizeInteger(row.impressions);
       current.messages += normalizeInteger(row.messages);
       current.profileVisits += normalizeInteger(row.profile_visits);
       current.leads += normalizeInteger(row.leads);
@@ -607,6 +621,8 @@ export function aggregateCampaignMetricsByMonth(
     grouped.set(month, {
       month,
       spend: normalizeMoney(row.spend),
+      reach: normalizeInteger(row.reach),
+      impressions: normalizeInteger(row.impressions),
       messages: normalizeInteger(row.messages),
       profileVisits: normalizeInteger(row.profile_visits),
       leads: normalizeInteger(row.leads),
@@ -624,6 +640,71 @@ export function aggregateCampaignMetricsByMonth(
   return [...grouped.values()]
     .map(finalizeMonthAggregate)
     .sort((a, b) => a.month.localeCompare(b.month));
+}
+
+/**
+ * Sums an array of monthly aggregates into a single CampaignAggregateByMonth.
+ * Used for "Total año" mode. CPM and frequency are recomputed from totals.
+ */
+export function sumCampaignMonthAggregates(
+  months: CampaignAggregateByMonth[],
+  label = 'total',
+): CampaignAggregateByMonth {
+  if (months.length === 0) {
+    return {
+      month: label, spend: 0, reach: 0, impressions: 0, cpm: 0, frequency: 0,
+      messages: 0, profileVisits: 0, leads: 0, purchases: 0, purchaseValue: 0,
+      linkClicks: 0, pageEngagement: 0, postEngagement: 0, videoViews: 0,
+      thruplays: 0, campaignCount: 0, adRoas: 0, costPerConversation: null,
+      costPerProfileVisit: null,
+    };
+  }
+  const spend = months.reduce((s, m) => s + m.spend, 0);
+  const reach = months.reduce((s, m) => s + m.reach, 0);
+  const impressions = months.reduce((s, m) => s + m.impressions, 0);
+  const messages = months.reduce((s, m) => s + m.messages, 0);
+  const profileVisits = months.reduce((s, m) => s + m.profileVisits, 0);
+  const purchaseValue = months.reduce((s, m) => s + m.purchaseValue, 0);
+  const campaignCount = months.reduce((s, m) => s + m.campaignCount, 0);
+  const cpm = impressions > 0 ? Math.round((spend / impressions) * 1000 * 100) / 100 : 0;
+  const frequency = reach > 0 ? Math.round((impressions / reach) * 100) / 100 : 0;
+  return {
+    month: label, spend, reach, impressions, cpm, frequency, messages, profileVisits,
+    leads: months.reduce((s, m) => s + m.leads, 0),
+    purchases: months.reduce((s, m) => s + m.purchases, 0),
+    purchaseValue,
+    linkClicks: months.reduce((s, m) => s + m.linkClicks, 0),
+    pageEngagement: months.reduce((s, m) => s + m.pageEngagement, 0),
+    postEngagement: months.reduce((s, m) => s + m.postEngagement, 0),
+    videoViews: months.reduce((s, m) => s + m.videoViews, 0),
+    thruplays: months.reduce((s, m) => s + m.thruplays, 0),
+    campaignCount,
+    adRoas: spend > 0 ? Math.round((purchaseValue / spend) * 10_000) / 10_000 : 0,
+    costPerConversation: messages > 0 ? Math.round((spend / messages) * 10_000) / 10_000 : null,
+    costPerProfileVisit: profileVisits > 0 ? Math.round((spend / profileVisits) * 10_000) / 10_000 : null,
+  };
+}
+
+/**
+ * Aggregates pre-filtered AdCampaignMetric rows per client.
+ * Caller is responsible for filtering rows to the desired period first.
+ * Returns Map<clientId, CampaignAggregateByMonth> (summed across all months in rows).
+ */
+export function aggregateCampaignKpisByClient(
+  rows: AdCampaignMetric[],
+): Map<string, CampaignAggregateByMonth> {
+  const grouped = new Map<string, AdCampaignMetric[]>();
+  for (const row of rows) {
+    if (!grouped.has(row.client_id)) grouped.set(row.client_id, []);
+    grouped.get(row.client_id)!.push(row);
+  }
+  const result = new Map<string, CampaignAggregateByMonth>();
+  for (const [clientId, clientRows] of grouped) {
+    const agg = aggregateCampaignMetricsByMonth(clientRows);
+    if (agg.length === 0) continue;
+    result.set(clientId, agg.length === 1 ? agg[0] : sumCampaignMonthAggregates(agg));
+  }
+  return result;
 }
 
 export function computeCampaignPerformanceSummary(
