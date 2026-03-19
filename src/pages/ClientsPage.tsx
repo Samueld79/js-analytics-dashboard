@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
-import { useCampaignSummary, useMetaSyncRows, useAlerts } from '../hooks/useData';
+import { useCampaignSummary, useAlerts } from '../hooks/useData';
 import {
   aggregateCampaignKpisByClient,
   sumCampaignMonthAggregates,
@@ -18,7 +18,6 @@ export function ClientsPage() {
   const { clients, loading, saving, error, createClient } = useClients();
   // Unified campaign source — same hook as DashboardPage
   const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary();
-  const { syncRows } = useMetaSyncRows();
   const { alerts } = useAlerts();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -62,16 +61,15 @@ export function ClientsPage() {
     return map;
   }, [alerts]);
 
-  const syncByClient = useMemo(() => {
-    const map = new Map<string, string | null>();
-    for (const row of syncRows) {
+  // MAX(date) per client from ad_campaign_metrics — replaces n8n sync indicator
+  const lastUpdateByClient = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of campaignRows) {
       const existing = map.get(row.client_id);
-      if (!existing || (row.last_sync_at ?? '') > existing) {
-        map.set(row.client_id, row.last_sync_at ?? null);
-      }
+      if (!existing || row.date > existing) map.set(row.client_id, row.date);
     }
     return map;
-  }, [syncRows]);
+  }, [campaignRows]);
 
   const filtered = useMemo(
     () =>
@@ -280,7 +278,7 @@ export function ClientsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.08)' }}>
-                  {['Cliente', 'Nicho', 'Inversión', 'Mensajes', 'Reach', 'Impr.', 'CPM', 'Frec.', 'Meta', 'Acciones'].map(
+                  {['Cliente', 'Nicho', 'Inversión', 'Mensajes', 'Reach', 'Impr.', 'CPM', 'Frec.', 'Actualizado', 'Acciones'].map(
                     (h) => (
                       <th
                         key={h}
@@ -302,20 +300,8 @@ export function ClientsPage() {
                 {filtered.map((client) => {
                   const kpi = campaignByClient.get(client.id);
                   const openAlerts = alertsByClient.get(client.id) ?? 0;
-                  const lastSync = syncByClient.get(client.id);
-                  const syncAge = lastSync
-                    ? Math.floor(
-                        (Date.now() - new Date(lastSync).getTime()) / 86_400_000,
-                      )
-                    : null;
-                  const syncLabel =
-                    syncAge === null
-                      ? 'SIN SYNC'
-                      : syncAge === 0
-                        ? 'HOY'
-                        : `HACE ${syncAge}D`;
-                  const syncOk = syncAge !== null && syncAge <= 1;
-                  const syncWarn = syncAge !== null && syncAge > 1 && syncAge <= 3;
+                  const lastUpdate = lastUpdateByClient.get(client.id);
+                  const updateLabel = lastUpdate ? formatShortDate(lastUpdate) : '—';
 
                   return (
                     <tr
@@ -435,35 +421,17 @@ export function ClientsPage() {
                         </span>
                       </td>
 
-                      {/* Meta sync */}
+                      {/* Actualizado */}
                       <td style={{ padding: '13px 20px' }}>
                         <span
                           style={{
                             fontFamily: 'JetBrains Mono',
                             fontSize: '0.6rem',
                             letterSpacing: '0.08em',
-                            padding: '3px 7px',
-                            borderRadius: '4px',
-                            ...(syncOk
-                              ? {
-                                  background: 'hsl(145 100% 45% / 0.12)',
-                                  color: 'hsl(145,100%,45%)',
-                                  border: '1px solid hsl(145 100% 45% / 0.2)',
-                                }
-                              : syncWarn
-                                ? {
-                                    background: 'hsl(38 100% 50% / 0.12)',
-                                    color: 'hsl(38,100%,60%)',
-                                    border: '1px solid hsl(38 100% 50% / 0.2)',
-                                  }
-                                : {
-                                    background: 'hsl(0 0% 100% / 0.04)',
-                                    color: 'hsl(215,15%,45%)',
-                                    border: '1px solid hsl(0 0% 100% / 0.08)',
-                                  }),
+                            color: lastUpdate ? 'hsl(215,15%,65%)' : 'hsl(215,15%,35%)',
                           }}
                         >
-                          {syncLabel}
+                          {updateLabel}
                         </span>
                       </td>
 
@@ -553,6 +521,14 @@ export function ClientsPage() {
       )}
     </div>
   );
+}
+
+/** Formats "2026-03-17" → "17 Mar" */
+function formatShortDate(dateStr: string): string {
+  const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const [, mm, dd] = dateStr.split('-');
+  const month = months[parseInt(mm, 10) - 1] ?? mm;
+  return `${parseInt(dd, 10)} ${month}`;
 }
 
 function clientGradient(id: string): string {

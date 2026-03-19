@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import {
   AreaChart,
@@ -19,17 +19,17 @@ import { motion, type Transition } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { ClientFileModal } from '../components/ClientFileModal';
 import { HistoricalMonthlyModal } from '../components/HistoricalMonthlyModal';
-import { MonthSelector } from '../components/MonthSelector';
 import { SalesModal } from '../components/SalesModal';
 import { useAuth } from '../hooks/useAuth';
-import { useAdCampaignMetrics, useCampaignMonthlyHistory } from '../hooks/useData';
+import { useCampaignSummary } from '../hooks/useData';
 import { useClientWorkspace } from '../hooks/useClientWorkspace';
 import {
   aggregateCampaignMetricsByCampaign,
   aggregateCampaignMetricsByObjective,
+  sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
-import { formatCop, formatRoas, formatNumber } from '../lib/utils';
-import { getMonthKey, getMonthLabel, listAvailableMonthKeys } from '../utils/monthLabel';
+import { formatCop, formatNumber } from '../lib/utils';
+import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 
 const FADE = { duration: 0.3, ease: 'easeOut' } as Transition;
 
@@ -62,8 +62,6 @@ export function ClientDetailPage() {
 
   const {
     client,
-    metrics,
-    monthlyKpis,
     sales,
     loading,
     error,
@@ -75,87 +73,46 @@ export function ClientDetailPage() {
     strategies,
   } = useClientWorkspace(id, 400);
 
-  // BUG 1 FIX: use useCampaignMonthlyHistory for the area chart (all historical months)
-  const { byMonth: campaignByMonth } = useCampaignMonthlyHistory(client?.id);
-  // Separate hook for campaign table / pie: only needs recent 90 days
-  const { rows: campaignRows } = useAdCampaignMetrics(client?.id, 90);
+  // Single source: ad_campaign_metrics (2 years of history)
+  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(client?.id, 730);
 
-  // Debug — check what history comes back per client
-  console.log('[ClientDetailPage] campaignByMonth:', campaignByMonth, 'clientId:', client?.id);
+  // Period selector — null = auto-select most recent
+  const [selectedPeriod, setSelectedPeriod] = useState<string | 'all' | null>(null);
+  const activePeriod = selectedPeriod ?? campaignByMonth[campaignByMonth.length - 1]?.month ?? '';
 
-  const [selectedMonth, setSelectedMonth] = useState('');
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
   const [showHistoricalModal, setShowHistoricalModal] = useState(false);
 
-  const availableMonths = useMemo(
+  // Rows filtered to active period (for campaign table / pie)
+  const periodRows = useMemo(
     () =>
-      listAvailableMonthKeys([
-        ...monthlyKpis.map((r) => r.month),
-        ...metrics.map((r) => r.date),
-        ...sales.map((r) => r.date),
-        ...campaignByMonth.map((m) => m.month),
-      ]),
-    [metrics, monthlyKpis, sales, campaignByMonth],
-  );
-
-  const fallbackMonth = availableMonths[0] ?? new Date().toISOString().slice(0, 7);
-  const activeMonth = selectedMonth || fallbackMonth;
-
-  useEffect(() => {
-    if (!selectedMonth) {
-      setSelectedMonth(fallbackMonth);
-    } else if (availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
-      setSelectedMonth(availableMonths[0]);
-    }
-  }, [availableMonths, fallbackMonth, selectedMonth]);
-
-  // Campaign aggregations for selected month (from 90-day raw rows)
-  const selectedMonthCampaignRows = useMemo(
-    () => campaignRows.filter((r) => getMonthKey(r.date) === activeMonth),
-    [campaignRows, activeMonth],
+      activePeriod === 'all' || activePeriod === ''
+        ? campaignRows
+        : campaignRows.filter((r) => r.date.startsWith(activePeriod)),
+    [campaignRows, activePeriod],
   );
 
   const campaignsByCampaign = useMemo(
-    () => aggregateCampaignMetricsByCampaign(selectedMonthCampaignRows),
-    [selectedMonthCampaignRows],
+    () => aggregateCampaignMetricsByCampaign(periodRows),
+    [periodRows],
   );
 
   const campaignsByObjective = useMemo(
-    () => aggregateCampaignMetricsByObjective(selectedMonthCampaignRows),
-    [selectedMonthCampaignRows],
+    () => aggregateCampaignMetricsByObjective(periodRows),
+    [periodRows],
   );
 
-  // KPI spend + messages: prefer ad_metrics (daily, accurate); fall back to campaign aggregates
-  const selectedMonthAdMetrics = useMemo(
-    () => metrics.filter((r) => getMonthKey(r.date) === activeMonth),
-    [metrics, activeMonth],
+  // KPI aggregate for selected period
+  const periodKpi = useMemo(
+    () =>
+      activePeriod === 'all'
+        ? sumCampaignMonthAggregates(campaignByMonth, 'all')
+        : (campaignByMonth.find((m) => m.month === activePeriod) ?? null),
+    [campaignByMonth, activePeriod],
   );
 
-  const campaignMonthFallback = useMemo(
-    () => campaignByMonth.find((m) => m.month === activeMonth) ?? null,
-    [campaignByMonth, activeMonth],
-  );
-
-  const kpiSpend = useMemo(() => {
-    const adSpend = selectedMonthAdMetrics.reduce((sum, r) => sum + r.spend, 0);
-    return adSpend > 0 ? adSpend : (campaignMonthFallback?.spend ?? 0);
-  }, [selectedMonthAdMetrics, campaignMonthFallback]);
-
-  const kpiMessages = useMemo(() => {
-    const adMessages = selectedMonthAdMetrics.reduce((sum, r) => sum + r.messages, 0);
-    return adMessages > 0 ? adMessages : (campaignMonthFallback?.messages ?? 0);
-  }, [selectedMonthAdMetrics, campaignMonthFallback]);
-
-  // ROAS and sales from monthly KPI consolidated row (more authoritative)
-  const selectedKpiRow = useMemo(
-    () => monthlyKpis.find((r) => getMonthKey(r.month) === activeMonth) ?? null,
-    [monthlyKpis, activeMonth],
-  );
-  const kpiRoas = selectedKpiRow?.real_roas ?? 0;
-  const kpiSales = selectedKpiRow?.total_sales ?? 0;
-
-  // Area chart: all historical months from useCampaignMonthlyHistory
+  // Area chart: all historical months
   const areaChartData = useMemo(
     () =>
       [...campaignByMonth]
@@ -265,14 +222,59 @@ export function ClientDetailPage() {
           </div>
         </div>
 
-        {/* BUG 4 FIX: actions flush-right */}
+        {/* Period selector */}
         <div className="portal-header-actions">
-          <MonthSelector
-            label="Periodo"
-            value={activeMonth}
-            options={availableMonths.length > 0 ? availableMonths : [fallbackMonth]}
-            onChange={setSelectedMonth}
-          />
+          {campaignByMonth.length > 0 && (
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {campaignByMonth.map((m) => (
+                <button
+                  key={m.month}
+                  onClick={() => setSelectedPeriod(m.month)}
+                  style={{
+                    fontFamily: 'JetBrains Mono',
+                    fontSize: '0.65rem',
+                    letterSpacing: '0.08em',
+                    padding: '5px 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    border: activePeriod === m.month
+                      ? '1px solid hsl(180,100%,50%)'
+                      : '1px solid hsl(0 0% 100% / 0.1)',
+                    background: activePeriod === m.month
+                      ? 'hsl(180 100% 50% / 0.1)'
+                      : 'transparent',
+                    color: activePeriod === m.month
+                      ? 'hsl(180,100%,50%)'
+                      : 'hsl(215,15%,55%)',
+                  }}
+                >
+                  {getMonthLabel(m.month)}
+                </button>
+              ))}
+              <button
+                onClick={() => setSelectedPeriod('all')}
+                style={{
+                  fontFamily: 'JetBrains Mono',
+                  fontSize: '0.65rem',
+                  letterSpacing: '0.08em',
+                  padding: '5px 12px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  border: activePeriod === 'all'
+                    ? '1px solid hsl(180,100%,50%)'
+                    : '1px solid hsl(0 0% 100% / 0.1)',
+                  background: activePeriod === 'all'
+                    ? 'hsl(180 100% 50% / 0.1)'
+                    : 'transparent',
+                  color: activePeriod === 'all'
+                    ? 'hsl(180,100%,50%)'
+                    : 'hsl(215,15%,55%)',
+                }}
+              >
+                Total año
+              </button>
+            </div>
+          )}
           {canLoadHistory && (
             <button className="btn-secondary" onClick={() => setShowHistoricalModal(true)}>
               + Cargar histórico
@@ -294,15 +296,12 @@ export function ClientDetailPage() {
       {/* ── KPI Grid ── */}
       <div className="portal-kpi-grid">
         {[
-          { label: 'Inversión', value: formatCop(kpiSpend), sub: getMonthLabel(activeMonth) },
-          { label: 'Conversaciones', value: formatNumber(kpiMessages), sub: 'mensajes iniciados' },
-          {
-            label: 'ROAS Operativo',
-            value: formatRoas(kpiRoas),
-            sub:
-              kpiRoas >= 3 ? 'Saludable' : kpiRoas >= 1 ? 'Revisar' : kpiRoas > 0 ? 'Bajo' : '—',
-          },
-          { label: 'Ventas', value: formatCop(kpiSales), sub: getMonthLabel(activeMonth) },
+          { label: 'Inversión', value: formatCop(periodKpi?.spend ?? 0), sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
+          { label: 'Mensajes', value: formatNumber(periodKpi?.messages ?? 0), sub: 'conversaciones iniciadas' },
+          { label: 'Alcance', value: formatNumber(periodKpi?.reach ?? 0), sub: 'personas únicas' },
+          { label: 'Impresiones', value: formatNumber(periodKpi?.impressions ?? 0), sub: 'veces mostrado' },
+          { label: 'CPM', value: periodKpi && periodKpi.cpm > 0 ? formatCop(periodKpi.cpm) : '—', sub: 'costo por 1000 imp.' },
+          { label: 'Frecuencia', value: periodKpi && periodKpi.frequency > 0 ? periodKpi.frequency.toFixed(2) : '—', sub: 'imp. por persona' },
         ].map((card, i) => (
           <motion.div
             key={card.label}
@@ -394,7 +393,7 @@ export function ClientDetailPage() {
         {/* BUG 3 FIX: Pie chart uses objectiveInfo for labels + colors */}
         <div className="card-glass" style={{ padding: '20px 24px' }}>
           <div className="number-label" style={{ marginBottom: 16 }}>
-            Mix de campañas — {getMonthLabel(activeMonth)}
+            Mix de campañas — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
           </div>
           {campaignsByObjective.length > 0 ? (
             <>
@@ -470,7 +469,7 @@ export function ClientDetailPage() {
       {campaignsByCampaign.length > 0 && (
         <div className="card-glass" style={{ padding: '20px 24px' }}>
           <div className="number-label" style={{ marginBottom: 16 }}>
-            Campañas — {getMonthLabel(activeMonth)}
+            Campañas — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
