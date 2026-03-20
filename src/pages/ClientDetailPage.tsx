@@ -26,6 +26,7 @@ import { useClientWorkspace } from '../hooks/useClientWorkspace';
 import {
   aggregateCampaignMetricsByCampaign,
   aggregateCampaignMetricsByObjective,
+  inferObjectiveFromName,
   sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
 import { formatCop, formatNumber } from '../lib/utils';
@@ -33,22 +34,17 @@ import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 
 const FADE = { duration: 0.3, ease: 'easeOut' } as Transition;
 
-// Maps result_type / objective raw values → human label + color
+// Maps inferred objective label → color for Pie chart
 type ObjectiveInfo = { label: string; color: string };
-function objectiveInfo(raw: string | null | undefined): ObjectiveInfo {
-  switch (raw) {
-    case 'messages':
-      return { label: 'Mensajes', color: 'hsl(280,80%,60%)' };
-    case 'profile_visit':
-      return { label: 'Tráfico', color: 'hsl(180,100%,50%)' };
-    case 'reach':
-      return { label: 'Reconocimiento', color: 'hsl(40,90%,55%)' };
-    case 'purchases':
-      return { label: 'Ventas', color: 'hsl(140,60%,50%)' };
-    case 'leads':
-      return { label: 'Leads', color: 'hsl(200,80%,55%)' };
-    default:
-      return { label: raw && raw !== 'Sin objetivo real' ? raw : 'Otro', color: 'hsl(220,15%,45%)' };
+function objectiveInfo(label: string | null | undefined): ObjectiveInfo {
+  switch (label) {
+    case 'Reconocimiento': return { label, color: 'hsl(40,90%,55%)' };
+    case 'Interacción':    return { label, color: 'hsl(280,80%,60%)' };
+    case 'Tráfico':        return { label, color: 'hsl(180,100%,50%)' };
+    case 'Ventas':         return { label, color: 'hsl(140,60%,50%)' };
+    case 'Presentación':   return { label, color: 'hsl(200,80%,55%)' };
+    case 'Evaluación':     return { label, color: 'hsl(20,90%,55%)' };
+    default:               return { label: label || 'Otro', color: 'hsl(220,15%,45%)' };
   }
 }
 
@@ -83,6 +79,7 @@ export function ClientDetailPage() {
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
   const [showHistoricalModal, setShowHistoricalModal] = useState(false);
+  const [tableOpen, setTableOpen] = useState(false);
 
   // Rows filtered to active period (for campaign table / pie)
   const periodRows = useMemo(
@@ -465,13 +462,28 @@ export function ClientDetailPage() {
         </div>
       </div>
 
-      {/* ── Campaign Table ── */}
+      {/* ── Campaign Table (collapsible) ── */}
       {campaignsByCampaign.length > 0 && (
         <div className="card-glass" style={{ padding: '20px 24px' }}>
-          <div className="number-label" style={{ marginBottom: 16 }}>
-            Campañas — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
+          <div
+            className="number-label"
+            onClick={() => setTableOpen((o) => !o)}
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: tableOpen ? 16 : 0,
+              userSelect: 'none',
+            }}
+          >
+            <span>
+              Campañas — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
+              {' '}({campaignsByCampaign.length})
+            </span>
+            <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>{tableOpen ? '▲' : '▼'}</span>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          {tableOpen && <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left' }}>
                 {['Campaña', 'Objetivo', 'Inversión', 'Resultados', 'Estado'].map((h, i) => (
@@ -491,7 +503,7 @@ export function ClientDetailPage() {
             </thead>
             <tbody>
               {campaignsByCampaign.map((c) => {
-                const obj = objectiveInfo(c.objective);
+                const obj = objectiveInfo(inferObjectiveFromName(c.campaignName));
                 const results =
                   c.messages > 0
                     ? `${formatNumber(c.messages)} msgs`
@@ -557,7 +569,7 @@ export function ClientDetailPage() {
                 );
               })}
             </tbody>
-          </table>
+          </table>}
         </div>
       )}
 

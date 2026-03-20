@@ -208,9 +208,19 @@ function resolveEffectiveStatus(row: RawAdCampaignImportRow): string | null {
   return metadataStatus || null;
 }
 
-function getObjectiveLabel(objective: string | null | undefined): string {
-  const normalized = normalizeText(objective);
-  return normalized || 'Sin objetivo real';
+/**
+ * Infers a human-readable objective category from the campaign name.
+ * Matching is case-insensitive and keyword-based.
+ */
+export function inferObjectiveFromName(name: string): string {
+  const u = (name ?? '').toUpperCase();
+  if (u.includes('RECON')) return 'Reconocimiento';
+  if (u.includes('INTER')) return 'Interacción';
+  if (u.includes('TRAFI')) return 'Tráfico';
+  if (u.includes('VENT')) return 'Ventas';
+  if (u.includes('PRESENT')) return 'Presentación';
+  if (u.includes('EVA')) return 'Evaluación';
+  return 'Otro';
 }
 
 function getMonthKey(date: string): string {
@@ -264,9 +274,10 @@ function finalizeObjectiveAggregate(
 }
 
 function finalizeMonthAggregate(aggregate: MutableMonthAggregate): CampaignAggregateByMonth {
+  // impressions is stored in thousands in the DB, so CPM = spend / impressions (no ×1000 needed)
   const cpm =
     aggregate.impressions > 0
-      ? Math.round((aggregate.spend / aggregate.impressions) * 1000 * 100) / 100
+      ? Math.round((aggregate.spend / aggregate.impressions) * 100) / 100
       : 0;
   const frequency =
     aggregate.reach > 0
@@ -549,7 +560,7 @@ export function aggregateCampaignMetricsByObjective(
   const grouped = new Map<string, MutableObjectiveAggregate>();
 
   rows.forEach((row) => {
-    const objective = getObjectiveLabel(row.objective);
+    const objective = inferObjectiveFromName(row.campaign_name ?? '');
     const current = grouped.get(objective);
 
     if (current) {
@@ -666,7 +677,7 @@ export function sumCampaignMonthAggregates(
   const profileVisits = months.reduce((s, m) => s + m.profileVisits, 0);
   const purchaseValue = months.reduce((s, m) => s + m.purchaseValue, 0);
   const campaignCount = months.reduce((s, m) => s + m.campaignCount, 0);
-  const cpm = impressions > 0 ? Math.round((spend / impressions) * 1000 * 100) / 100 : 0;
+  const cpm = impressions > 0 ? Math.round((spend / impressions) * 100) / 100 : 0;
   const frequency = reach > 0 ? Math.round((impressions / reach) * 100) / 100 : 0;
   return {
     month: label, spend, reach, impressions, cpm, frequency, messages, profileVisits,
