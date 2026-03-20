@@ -8,7 +8,7 @@ import {
   sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
 import { getMonthLabel } from '../utils/monthLabel';
-import { Plus, Search, Users } from 'lucide-react';
+import { ExternalLink, Eye, Plus, Search, Users } from 'lucide-react';
 import { formatCop, formatNumber } from '../lib/utils';
 
 type StatusFilter = 'all' | 'active' | 'paused';
@@ -278,7 +278,7 @@ export function ClientsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.06)' }}>
-                  {['Cliente', 'Inversión', 'Mensajes', 'Reach', 'CPM', 'Frec.', 'Actualizado', 'Acciones'].map(
+                  {['Cliente', 'Inversión', 'Alcance', 'CPM', 'Actualizado', 'Acciones'].map(
                     (h) => (
                       <th
                         key={h}
@@ -367,46 +367,34 @@ export function ClientsPage() {
                       </td>
 
                       {/* Inversión — cyan */}
-                      <td style={{ padding: '9px 16px' }}>
+                      <td style={{ padding: '9px 14px' }}>
                         <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.76rem', color: kpi ? 'hsl(180,100%,50%)' : 'hsl(215,15%,35%)', fontWeight: 500 }}>
                           {kpi ? formatCop(kpi.spend) : '—'}
                         </span>
                       </td>
 
-                      {/* Mensajes — muted */}
-                      <td style={{ padding: '9px 16px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,58%)' }}>
-                          {kpi ? formatNumber(kpi.messages) : '—'}
+                      {/* Alcance = msgs · reach compact */}
+                      <td style={{ padding: '9px 14px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.66rem', color: 'hsl(215,15%,55%)', whiteSpace: 'nowrap' }}>
+                          {kpi
+                            ? `${formatNumber(kpi.messages)} msgs · ${fmtCompact(kpi.reach)} reach`
+                            : '—'}
                         </span>
                       </td>
 
-                      {/* Reach — muted */}
-                      <td style={{ padding: '9px 16px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,58%)' }}>
-                          {kpi ? formatNumber(kpi.reach) : '—'}
-                        </span>
-                      </td>
-
-                      {/* CPM — color badge */}
-                      <td style={{ padding: '9px 16px' }}>
+                      {/* CPM — color badge, no $ */}
+                      <td style={{ padding: '9px 14px' }}>
                         {kpi && kpi.cpm > 0 ? (
                           <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.6rem', letterSpacing: '0.05em', padding: '2px 6px', borderRadius: '3px', ...cpmBadgeStyle(kpi.cpm) }}>
-                            {formatCop(kpi.cpm)}
+                            {formatNumber(Math.round(kpi.cpm))}
                           </span>
                         ) : (
                           <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,35%)' }}>—</span>
                         )}
                       </td>
 
-                      {/* Frecuencia */}
-                      <td style={{ padding: '9px 16px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,58%)' }}>
-                          {kpi && kpi.frequency > 0 ? kpi.frequency.toFixed(2) : '—'}
-                        </span>
-                      </td>
-
                       {/* Actualizado — dot + fecha */}
-                      <td style={{ padding: '9px 16px' }}>
+                      <td style={{ padding: '9px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                           <span style={{ width: 5, height: 5, borderRadius: '50%', background: lastUpdate ? 'hsl(180,100%,50%)' : 'hsl(215,15%,28%)', flexShrink: 0 }} />
                           <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', letterSpacing: '0.04em', color: lastUpdate ? 'hsl(215,15%,62%)' : 'hsl(215,15%,32%)' }}>
@@ -415,23 +403,25 @@ export function ClientsPage() {
                         </div>
                       </td>
 
-                      {/* Acciones */}
-                      <td style={{ padding: '9px 16px' }}>
-                        <div style={{ display: 'flex', gap: '5px' }}>
+                      {/* Acciones — icon only con title tooltip */}
+                      <td style={{ padding: '9px 14px' }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
                           <button
+                            title="Ver cliente"
                             className="btn-ghost"
-                            style={{ fontSize: '0.62rem', padding: '3px 8px', cursor: 'pointer', border: '1px solid hsl(0 0% 100% / 0.08)' }}
+                            style={{ padding: '4px 6px', cursor: 'pointer', border: '1px solid hsl(0 0% 100% / 0.08)', display: 'flex', alignItems: 'center', color: 'hsl(215,15%,55%)' }}
                             onClick={() => void navigate(`/clients/${client.id}`)}
                           >
-                            Ver
+                            <Eye size={12} />
                           </button>
                           <a
                             href={`/portal/${client.id}`}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ fontFamily: 'JetBrains Mono', fontSize: '0.62rem', padding: '3px 8px', borderRadius: '4px', border: '1px solid hsl(180 100% 50% / 0.22)', color: 'hsl(180,100%,50%)', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                            title="Abrir portal"
+                            style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid hsl(180 100% 50% / 0.2)', color: 'hsl(180,100%,50%)', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
                           >
-                            Portal ↗
+                            <ExternalLink size={12} />
                           </a>
                         </div>
                       </td>
@@ -441,7 +431,7 @@ export function ClientsPage() {
 
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: '48px 24px', textAlign: 'center' }}>
+                    <td colSpan={6} style={{ padding: '48px 24px', textAlign: 'center' }}>
                       <div
                         style={{
                           display: 'flex',
@@ -486,6 +476,13 @@ export function ClientsPage() {
       )}
     </div>
   );
+}
+
+/** Compact number: 162000 → "162K", 1500000 → "1.5M" */
+function fmtCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return String(n);
 }
 
 function cpmBadgeStyle(cpm: number): React.CSSProperties {

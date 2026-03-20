@@ -3,6 +3,11 @@ import { Link } from 'react-router-dom';
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
+  ComposedChart,
+  Cell,
+  LabelList,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -16,12 +21,23 @@ import { useAuth } from '../hooks/useAuth';
 import { useMonthlyOperatingKpis, useCampaignSummary } from '../hooks/useData';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
-import { sumCampaignMonthAggregates } from '../services/adCampaignMetrics';
+import {
+  aggregateCampaignKpisByClient,
+  sumCampaignMonthAggregates,
+} from '../services/adCampaignMetrics';
 import type { ClientMonthlyOperatingKpi } from '../lib/supabase';
 import { formatCop, formatNumber, formatRoas, sumOperatingKpis } from '../lib/utils';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
+
+const CHART_COLORS = [
+  'hsl(180,100%,50%)',
+  'hsl(280,80%,60%)',
+  'hsl(40,90%,55%)',
+  'hsl(140,60%,50%)',
+  'hsl(200,80%,55%)',
+];
 
 function shortMonthLabel(monthKey: string): string {
   const [year, month] = monthKey.split('-');
@@ -88,7 +104,7 @@ export function MetricsPage() {
       : selectedClientId;
 
   // Primary data source: ad_campaign_metrics
-  const { byMonth: campaignByMonth } = useCampaignSummary(queryClientId, 730);
+  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(queryClientId, 730);
 
   // Historical ROAS: monthly KPI rows + manual sales
   const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, 12);
@@ -152,6 +168,22 @@ export function MetricsPage() {
   }, [campaignByMonth, scopedMonthlyKpis, scopedSales]);
 
   const chartData = historyRows.map((row) => ({ month: row.monthKey, spend: row.spend }));
+
+  // Top-5 clients by spend for the selected period
+  const top5ClientData = useMemo(() => {
+    const periodRows =
+      activePeriod === 'all' || activePeriod === ''
+        ? campaignRows
+        : campaignRows.filter((r) => r.date.startsWith(activePeriod));
+    const byClient = aggregateCampaignKpisByClient(periodRows);
+    return [...byClient.entries()]
+      .map(([clientId, kpi]) => {
+        const client = clients.find((c) => c.id === clientId);
+        return { name: client?.name ?? clientId.slice(0, 8), spend: kpi.spend };
+      })
+      .sort((a, b) => b.spend - a.spend)
+      .slice(0, 5);
+  }, [campaignRows, activePeriod, clients]);
 
   const cStatus: HealthStatus = costPerConv != null ? costStatus(costPerConv) : 'neutral';
 
@@ -407,6 +439,182 @@ export function MetricsPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* ── Comparison Charts ── */}
+      {campaignByMonth.length > 0 && (
+        <div style={{ padding: '0 24px 24px' }}>
+          <p className="number-label" style={{ marginBottom: 12, marginTop: 4, color: 'hsl(215,15%,36%)' }}>
+            ANÁLISIS COMPARATIVO
+          </p>
+
+          {/* Charts 1 & 2 — side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+
+            {/* Chart 1 — Inversión por mes (BarChart con gradiente) */}
+            <div style={{ background: 'rgba(6,10,18,0.8)', border: '1px solid hsl(180 100% 50% / 0.1)', borderRadius: 8, padding: '18px 16px 10px' }}>
+              <span className="number-label" style={{ fontSize: '0.58rem', color: 'hsl(215,15%,42%)', marginBottom: 14, display: 'block' }}>
+                INVERSIÓN POR MES
+              </span>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={campaignByMonth} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="barSpendGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(180,100%,50%)" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="hsl(280,80%,60%)" stopOpacity={0.75} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickFormatter={shortMonthLabel}
+                    tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tickFormatter={formatCopCompact}
+                    tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={56}
+                  />
+                  <Tooltip
+                    formatter={(v: unknown) => [formatCop(v as number), 'Inversión']}
+                    labelFormatter={(l: unknown) => shortMonthLabel(String(l))}
+                    contentStyle={{ background: 'rgba(0,0,0,0.88)', border: '1px solid hsl(180 100% 50% / 0.2)', borderRadius: 6, fontFamily: 'JetBrains Mono', fontSize: 11 }}
+                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  />
+                  <Bar dataKey="spend" fill="url(#barSpendGrad)" radius={[8, 8, 0, 0]} animationDuration={700} animationEasing="ease-out">
+                    <LabelList
+                      dataKey="spend"
+                      position="top"
+                      formatter={(v: unknown) => formatCopCompact(v as number)}
+                      style={{ fontSize: 9, fontFamily: 'JetBrains Mono', fill: 'hsl(215,15%,52%)' }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Chart 2 — Conversaciones vs CPM (dual axis) */}
+            <div style={{ background: 'rgba(6,10,18,0.8)', border: '1px solid hsl(180 100% 50% / 0.1)', borderRadius: 8, padding: '18px 16px 10px' }}>
+              <span className="number-label" style={{ fontSize: '0.58rem', color: 'hsl(215,15%,42%)', marginBottom: 14, display: 'block' }}>
+                CONVERSACIONES <span style={{ color: 'hsl(280,60%,55%)' }}>▌</span> vs CPM <span style={{ color: 'hsl(180,100%,50%)' }}>━</span>
+              </span>
+              <ResponsiveContainer width="100%" height={200}>
+                <ComposedChart data={campaignByMonth} margin={{ top: 6, right: 52, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="cpmAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(180,100%,50%)" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="hsl(180,100%,50%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickFormatter={shortMonthLabel}
+                    tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    yAxisId="msgs"
+                    tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                  />
+                  <YAxis
+                    yAxisId="cpm"
+                    orientation="right"
+                    tickFormatter={formatCopCompact}
+                    tick={{ fontSize: 10, fill: 'hsl(180,80%,50%)', fontFamily: 'JetBrains Mono', opacity: 0.65 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={50}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: 'rgba(0,0,0,0.88)', border: '1px solid hsl(180 100% 50% / 0.2)', borderRadius: 6, fontFamily: 'JetBrains Mono', fontSize: 11 }}
+                    formatter={(v: unknown, name: unknown) => [
+                      name === 'CPM' ? formatCop(v as number) : formatNumber(v as number),
+                      String(name),
+                    ]}
+                    labelFormatter={(l: unknown) => shortMonthLabel(String(l))}
+                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  />
+                  <Bar yAxisId="msgs" dataKey="messages" name="Mensajes" fill="hsl(280,80%,60%)" fillOpacity={0.5} radius={[4, 4, 0, 0]} animationDuration={700} />
+                  <Area
+                    yAxisId="cpm"
+                    type="monotone"
+                    dataKey="cpm"
+                    name="CPM"
+                    stroke="hsl(180,100%,50%)"
+                    strokeWidth={2.5}
+                    fill="url(#cpmAreaGrad)"
+                    dot={{ r: 5, fill: 'hsl(180,100%,50%)', strokeWidth: 0 }}
+                    activeDot={{ r: 7, fill: 'hsl(180,100%,50%)', stroke: 'hsl(180,100%,80%)', strokeWidth: 2 }}
+                    animationDuration={800}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Chart 3 — Top 5 clientes horizontal bar */}
+          {top5ClientData.length > 0 && (
+            <div style={{ background: 'rgba(6,10,18,0.8)', border: '1px solid hsl(180 100% 50% / 0.1)', borderRadius: 8, padding: '18px 20px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <span className="number-label" style={{ fontSize: '0.58rem', color: 'hsl(215,15%,42%)' }}>
+                  INVERSIÓN POR CLIENTE — TOP {top5ClientData.length}
+                </span>
+                <span className="number-label" style={{ fontSize: '0.55rem', color: 'hsl(215,15%,32%)' }}>
+                  {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height={Math.max(160, top5ClientData.length * 46)}>
+                <BarChart
+                  layout="vertical"
+                  data={top5ClientData}
+                  margin={{ top: 4, right: 88, left: 4, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.05)" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tickFormatter={formatCopCompact}
+                    tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={110}
+                    tick={{ fontSize: 11, fill: 'hsl(215,15%,65%)', fontFamily: 'Outfit, sans-serif' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: 'rgba(0,0,0,0.88)', border: '1px solid hsl(180 100% 50% / 0.2)', borderRadius: 6, fontFamily: 'JetBrains Mono', fontSize: 11 }}
+                    formatter={(v: unknown) => [formatCop(v as number), 'Inversión']}
+                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  />
+                  <Bar dataKey="spend" radius={[0, 6, 6, 0]} animationDuration={900} animationBegin={100} animationEasing="ease-out">
+                    {top5ClientData.map((_, index) => (
+                      <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.82} />
+                    ))}
+                    <LabelList
+                      dataKey="spend"
+                      position="right"
+                      formatter={(v: unknown) => formatCopCompact(v as number)}
+                      style={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215,15%,58%)' }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
