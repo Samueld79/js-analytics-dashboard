@@ -6523,3 +6523,165 @@ table tbody td {
   .portal-charts-grid { grid-template-columns: 1fr; }
   .portal-header-actions { margin-left: 0; }
 }
+
+/* ══════════════════════════════════════════════════════
+   SIDEBAR REDESIGN — PREMIUM DARK
+   ══════════════════════════════════════════════════════ */
+
+.sidebar {
+  background: linear-gradient(180deg, #040810 0%, #08101e 100%) !important;
+  border-right: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: 1px 0 12px rgba(0,0,0,0.4) !important;
+}
+
+.sidebar-brand {
+  padding: 20px 16px 16px !important;
+  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+}
+
+/* Brand name: white, not cyan */
+.sidebar-brand-signature .brand-wordmark {
+  color: #ffffff !important;
+  font-size: 0.86rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Dot stays cyan via inline style on BrandSignature */
+
+/* Subtitle: cyan/60, small */
+.sidebar-brand-signature .brand-subline {
+  color: rgba(6,182,212,0.58) !important;
+  font-size: 0.57rem !important;
+  letter-spacing: 0.18em !important;
+}
+
+/* Nav container */
+.sidebar-nav {
+  padding: 6px 0 !important;
+  flex: 1 !important;
+  overflow-y: auto !important;
+}
+
+/* Base link */
+.sidebar-link {
+  margin: 0 8px !important;
+  padding: 10px 12px !important;
+  border-radius: 6px !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+  color: hsl(215,15%,50%) !important;
+  font-size: 0.76rem !important;
+  gap: 10px !important;
+  transition: background 0.16s ease, color 0.16s ease !important;
+}
+
+.sidebar-link:hover {
+  background: rgba(255,255,255,0.05) !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Active: left-bar indicator via box-shadow (preserves layout) */
+.sidebar-link.active {
+  background: rgba(6,182,212,0.08) !important;
+  color: hsl(180,100%,58%) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+  border-left: none !important;
+  box-shadow: inset 2px 0 0 hsl(180,100%,55%) !important;
+  border-radius: 0 6px 6px 0 !important;
+}
+
+/* Small footer settings link */
+.sidebar-link.small {
+  margin-top: 4px !important;
+}
+
+/* Footer */
+.sidebar-footer {
+  border-top: 1px solid rgba(255,255,255,0.05) !important;
+  padding: 10px 8px 12px !important;
+  gap: 6px !important;
+}
+
+/* User card */
+.sidebar-user-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  padding: 8px 10px !important;
+  border-radius: 6px !important;
+  background: rgba(255,255,255,0.025) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  min-width: 0 !important;
+}
+
+/* Avatar circle */
+.sidebar-user-avatar {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  background: rgba(6,182,212,0.12) !important;
+  border: 1px solid rgba(6,182,212,0.25) !important;
+  color: hsl(180,100%,58%) !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  font-family: 'Outfit', sans-serif !important;
+  line-height: 1 !important;
+}
+
+.sidebar-user-copy {
+  flex: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.sidebar-user-name {
+  font-size: 0.72rem !important;
+  font-weight: 500 !important;
+  color: hsl(215,15%,78%) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.sidebar-user-role {
+  font-size: 0.58rem !important;
+  color: hsl(215,15%,42%) !important;
+  letter-spacing: 0.08em !important;
+  margin-top: 1px !important;
+}
+
+.sidebar-signout {
+  flex-shrink: 0 !important;
+  padding: 5px 6px !important;
+  border-radius: 4px !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  background: transparent !important;
+  color: hsl(215,15%,42%) !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s, color 0.15s, border-color 0.15s !important;
+}
+
+.sidebar-signout:hover {
+  background: rgba(6,182,212,0.1) !important;
+  color: hsl(180,100%,55%) !important;
+  border-color: rgba(6,182,212,0.2) !important;
+}
+
+/* Collapsed: hide avatar text, show compact user section */
+.sidebar.collapsed .sidebar-user-avatar {
+  width: 28px !important;
+  height: 28px !important;
+}
+

@@ -190,7 +190,7 @@ export function Sidebar() {
                 title={sidebarCollapsed ? label : undefined}
                 onClick={() => setMobileOpen(false)}
               >
-                <Icon size={16} />
+                <Icon size={18} />
                 <span className="sidebar-link-text">{label}</span>
                 {badge && unreadCount > 0 && (
                   <span className="sidebar-badge">{unreadCount}</span>
@@ -204,9 +204,12 @@ export function Sidebar() {
         <div className="sidebar-footer">
           {authEnabled && (
             <div className="sidebar-user-card">
+              <div className="sidebar-user-avatar">
+                {((profile?.full_name ?? profile?.email ?? 'U')[0] ?? 'U').toUpperCase()}
+              </div>
               <div className="sidebar-user-copy">
                 <div className="sidebar-user-name">
-                  {profile?.full_name ?? profile?.email ?? 'Sesion activa'}
+                  {profile?.email ?? profile?.full_name ?? 'Sesion activa'}
                 </div>
                 <div className="sidebar-user-role">{roleLabel(role)}</div>
               </div>
