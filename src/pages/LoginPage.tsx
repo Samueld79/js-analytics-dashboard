@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import { Loader2, Lock, Mail } from 'lucide-react';
-import { AntiGravityCanvas } from '../components/AntiGravityCanvas';
+import { StardustCanvas } from '../components/StardustCanvas';
 import brandLogo from '../assets/brand-logo.png';
 import { useAuth } from '../hooks/useAuth';
 
@@ -104,7 +104,7 @@ export function LoginPage() {
         background: '#030712',
       }}
     >
-      <AntiGravityCanvas count={60} />
+      <StardustCanvas />
 
       <div
         style={{
