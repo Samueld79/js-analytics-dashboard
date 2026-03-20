@@ -54,6 +54,11 @@ function formatCopCompact(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
+// Full format with period as thousands separator (Colombian style: $23.400.000)
+function formatCopFull(value: number): string {
+  return `$${Math.round(value).toLocaleString('es-CO')}`;
+}
+
 function actionBtn(variant: 'cyan' | 'red' | 'muted') {
   const base = {
     display: 'inline-flex' as const,
@@ -493,7 +498,7 @@ export function SalesPage() {
                                   fontSize: '0.82rem',
                                 }}
                               >
-                                {formatCop(sale.total_sales)}
+                                {formatCopFull(sale.total_sales)}
                               </span>
                             )}
                           </td>
