@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import brandLogo from '../assets/brand-logo.png';
-import { AntiGravityCanvas } from './AntiGravityCanvas';
+import { StardustCanvas } from './StardustCanvas';
 
 export function SplashScreen({ onDone }: { onDone: () => void }) {
   const [progress, setProgress] = useState(0);
@@ -46,7 +46,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
         pointerEvents: exiting ? 'none' : 'auto',
       }}
     >
-      <AntiGravityCanvas count={60} />
+      <StardustCanvas />
 
       <div
         style={{
