@@ -7,7 +7,6 @@ import {
   BarChart2,
   TrendingUp,
   ClipboardList,
-  Bot,
   Bell,
   Calendar,
   Settings,
@@ -38,7 +37,6 @@ const INTERNAL_NAV: NavItem[] = [
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
   { to: '/strategies', icon: ClipboardList, label: 'Estrategias' },
   { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
-  { to: '/ai', icon: Bot, label: 'IA' },
 ];
 
 const CLIENT_NAV: NavItem[] = [

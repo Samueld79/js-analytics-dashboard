@@ -8,7 +8,6 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { isSupabaseConfigured } from './lib/supabase';
 import { formatDateTime, roleLabel } from './lib/utils';
 import { LoginPage } from './pages/LoginPage';
-import { AIAgentPage } from './pages/AIAgentPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { ClientDetailPage } from './pages/ClientDetailPage';
 import { ClientsPage } from './pages/ClientsPage';
@@ -69,7 +68,6 @@ function AppContent() {
       <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
       <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />
       <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
-      <Route path="/ai" element={<RequireInternal><AIAgentPage /></RequireInternal>} />
       <Route path="/calendar" element={<RequireInternal><CalendarPage /></RequireInternal>} />
       <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} />
       <Route path="/settings" element={<RequireSignedIn><SettingsPage /></RequireSignedIn>} />
