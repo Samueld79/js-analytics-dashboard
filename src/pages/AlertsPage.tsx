@@ -333,6 +333,8 @@ export function AlertsPage() {
   const [customDates, setCustomDates] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [mobileTab, setMobileTab] = useState<'alerts' | 'tasks'>('alerts');
+  const [fabTrigger, setFabTrigger] = useState(0);
 
   // Monday weekly-report alert (once per mount per week)
   const weeklyAlertRef = useRef(false);
@@ -460,8 +462,25 @@ export function AlertsPage() {
         </p>
       )}
 
+      {/* Mobile tab bar — hidden on desktop via CSS */}
+      <div className="alerts-mobile-tabs" style={{ display: 'none', flexShrink: 0, gap: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
+        <button
+          className={`alerts-tab-btn${mobileTab === 'alerts' ? ' active' : ''}`}
+          onClick={() => setMobileTab('alerts')}
+        >
+          Alertas {unread > 0 && <span className="alerts-tab-badge">{unread}</span>}
+        </button>
+        <button
+          className={`alerts-tab-btn${mobileTab === 'tasks' ? ' active' : ''}`}
+          onClick={() => setMobileTab('tasks')}
+        >
+          Tareas
+        </button>
+      </div>
+
       {/* Two-column fixed-height grid */}
       <div
+        className="alerts-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
@@ -472,7 +491,7 @@ export function AlertsPage() {
         }}
       >
         {/* ── Left: Alerts ── */}
-        <div style={COLUMN_STYLE}>
+        <div className={`alerts-col${mobileTab !== 'alerts' ? ' mobile-hidden' : ''}`} style={COLUMN_STYLE}>
           <div className="filter-row" style={{ marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
             {(['open', 'snoozed', 'resolved', 'dismissed'] as const).map((v) => (
               <button
@@ -654,10 +673,21 @@ export function AlertsPage() {
         </div>
 
         {/* ── Right: Tasks ── */}
-        <div style={COLUMN_STYLE}>
-          <TasksPanel clients={clients} isInternal={isInternal} />
+        <div className={`tasks-col${mobileTab !== 'tasks' ? ' mobile-hidden' : ''}`} style={COLUMN_STYLE}>
+          <TasksPanel clients={clients} isInternal={isInternal} fabTrigger={fabTrigger} />
         </div>
       </div>
+
+      {/* Mobile FAB — hidden on desktop via CSS */}
+      <button
+        className="alerts-mobile-fab"
+        style={{ display: 'none' }}
+        onClick={() => { setMobileTab('tasks'); setFabTrigger((n) => n + 1); }}
+        aria-label="Nueva tarea"
+      >
+        <Plus size={20} />
+        <span>NUEVA TAREA</span>
+      </button>
     </div>
   );
 }
@@ -666,15 +696,21 @@ export function AlertsPage() {
 function TasksPanel({
   clients,
   isInternal,
+  fabTrigger = 0,
 }: {
   clients: Client[];
   isInternal: boolean;
+  fabTrigger?: number;
 }) {
   const { tasks, updateTask, deleteTask, reload } = useTasks();
   const [filterClient, setFilterClient] = useState('all');
   const [showDone, setShowDone] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [taskNotice, setTaskNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (fabTrigger > 0) setModalOpen(true);
+  }, [fabTrigger]);
 
   const today = todayKey();
 

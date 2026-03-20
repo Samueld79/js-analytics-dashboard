@@ -45,7 +45,8 @@ export function StardustCanvas({ style }: StardustCanvasProps) {
     canvas.width = w;
     canvas.height = h;
 
-    const particles: Dust[] = Array.from({ length: 120 }, () => makeDust(w, h));
+    const isMobile = w < 768;
+    const particles: Dust[] = Array.from({ length: isMobile ? 60 : 120 }, () => makeDust(w, h));
     let t = 0;
     let rafId: number;
 

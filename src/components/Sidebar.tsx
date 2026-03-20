@@ -63,7 +63,7 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return window.matchMedia('(max-width: 660px)').matches;
+    return window.matchMedia('(max-width: 768px)').matches;
   });
 
   const nav = isInternal
@@ -90,7 +90,7 @@ export function Sidebar() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
-    const media = window.matchMedia('(max-width: 660px)');
+    const media = window.matchMedia('(max-width: 768px)');
     const syncViewport = (matches: boolean) => {
       setIsMobileViewport(matches);
       if (!matches) {
