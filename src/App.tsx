@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { BrandSignature } from './components/BrandSignature';
 import { Sidebar } from './components/Sidebar';
@@ -16,8 +16,12 @@ import { MetricsPage } from './pages/MetricsPage';
 import { SalesPage } from './pages/SalesPage';
 import { StrategiesPage } from './pages/StrategiesPage';
 import { CalendarPage } from './pages/CalendarPage';
+import { SplashScreen } from './components/SplashScreen';
+import { WelcomeOverlay } from './components/WelcomeOverlay';
 
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   useEffect(() => {
     const handleVisibility = () => {
       document.body.classList.toggle('tab-hidden', document.hidden);
@@ -29,6 +33,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
         <AppContent />
       </AuthProvider>
     </BrowserRouter>
@@ -36,9 +41,25 @@ function App() {
 }
 
 function AppContent() {
-  const { authEnabled, initialized, session } = useAuth();
+  const { authEnabled, initialized, session, profile } = useAuth();
   const location = useLocation();
   const isPortalRoute = location.pathname.startsWith('/portal/');
+  const hadNullSession = useRef(false);
+  const [welcomeName, setWelcomeName] = useState<string | null>(null);
+
+  // Track when app was initialised with no session (= login screen shown)
+  useEffect(() => {
+    if (initialized && !session) hadNullSession.current = true;
+  }, [initialized, session]);
+
+  // Detect fresh login: session appeared after we had a null-session cycle
+  useEffect(() => {
+    if (initialized && session && hadNullSession.current) {
+      hadNullSession.current = false;
+      const name = profile?.full_name ?? profile?.email ?? session.user.email ?? 'equipo';
+      setWelcomeName(name);
+    }
+  }, [initialized, session, profile]);
 
   if (authEnabled && !initialized) {
     return (
@@ -77,26 +98,32 @@ function AppContent() {
 
   if (isPortalRoute) {
     return (
-      <div className="portal-shell">
-        <div className="page-bg" />
-        <header className="portal-shell-header">
-          <BrandSignature
-            compact
-            subtitle="Reporte cliente"
-            className="portal-brand-signature"
-          />
-        </header>
-        <main className="app-main portal-main">{appRoutes}</main>
-      </div>
+      <>
+        {welcomeName && <WelcomeOverlay name={welcomeName} onDone={() => setWelcomeName(null)} />}
+        <div className="portal-shell">
+          <div className="page-bg" />
+          <header className="portal-shell-header">
+            <BrandSignature
+              compact
+              subtitle="Reporte cliente"
+              className="portal-brand-signature"
+            />
+          </header>
+          <main className="app-main portal-main">{appRoutes}</main>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="app-shell">
-      <div className="page-bg" />
-      <Sidebar />
-      <main className="app-main">{appRoutes}</main>
-    </div>
+    <>
+      {welcomeName && <WelcomeOverlay name={welcomeName} onDone={() => setWelcomeName(null)} />}
+      <div className="app-shell">
+        <div className="page-bg" />
+        <Sidebar />
+        <main className="app-main">{appRoutes}</main>
+      </div>
+    </>
   );
 }
 
@@ -341,7 +368,7 @@ function SettingsPage() {
             <div style={{ ...SETTINGS_ITEM, borderBottom: 'none' }}>
               <span style={SETTINGS_LABEL}>Versión</span>
               <span style={{ ...SETTINGS_VALUE, color: 'hsl(215,15%,42%)', fontSize: '0.7rem' }}>
-                Growth Strategy JS
+                Growth Strategy
               </span>
             </div>
           </div>

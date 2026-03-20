@@ -17,12 +17,12 @@ export function BrandSignature({
     <div className={`brand-signature ${compact ? 'compact' : ''} ${className}`.trim()}>
       <img
         src={brandLogo}
-        alt="Growth Strategy JS"
+        alt="Growth Strategy"
         className="brand-mark"
       />
       <div className="brand-copy">
         <span className="brand-wordmark">
-          Growth Strategy JS<span style={{ color: 'hsl(180,100%,50%)' }}>.</span>
+          Growth Strategy<span style={{ color: 'hsl(180,100%,50%)' }}>.</span>
         </span>
         {showSubtitle && <span className="brand-subline">{subtitle}</span>}
       </div>

@@ -34,7 +34,15 @@ export function LoginPage() {
           />
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form
+          className="auth-form"
+          onSubmit={handleSubmit}
+          style={{
+            opacity: loading ? 0 : 1,
+            transform: loading ? 'scale(0.94)' : 'scale(1)',
+            transition: 'opacity 0.35s ease-out, transform 0.35s ease-out',
+          }}
+        >
           <label className="form-field">
             <span className="form-label">Correo</span>
             <div className="auth-input-wrap">

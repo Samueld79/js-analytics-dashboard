@@ -331,7 +331,7 @@ export function StrategyFormModal({
               {isEditing ? 'Editar estrategia' : 'Nueva estrategia'}
             </h2>
             <p className="modal-subtitle" style={{ color: 'hsl(215,15%,48%)' }}>
-              Estructura operativa · Growth Strategy JS
+              Estructura operativa · Growth Strategy
             </p>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
