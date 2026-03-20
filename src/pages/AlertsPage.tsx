@@ -16,6 +16,7 @@ import {
   Info,
   Layers,
   Palette,
+  Plus,
   Trash2,
   XCircle,
 } from 'lucide-react';
@@ -26,7 +27,7 @@ import {
   getAlertSnoozedUntil,
   isAlertSnoozed,
 } from '../lib/utils';
-import type { Alert, AlertSeverity } from '../lib/supabase';
+import type { Alert, AlertSeverity, Client, Task } from '../lib/supabase';
 
 // ── Allowed alert types ───────────────────────────────────────────────────────
 const ALLOWED_TYPES = new Set(['optimize_creatives', 'optimize_adsets', 'weekly_report']);
@@ -69,6 +70,29 @@ function AlertIcon({ type, severity }: { type: string; severity: AlertSeverity }
   return <Info size={size} style={{ color }} />;
 }
 
+// ── Task due-date helpers ─────────────────────────────────────────────────────
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+type Dueness = 'overdue' | 'today' | 'upcoming' | 'none';
+
+function taskDueness(task: Task): Dueness {
+  if (!task.due_date || task.status === 'done') return 'none';
+  const today = todayKey();
+  if (task.due_date < today) return 'overdue';
+  if (task.due_date === today) return 'today';
+  return 'upcoming';
+}
+
+function taskBorderColor(d: Dueness): string {
+  if (d === 'overdue') return 'hsl(0,84%,60%)';
+  if (d === 'today') return 'hsl(38,100%,55%)';
+  if (d === 'upcoming') return 'hsl(180,100%,50%)';
+  return 'rgba(255,255,255,0.07)';
+}
+
 const COLUMN_STYLE: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -83,6 +107,221 @@ const SCROLL_AREA: React.CSSProperties = {
   minHeight: 0,
 };
 
+// ── Task creation modal ───────────────────────────────────────────────────────
+function TaskCreateModal({
+  clients,
+  onClose,
+  onCreated,
+}: {
+  clients: Client[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit() {
+    if (!title.trim()) { setError('El título es obligatorio.'); return; }
+    setSaving(true);
+    const result = await createTasks([{
+      title: title.trim(),
+      client_id: clientId || null,
+      due_date: dueDate || null,
+      priority,
+      type: 'general',
+      status: 'pending',
+      description: notes.trim() || null,
+    }]);
+    setSaving(false);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      onCreated();
+      onClose();
+    }
+  }
+
+  const PRIORITIES: Array<{ key: 'low' | 'medium' | 'high'; label: string; color: string }> = [
+    { key: 'low',    label: 'LOW',    color: 'hsl(180,100%,45%)' },
+    { key: 'medium', label: 'MEDIUM', color: 'hsl(38,100%,55%)' },
+    { key: 'high',   label: 'HIGH',   color: 'hsl(0,84%,60%)' },
+  ];
+
+  return (
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      style={{ zIndex: 900 }}
+    >
+      <div
+        className="modal-box"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 440,
+          background: 'hsl(220,22%,7%)',
+          border: '1px solid hsl(180 100% 50% / 0.18)',
+          boxShadow: '0 0 40px hsl(180 100% 50% / 0.06), 0 24px 80px rgba(0,0,0,0.7)',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="modal-header"
+          style={{ borderBottom: '1px solid hsl(180 100% 50% / 0.1)', background: 'hsl(180 100% 50% / 0.04)', paddingBottom: 14 }}
+        >
+          <div>
+            <h2 className="modal-title" style={{ color: 'hsl(180,100%,60%)', fontSize: '1rem' }}>
+              + Nueva tarea
+            </h2>
+            <p className="modal-subtitle" style={{ color: 'hsl(215,15%,45%)', fontSize: '0.72rem' }}>
+              Tarea operativa · se guarda en Supabase
+            </p>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body" style={{ display: 'grid', gap: 14, padding: '18px 22px' }}>
+          {/* Title */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <label style={{ fontSize: '0.68rem', color: 'hsl(215,15%,52%)', fontWeight: 600, letterSpacing: '0.04em' }}>
+              TÍTULO *
+            </label>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit(); }}
+              placeholder="Ej. Revisar anuncios activos de cliente X"
+              style={{
+                padding: '8px 10px', fontSize: '0.86rem',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid hsl(180 100% 50% / 0.18)',
+                borderRadius: 7, color: 'inherit', outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Client */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <label style={{ fontSize: '0.68rem', color: 'hsl(215,15%,52%)', fontWeight: 600, letterSpacing: '0.04em' }}>
+              CLIENTE
+            </label>
+            <select
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              style={{
+                padding: '7px 10px', fontSize: '0.84rem',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid hsl(180 100% 50% / 0.15)',
+                borderRadius: 7, color: 'inherit',
+              }}
+            >
+              <option value="">Sin cliente</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          {/* Due date */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <label style={{ fontSize: '0.68rem', color: 'hsl(215,15%,52%)', fontWeight: 600, letterSpacing: '0.04em' }}>
+              FECHA LÍMITE
+            </label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              style={{
+                padding: '7px 10px', fontSize: '0.84rem',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid hsl(180 100% 50% / 0.15)',
+                borderRadius: 7, color: 'inherit',
+              }}
+            />
+          </div>
+
+          {/* Priority pills */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: '0.68rem', color: 'hsl(215,15%,52%)', fontWeight: 600, letterSpacing: '0.04em' }}>
+              PRIORIDAD
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {PRIORITIES.map(({ key, label, color }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPriority(key)}
+                  style={{
+                    flex: 1, padding: '6px 0', borderRadius: 7,
+                    border: `1px solid ${priority === key ? color : 'rgba(255,255,255,0.1)'}`,
+                    cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700,
+                    letterSpacing: '0.06em', fontFamily: 'JetBrains Mono, monospace',
+                    background: priority === key ? `${color}1a` : 'transparent',
+                    color: priority === key ? color : 'hsl(215,15%,50%)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <label style={{ fontSize: '0.68rem', color: 'hsl(215,15%,52%)', fontWeight: 600, letterSpacing: '0.04em' }}>
+              NOTAS <span style={{ color: 'hsl(215,15%,40%)', fontWeight: 400 }}>(opcional)</span>
+            </label>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Contexto adicional, links, referencias..."
+              style={{
+                padding: '7px 10px', fontSize: '0.82rem',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid hsl(180 100% 50% / 0.12)',
+                borderRadius: 7, color: 'inherit', resize: 'vertical',
+                fontFamily: 'inherit', lineHeight: 1.5,
+              }}
+            />
+          </div>
+
+          {error && (
+            <p style={{ margin: 0, fontSize: '0.78rem', color: 'hsl(0,84%,65%)' }}>{error}</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          className="modal-footer"
+          style={{ borderTop: '1px solid hsl(180 100% 50% / 0.1)', padding: '14px 22px' }}
+        >
+          <button className="btn-ghost" onClick={onClose}>Cancelar</button>
+          <button
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+            style={{
+              padding: '8px 22px', borderRadius: 7, border: 'none',
+              cursor: saving ? 'not-allowed' : 'pointer',
+              background: 'hsl(180,100%,45%)', color: '#000',
+              fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.06em',
+              fontFamily: 'JetBrains Mono, monospace',
+              opacity: saving ? 0.55 : 1,
+            }}
+          >
+            {saving ? 'GUARDANDO...' : 'CREAR TAREA'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export function AlertsPage() {
   const { alerts, dismiss, postpone, resolve, reload, loading } = useAlerts();
   const { clients } = useClients();
@@ -100,7 +339,7 @@ export function AlertsPage() {
   useEffect(() => {
     if (weeklyAlertRef.current || !isInternal || loading || !supabase || !isSupabaseConfigured) return;
     const now = new Date();
-    if (now.getDay() !== 1) return; // 1 = Monday
+    if (now.getDay() !== 1) return;
     const weekKey = getISOWeekKey(now);
     const ruleKey = `weekly_report:${weekKey}`;
     const exists = alerts.some((a) => a.rule_key === ruleKey);
@@ -118,12 +357,9 @@ export function AlertsPage() {
         triggered_by: 'system',
         metadata: { week: weekKey },
       })
-      .then(({ error }) => {
-        if (!error) void reload();
-      });
+      .then(({ error }) => { if (!error) void reload(); });
   }, [alerts, isInternal, loading, reload]);
 
-  // Only show allowed types
   const allowedAlerts = useMemo(
     () => alerts.filter((a) => ALLOWED_TYPES.has(a.type)),
     [alerts],
@@ -237,7 +473,6 @@ export function AlertsPage() {
       >
         {/* ── Left: Alerts ── */}
         <div style={COLUMN_STYLE}>
-          {/* Filter row */}
           <div className="filter-row" style={{ marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
             {(['open', 'snoozed', 'resolved', 'dismissed'] as const).map((v) => (
               <button
@@ -263,7 +498,6 @@ export function AlertsPage() {
             </select>
           </div>
 
-          {/* Scrollable alerts area */}
           <div style={SCROLL_AREA}>
             {loading ? (
               <div style={{ display: 'grid', gap: 8 }}>
@@ -428,55 +662,69 @@ export function AlertsPage() {
   );
 }
 
+// ── Tasks panel ───────────────────────────────────────────────────────────────
 function TasksPanel({
   clients,
   isInternal,
 }: {
-  clients: import('../lib/supabase').Client[];
+  clients: Client[];
   isInternal: boolean;
 }) {
   const { tasks, updateTask, deleteTask, reload } = useTasks();
   const [filterClient, setFilterClient] = useState('all');
   const [showDone, setShowDone] = useState(false);
-  const [showNewTask, setShowNewTask] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newClient, setNewClient] = useState('');
-  const [newDueDate, setNewDueDate] = useState('');
-  const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
-  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [taskNotice, setTaskNotice] = useState<string | null>(null);
 
-  async function handleCreateTask() {
-    if (!newTitle.trim()) { setTaskNotice('El título es obligatorio.'); return; }
-    setSaving(true);
-    const result = await createTasks([{
-      title: newTitle.trim(),
-      client_id: newClient || null,
-      due_date: newDueDate || null,
-      priority: newPriority,
-      type: 'general',
-      status: 'pending',
-    }]);
-    setSaving(false);
-    if (!result.error) {
-      setNewTitle(''); setNewClient(''); setNewDueDate(''); setNewPriority('medium');
-      setShowNewTask(false);
-      setTaskNotice('Tarea creada.');
-      void reload();
-    } else {
-      setTaskNotice(result.error);
-    }
+  const today = todayKey();
+
+  const filtered = useMemo(
+    () =>
+      tasks.filter(
+        (t) =>
+          (filterClient === 'all' || t.client_id === filterClient) &&
+          (showDone || t.status !== 'done'),
+      ),
+    [tasks, filterClient, showDone],
+  );
+
+  // Sort: overdue first → today → upcoming (by date asc) → no date → done last
+  const sortedFiltered = useMemo(() => {
+    const order: Record<Dueness, number> = { overdue: 0, today: 1, upcoming: 2, none: 3 };
+    return [...filtered].sort((a, b) => {
+      const aDone = a.status === 'done' ? 1 : 0;
+      const bDone = b.status === 'done' ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      const dA = taskDueness(a);
+      const dB = taskDueness(b);
+      if (order[dA] !== order[dB]) return order[dA] - order[dB];
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return 0;
+    });
+  }, [filtered]);
+
+  const overdueCount = useMemo(
+    () => tasks.filter((t) => t.status !== 'done' && !!t.due_date && t.due_date < today).length,
+    [tasks, today],
+  );
+  const todayCount = useMemo(
+    () => tasks.filter((t) => t.status !== 'done' && t.due_date === today).length,
+    [tasks, today],
+  );
+  const pendingCount = filtered.filter((t) => t.status !== 'done').length;
+
+  async function handleToggleDone(task: Task) {
+    const isDone = task.status === 'done';
+    await updateTask(task.id, {
+      status: isDone ? 'pending' : 'done',
+      completed_at: isDone ? null : new Date().toISOString(),
+    });
   }
 
-  const filtered = tasks.filter(
-    (t) => (filterClient === 'all' || t.client_id === filterClient) && (showDone || t.status !== 'done'),
-  );
-  const clientName = (id?: string | null) => clients.find((c) => c.id === id)?.name ?? 'Sin cliente';
-  const pending = filtered.filter((t) => t.status !== 'done').length;
-
   return (
-    <div style={{ ...COLUMN_STYLE }}>
-      {/* Panel header */}
+    <div style={COLUMN_STYLE}>
       <div
         style={{
           background: 'hsl(220,18%,7%)',
@@ -485,135 +733,216 @@ function TasksPanel({
           display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1,
         }}
       >
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10, flexShrink: 0 }}>
+        {/* Panel header */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexShrink: 0, flexWrap: 'wrap' }}>
           <span className="number-label" style={{ fontSize: '0.62rem', letterSpacing: '0.1em' }}>
-            TAREAS PENDIENTES
+            TAREAS
           </span>
+
+          {/* Due badges */}
+          {overdueCount > 0 && (
+            <span style={{
+              fontSize: '0.64rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+              background: 'hsl(0 84% 60% / 0.15)', color: 'hsl(0,84%,65%)',
+              border: '1px solid hsl(0 84% 60% / 0.3)',
+            }}>
+              ⚠ {overdueCount} vencida{overdueCount !== 1 ? 's' : ''}
+            </span>
+          )}
+          {todayCount > 0 && (
+            <span
+              className="task-due-today-badge"
+              style={{
+                fontSize: '0.64rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                background: 'hsl(38 100% 55% / 0.15)', color: 'hsl(38,100%,65%)',
+                border: '1px solid hsl(38 100% 55% / 0.3)',
+              }}
+            >
+              ⏰ {todayCount} vence hoy
+            </span>
+          )}
+
           <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'hsl(180,100%,50%)', fontWeight: 600 }}>
-            {pending} pendientes
+            {pendingCount} pendientes
           </span>
+
+          {/* + NUEVA TAREA button */}
+          <button
+            onClick={() => { setModalOpen(true); setTaskNotice(null); }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '5px 12px', borderRadius: 6, border: '1px solid hsl(180 100% 50% / 0.3)',
+              cursor: 'pointer', background: 'hsl(180 100% 50% / 0.08)',
+              color: 'hsl(180,100%,55%)', fontSize: '0.7rem', fontWeight: 700,
+              letterSpacing: '0.06em', fontFamily: 'JetBrains Mono, monospace',
+              flexShrink: 0,
+            }}
+          >
+            <Plus size={12} /> NUEVA TAREA
+          </button>
         </div>
 
+        {/* Filter row */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, flexShrink: 0 }}>
           <select
             value={filterClient}
             onChange={(e) => setFilterClient(e.target.value)}
-            style={{ flex: 1, minWidth: 140, fontSize: '0.78rem', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'inherit' }}
+            style={{ flex: 1, minWidth: 130, fontSize: '0.76rem', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'inherit' }}
           >
             <option value="all">Todos los clientes</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: 'hsl(215,15%,55%)', cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', color: 'hsl(215,15%,52%)', cursor: 'pointer', flexShrink: 0 }}>
             <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
             Completadas
           </label>
-          <button
-            className="btn-primary"
-            style={{ fontSize: '0.76rem', padding: '4px 10px' }}
-            onClick={() => { setShowNewTask((v) => !v); setTaskNotice(null); }}
-          >
-            + Nueva
-          </button>
         </div>
 
         {taskNotice && <p className="empty-note" style={{ marginBottom: 8, flexShrink: 0 }}>{taskNotice}</p>}
 
-        {showNewTask && (
-          <div style={{ display: 'grid', gap: 8, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)', marginBottom: 10, flexShrink: 0 }}>
-            <input
-              className="form-input"
-              placeholder="Título de la tarea *"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              style={{ fontSize: '0.82rem' }}
-            />
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <select
-                className="form-select"
-                value={newClient}
-                onChange={(e) => setNewClient(e.target.value)}
-                style={{ flex: 1, minWidth: 130, fontSize: '0.78rem' }}
-              >
-                <option value="">Sin cliente</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <select
-                className="form-select"
-                value={newPriority}
-                onChange={(e) => setNewPriority(e.target.value as 'high' | 'medium' | 'low')}
-                style={{ fontSize: '0.78rem' }}
-              >
-                <option value="high">Alta</option>
-                <option value="medium">Media</option>
-                <option value="low">Baja</option>
-              </select>
-              <input
-                type="date"
-                className="form-input"
-                value={newDueDate}
-                onChange={(e) => setNewDueDate(e.target.value)}
-                style={{ minWidth: 130, fontSize: '0.78rem' }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="btn-primary" style={{ fontSize: '0.78rem' }} onClick={() => void handleCreateTask()} disabled={saving}>
-                {saving ? 'Guardando...' : 'Guardar tarea'}
-              </button>
-              <button className="btn-secondary" style={{ fontSize: '0.78rem' }} onClick={() => setShowNewTask(false)}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Scrollable task list */}
         <div style={{ ...SCROLL_AREA, paddingRight: 2 }}>
-          {filtered.length === 0 ? (
-            <p style={{ fontSize: '0.8rem', color: 'hsl(215,15%,42%)', textAlign: 'center', padding: '12px 0' }}>
+          {sortedFiltered.length === 0 ? (
+            <p style={{ fontSize: '0.8rem', color: 'hsl(215,15%,42%)', textAlign: 'center', padding: '24px 0' }}>
               Sin tareas pendientes
             </p>
           ) : (
-            <div className="task-list">
-              {filtered.map((task) => (
-                <div key={task.id} className={`task-row ${task.status === 'done' ? 'done' : ''}`}>
-                  <button
-                    className={`task-checkbox ${task.status === 'done' ? 'checked' : ''}`}
-                    onClick={() => void updateTask(task.id, { status: task.status === 'done' ? 'pending' : 'done' })}
+            <div style={{ display: 'grid', gap: 6 }}>
+              {sortedFiltered.map((task) => {
+                const dueness = taskDueness(task);
+                const borderColor = taskBorderColor(dueness);
+                const isDone = task.status === 'done';
+                const client = clients.find((c) => c.id === task.client_id);
+
+                return (
+                  <div
+                    key={task.id}
+                    style={{
+                      display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8,
+                      background: isDone ? 'rgba(255,255,255,0.02)' : 'rgba(6,10,18,0.7)',
+                      border: `1px solid ${isDone ? 'rgba(255,255,255,0.05)' : `${borderColor}25`}`,
+                      borderLeft: `3px solid ${borderColor}`,
+                      opacity: isDone ? 0.5 : 1,
+                      transition: 'opacity 0.25s ease, border-color 0.2s',
+                    }}
                   >
-                    {task.status === 'done' ? '✓' : ''}
-                  </button>
-                  <div className="task-body">
-                    <span className={`task-title ${task.status === 'done' ? 'done-text' : ''}`}>
-                      {task.title}
-                    </span>
-                    <span className="task-desc">
-                      {clientName(task.client_id)}
-                      {task.due_date && ` · Vence ${new Date(`${task.due_date}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}`}
-                    </span>
+                    {/* Checkbox */}
+                    <button
+                      type="button"
+                      onClick={() => void handleToggleDone(task)}
+                      title={isDone ? 'Marcar pendiente' : 'Marcar completa'}
+                      style={{
+                        flexShrink: 0, width: 18, height: 18, marginTop: 2, borderRadius: 4,
+                        border: `1.5px solid ${isDone ? 'hsl(145,100%,45%)' : borderColor}`,
+                        background: isDone ? 'hsl(145 100% 45% / 0.18)' : 'transparent',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'hsl(145,100%,55%)', fontSize: '0.7rem', fontWeight: 700,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {isDone ? '✓' : ''}
+                    </button>
+
+                    {/* Body */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 2 }}>
+                        <span style={{
+                          fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.3,
+                          textDecoration: isDone ? 'line-through' : 'none',
+                          color: isDone ? 'hsl(215,15%,45%)' : 'hsl(215,15%,88%)',
+                          transition: 'color 0.2s, text-decoration 0.2s',
+                        }}>
+                          {task.title}
+                        </span>
+
+                        {/* Status labels */}
+                        {!isDone && dueness === 'overdue' && (
+                          <span style={{
+                            fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em',
+                            color: 'hsl(0,84%,65%)', fontFamily: 'JetBrains Mono, monospace',
+                          }}>
+                            VENCIDA
+                          </span>
+                        )}
+                        {!isDone && dueness === 'today' && (
+                          <span
+                            className="task-label-today"
+                            style={{
+                              fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em',
+                              color: 'hsl(38,100%,65%)', fontFamily: 'JetBrains Mono, monospace',
+                            }}
+                          >
+                            HOY
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {client && (
+                          <span style={{ fontSize: '0.66rem', color: 'hsl(215,15%,45%)' }}>
+                            {client.name}
+                          </span>
+                        )}
+                        {task.due_date && (
+                          <span style={{
+                            fontSize: '0.66rem',
+                            color: dueness === 'overdue'
+                              ? 'hsl(0,84%,58%)'
+                              : dueness === 'today'
+                                ? 'hsl(38,100%,55%)'
+                                : 'hsl(215,15%,42%)',
+                          }}>
+                            {new Date(`${task.due_date}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
+                        {task.description && (
+                          <span style={{ fontSize: '0.66rem', color: 'hsl(215,15%,38%)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+                            {task.description}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right side: priority + delete */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, alignItems: 'flex-end' }}>
+                      <span className={`priority-pill priority-${task.priority}`} style={{ fontSize: '0.58rem' }}>
+                        {task.priority}
+                      </span>
+                      {isInternal && (
+                        <button
+                          className="task-delete-btn"
+                          title="Eliminar tarea"
+                          onClick={async () => {
+                            if (!window.confirm(`¿Eliminar "${task.title}"?`)) return;
+                            const result = await deleteTask(task.id);
+                            if (result.error) setTaskNotice(result.error);
+                            else void reload();
+                          }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="task-meta">
-                    <span className={`priority-pill priority-${task.priority}`}>{task.priority}</span>
-                    {isInternal && (
-                      <button
-                        className="task-delete-btn"
-                        title="Eliminar tarea"
-                        onClick={async () => {
-                          if (!window.confirm(`¿Eliminar "${task.title}"?`)) return;
-                          const result = await deleteTask(task.id);
-                          if (result.error) setTaskNotice(result.error);
-                          else void reload();
-                        }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
+
+      {/* Task creation modal */}
+      {modalOpen && (
+        <TaskCreateModal
+          clients={clients}
+          onClose={() => setModalOpen(false)}
+          onCreated={() => {
+            void reload();
+            setTaskNotice('Tarea creada.');
+            setTimeout(() => setTaskNotice(null), 3000);
+          }}
+        />
+      )}
     </div>
   );
 }
