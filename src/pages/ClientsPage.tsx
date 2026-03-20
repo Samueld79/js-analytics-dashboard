@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
@@ -277,17 +277,19 @@ export function ClientsPage() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.08)' }}>
-                  {['Cliente', 'Nicho', 'Inversión', 'Mensajes', 'Reach', 'Impr.', 'CPM', 'Frec.', 'Actualizado', 'Acciones'].map(
+                <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.06)' }}>
+                  {['Cliente', 'Inversión', 'Mensajes', 'Reach', 'CPM', 'Frec.', 'Actualizado', 'Acciones'].map(
                     (h) => (
                       <th
                         key={h}
                         className="number-label"
                         style={{
-                          padding: '11px 20px',
+                          padding: '9px 16px',
                           textAlign: 'left',
                           fontWeight: 400,
                           whiteSpace: 'nowrap',
+                          fontSize: '0.6rem',
+                          color: 'hsl(215,15%,40%)',
                         }}
                       >
                         {h}
@@ -307,24 +309,24 @@ export function ClientsPage() {
                     <tr
                       key={client.id}
                       style={{
-                        borderBottom: '1px solid hsl(0 0% 100% / 0.05)',
-                        transition: 'background 150ms ease',
+                        borderBottom: '1px solid hsl(0 0% 100% / 0.04)',
+                        transition: 'background 120ms ease',
                       }}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLTableRowElement).style.background =
-                          'hsl(0 0% 100% / 0.02)';
+                          'hsl(0 0% 100% / 0.025)';
                       }}
                       onMouseLeave={(e) => {
                         (e.currentTarget as HTMLTableRowElement).style.background = 'transparent';
                       }}
                     >
-                      {/* Cliente */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {/* Cliente + Nicho */}
+                      <td style={{ padding: '9px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                           <div
                             style={{
-                              width: '30px',
-                              height: '30px',
+                              width: '28px',
+                              height: '28px',
                               borderRadius: '4px',
                               background: clientGradient(client.id),
                               display: 'flex',
@@ -333,40 +335,30 @@ export function ClientsPage() {
                               flexShrink: 0,
                             }}
                           >
-                            <span
-                              style={{
-                                fontFamily: 'Outfit, sans-serif',
-                                fontWeight: 700,
-                                fontSize: '0.72rem',
-                                color: '#fff',
-                              }}
-                            >
+                            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.68rem', color: '#fff' }}>
                               {client.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div>
+                          <div style={{ minWidth: 0 }}>
                             <Link
                               to={`/clients/${client.id}`}
                               style={{
                                 fontFamily: 'Outfit, sans-serif',
-                                fontSize: '0.85rem',
+                                fontSize: '0.82rem',
                                 fontWeight: 600,
                                 color: 'hsl(0,0%,92%)',
                                 textDecoration: 'none',
                                 display: 'block',
+                                lineHeight: 1.2,
                               }}
                             >
                               {client.name}
                             </Link>
+                            <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', color: 'hsl(215,15%,42%)', letterSpacing: '0.04em' }}>
+                              {client.niche ?? '—'}
+                            </span>
                             {openAlerts > 0 && (
-                              <span
-                                style={{
-                                  fontFamily: 'JetBrains Mono',
-                                  fontSize: '0.58rem',
-                                  letterSpacing: '0.08em',
-                                  color: 'hsl(0,84%,65%)',
-                                }}
-                              >
+                              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.55rem', letterSpacing: '0.06em', color: 'hsl(0,84%,65%)', display: 'block' }}>
                                 {openAlerts} alerta{openAlerts > 1 ? 's' : ''}
                               </span>
                             )}
@@ -374,78 +366,61 @@ export function ClientsPage() {
                         </div>
                       </td>
 
-                      {/* Nicho */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span className="number-label">{client.niche ?? '—'}</span>
-                      </td>
-
-                      {/* Inversión */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                      {/* Inversión — cyan */}
+                      <td style={{ padding: '9px 16px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.76rem', color: kpi ? 'hsl(180,100%,50%)' : 'hsl(215,15%,35%)', fontWeight: 500 }}>
                           {kpi ? formatCop(kpi.spend) : '—'}
                         </span>
                       </td>
 
-                      {/* Mensajes */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                      {/* Mensajes — muted */}
+                      <td style={{ padding: '9px 16px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,58%)' }}>
                           {kpi ? formatNumber(kpi.messages) : '—'}
                         </span>
                       </td>
 
-                      {/* Reach */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                      {/* Reach — muted */}
+                      <td style={{ padding: '9px 16px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,58%)' }}>
                           {kpi ? formatNumber(kpi.reach) : '—'}
                         </span>
                       </td>
 
-                      {/* Impresiones */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
-                          {kpi ? formatNumber(kpi.impressions) : '—'}
-                        </span>
-                      </td>
-
-                      {/* CPM */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
-                          {kpi && kpi.cpm > 0 ? formatCop(kpi.cpm) : '—'}
-                        </span>
+                      {/* CPM — color badge */}
+                      <td style={{ padding: '9px 16px' }}>
+                        {kpi && kpi.cpm > 0 ? (
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.6rem', letterSpacing: '0.05em', padding: '2px 6px', borderRadius: '3px', ...cpmBadgeStyle(kpi.cpm) }}>
+                            {formatCop(kpi.cpm)}
+                          </span>
+                        ) : (
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,35%)' }}>—</span>
+                        )}
                       </td>
 
                       {/* Frecuencia */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.78rem', color: 'hsl(0,0%,85%)' }}>
+                      <td style={{ padding: '9px 16px' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,58%)' }}>
                           {kpi && kpi.frequency > 0 ? kpi.frequency.toFixed(2) : '—'}
                         </span>
                       </td>
 
-                      {/* Actualizado */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span
-                          style={{
-                            fontFamily: 'JetBrains Mono',
-                            fontSize: '0.6rem',
-                            letterSpacing: '0.08em',
-                            color: lastUpdate ? 'hsl(215,15%,65%)' : 'hsl(215,15%,35%)',
-                          }}
-                        >
-                          {updateLabel}
-                        </span>
+                      {/* Actualizado — dot + fecha */}
+                      <td style={{ padding: '9px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: lastUpdate ? 'hsl(180,100%,50%)' : 'hsl(215,15%,28%)', flexShrink: 0 }} />
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', letterSpacing: '0.04em', color: lastUpdate ? 'hsl(215,15%,62%)' : 'hsl(215,15%,32%)' }}>
+                            {updateLabel}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Acciones */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                      <td style={{ padding: '9px 16px' }}>
+                        <div style={{ display: 'flex', gap: '5px' }}>
                           <button
                             className="btn-ghost"
-                            style={{
-                              fontSize: '0.7rem',
-                              padding: '4px 10px',
-                              cursor: 'pointer',
-                              border: '1px solid hsl(0 0% 100% / 0.08)',
-                            }}
+                            style={{ fontSize: '0.62rem', padding: '3px 8px', cursor: 'pointer', border: '1px solid hsl(0 0% 100% / 0.08)' }}
                             onClick={() => void navigate(`/clients/${client.id}`)}
                           >
                             Ver
@@ -454,17 +429,7 @@ export function ClientsPage() {
                             href={`/portal/${client.id}`}
                             target="_blank"
                             rel="noreferrer"
-                            style={{
-                              fontFamily: 'JetBrains Mono',
-                              fontSize: '0.7rem',
-                              padding: '4px 10px',
-                              borderRadius: '4px',
-                              border: '1px solid hsl(180 100% 50% / 0.25)',
-                              color: 'hsl(180,100%,50%)',
-                              textDecoration: 'none',
-                              transition: 'all 200ms ease',
-                              whiteSpace: 'nowrap',
-                            }}
+                            style={{ fontFamily: 'JetBrains Mono', fontSize: '0.62rem', padding: '3px 8px', borderRadius: '4px', border: '1px solid hsl(180 100% 50% / 0.22)', color: 'hsl(180,100%,50%)', textDecoration: 'none', whiteSpace: 'nowrap' }}
                           >
                             Portal ↗
                           </a>
@@ -476,7 +441,7 @@ export function ClientsPage() {
 
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={10} style={{ padding: '48px 24px', textAlign: 'center' }}>
+                    <td colSpan={8} style={{ padding: '48px 24px', textAlign: 'center' }}>
                       <div
                         style={{
                           display: 'flex',
@@ -521,6 +486,12 @@ export function ClientsPage() {
       )}
     </div>
   );
+}
+
+function cpmBadgeStyle(cpm: number): React.CSSProperties {
+  if (cpm < 5_000) return { background: 'hsl(145 100% 45% / 0.12)', color: 'hsl(145,100%,45%)', border: '1px solid hsl(145 100% 45% / 0.2)' };
+  if (cpm <= 10_000) return { background: 'hsl(38 100% 50% / 0.12)', color: 'hsl(38,100%,60%)', border: '1px solid hsl(38 100% 50% / 0.2)' };
+  return { background: 'hsl(0 84% 60% / 0.12)', color: 'hsl(0,84%,65%)', border: '1px solid hsl(0 84% 60% / 0.2)' };
 }
 
 /** Formats "2026-03-17" → "17 Mar" */

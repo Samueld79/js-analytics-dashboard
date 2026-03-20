@@ -10,99 +10,18 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { motion, type Transition } from 'framer-motion';
-import {
-  BarChart3,
-  DollarSign,
-  MessageCircle,
-  Percent,
-  ShoppingCart,
-  TrendingDown,
-} from 'lucide-react';
+import { BarChart3, DollarSign, MessageCircle, Percent, TrendingDown, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useMonthlyOperatingKpis, useAdMetrics, useCampaignMonthlyHistory } from '../hooks/useData';
+import { useMonthlyOperatingKpis, useCampaignSummary } from '../hooks/useData';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
-import type { AdMetric, ClientMonthlyOperatingKpi, DailySale } from '../lib/supabase';
-import {
-  buildMarketingActionSummary,
-  formatCop,
-  formatNumber,
-  formatPct,
-  formatRoas,
-  sumMetrics,
-  sumOperatingKpis,
-  sumSales,
-} from '../lib/utils';
-import { getMonthKey } from '../utils/monthLabel';
+import { sumCampaignMonthAggregates } from '../services/adCampaignMetrics';
+import type { ClientMonthlyOperatingKpi } from '../lib/supabase';
+import { formatCop, formatNumber, formatRoas, sumOperatingKpis } from '../lib/utils';
+import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
-
-type RangeKey =
-  | 'today' | 'yesterday' | 'last7' | 'last14' | 'last28' | 'last30'
-  | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'all' | 'custom';
-
-const RANGE_OPTIONS: { key: RangeKey; label: string }[] = [
-  { key: 'today', label: 'Hoy' },
-  { key: 'yesterday', label: 'Ayer' },
-  { key: 'last7', label: 'Últ. 7 días' },
-  { key: 'last14', label: 'Últ. 14 días' },
-  { key: 'last28', label: 'Últ. 28 días' },
-  { key: 'last30', label: 'Últ. 30 días' },
-  { key: 'thisWeek', label: 'Esta semana' },
-  { key: 'lastWeek', label: 'Sem. pasada' },
-  { key: 'thisMonth', label: 'Este mes' },
-  { key: 'lastMonth', label: 'Mes pasado' },
-  { key: 'all', label: 'Máximo' },
-  { key: 'custom', label: 'Personalizado' },
-];
-
-function getRangeDates(
-  key: RangeKey,
-  customFrom: string,
-  customTo: string,
-): { start: string; end: string } {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const shift = (days: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
-  };
-  switch (key) {
-    case 'today': return { start: todayStr, end: todayStr };
-    case 'yesterday': { const y = shift(-1); return { start: y, end: y }; }
-    case 'last7': return { start: shift(-6), end: todayStr };
-    case 'last14': return { start: shift(-13), end: todayStr };
-    case 'last28': return { start: shift(-27), end: todayStr };
-    case 'last30': return { start: shift(-29), end: todayStr };
-    case 'thisWeek': {
-      const now = new Date();
-      const mon = new Date(now);
-      mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-      return { start: mon.toISOString().slice(0, 10), end: todayStr };
-    }
-    case 'lastWeek': {
-      const now = new Date();
-      const lastMon = new Date(now);
-      lastMon.setDate(now.getDate() - ((now.getDay() + 6) % 7) - 7);
-      const lastSun = new Date(lastMon);
-      lastSun.setDate(lastMon.getDate() + 6);
-      return { start: lastMon.toISOString().slice(0, 10), end: lastSun.toISOString().slice(0, 10) };
-    }
-    case 'thisMonth': {
-      const now = new Date();
-      return { start: `${now.toISOString().slice(0, 7)}-01`, end: todayStr };
-    }
-    case 'lastMonth': {
-      const now = new Date();
-      const firstOfPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastOfPrev = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { start: firstOfPrev.toISOString().slice(0, 10), end: lastOfPrev.toISOString().slice(0, 10) };
-    }
-    case 'all': return { start: '2020-01-01', end: todayStr };
-    case 'custom': return { start: customFrom || todayStr, end: customTo || todayStr };
-  }
-}
 
 function shortMonthLabel(monthKey: string): string {
   const [year, month] = monthKey.split('-');
@@ -126,27 +45,11 @@ function costStatus(cost: number): HealthStatus {
   return 'bad';
 }
 
-function roasStatus(roas: number): HealthStatus {
-  if (roas === 0) return 'neutral';
-  if (roas > 10) return 'great';
-  if (roas >= 3) return 'good';
-  if (roas >= 1) return 'warning';
-  return 'bad';
-}
-
 const COST_BADGE: Record<HealthStatus, { label: string; cls: string } | null> = {
   great:   { label: '✓ Excelente', cls: 'badge-great' },
   good:    { label: '~ Bueno',     cls: 'badge-good' },
   warning: { label: '⚠ Regular',   cls: 'badge-warning' },
   bad:     { label: '✗ Alto',      cls: 'badge-bad' },
-  neutral: null,
-};
-
-const ROAS_BADGE: Record<HealthStatus, { label: string; cls: string } | null> = {
-  great:   { label: '✓ Excelente', cls: 'badge-great' },
-  good:    { label: '~ Saludable', cls: 'badge-good' },
-  warning: { label: '⚠ Bajo',      cls: 'badge-warning' },
-  bad:     { label: '✗ Pérdida',   cls: 'badge-bad' },
   neutral: null,
 };
 
@@ -175,9 +78,7 @@ export function MetricsPage() {
   const [selectedClient, setSelectedClient] = useState(
     !isInternal && defaultClientId ? defaultClientId : 'all',
   );
-  const [rangeKey, setRangeKey] = useState<RangeKey>('thisMonth');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState<string | 'all' | null>(null);
 
   const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;
   const canSelectAllClients = isInternal || visibleClients.length > 1;
@@ -186,19 +87,13 @@ export function MetricsPage() {
       ? defaultClientId ?? EMPTY_CLIENT_SCOPE
       : selectedClientId;
 
-  const queryDays = rangeKey === 'all' ? 1825 : 450;
-  const queryMonths = rangeKey === 'all' ? 36 : 12;
+  // Primary data source: ad_campaign_metrics
+  const { byMonth: campaignByMonth } = useCampaignSummary(queryClientId, 730);
 
-  const { metrics } = useAdMetrics(queryClientId, queryDays);
-  const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, queryMonths);
-  const { sales } = useDailySales({ clientId: queryClientId, days: queryDays });
-  const { byMonth: campaignByMonth } = useCampaignMonthlyHistory(queryClientId);
+  // Historical ROAS: monthly KPI rows + manual sales
+  const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, 12);
+  const { sales } = useDailySales({ clientId: queryClientId, days: 730 });
 
-  const scopedMetrics = useMemo(
-    () =>
-      isInternal ? metrics : metrics.filter((row) => visibleClientIds.has(row.client_id)),
-    [isInternal, metrics, visibleClientIds],
-  );
   const scopedMonthlyKpis = useMemo(
     () =>
       isInternal
@@ -223,113 +118,42 @@ export function MetricsPage() {
     }
   }, [canSelectAllClients, defaultClientId, isInternal, selectedClient, visibleClientIds]);
 
-  const { start: rangeStart, end: rangeEnd } = getRangeDates(rangeKey, customFrom, customTo);
-  const rangeStartMonth = rangeStart.slice(0, 7);
-  const rangeEndMonth = rangeEnd.slice(0, 7);
-  const activeMonth = rangeEndMonth;
+  const activePeriod = selectedPeriod ?? campaignByMonth[campaignByMonth.length - 1]?.month ?? '';
 
-  const monthMetrics = useMemo(
-    () => scopedMetrics.filter((m) => m.date >= rangeStart && m.date <= rangeEnd),
-    [rangeStart, rangeEnd, scopedMetrics],
-  );
-  const monthOperatingRows = useMemo(
+  const periodKpi = useMemo(
     () =>
-      scopedMonthlyKpis.filter((row) => {
-        const m = getMonthKey(row.month);
-        return m >= rangeStartMonth && m <= rangeEndMonth;
-      }),
-    [rangeStartMonth, rangeEndMonth, scopedMonthlyKpis],
-  );
-  const monthSales = useMemo(
-    () => scopedSales.filter((row) => row.date >= rangeStart && row.date <= rangeEnd),
-    [rangeStart, rangeEnd, scopedSales],
+      activePeriod === 'all'
+        ? sumCampaignMonthAggregates(campaignByMonth, 'all')
+        : (campaignByMonth.find((m) => m.month === activePeriod) ?? null),
+    [campaignByMonth, activePeriod],
   );
 
-  const operatingTotals = monthOperatingRows.length
-    ? sumOperatingKpis(monthOperatingRows)
-    : buildCombinedMonthTotals(monthMetrics, monthSales);
-  const marketingSummary = buildMarketingActionSummary(monthMetrics);
+  const costPerConv =
+    periodKpi && periodKpi.messages > 0 ? periodKpi.spend / periodKpi.messages : null;
 
-  // Campaign fallback: sum monthly aggregates when ad_metrics has no data for the range
-  const campaignRangeFallback = useMemo(() => {
-    if (monthMetrics.length > 0) return null;
-    let spend = 0;
-    let messages = 0;
-    let cur = rangeStartMonth;
-    while (cur <= rangeEndMonth) {
-      const row = campaignByMonth.find((r) => r.month === cur);
-      if (row) { spend += row.spend; messages += row.messages; }
-      const [y, m] = cur.split('-').map(Number);
-      cur = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
-    }
-    return spend > 0 || messages > 0 ? { spend, messages } : null;
-  }, [monthMetrics, campaignByMonth, rangeStartMonth, rangeEndMonth]);
-
-  const effectiveSpend = operatingTotals.spend > 0 ? operatingTotals.spend : (campaignRangeFallback?.spend ?? 0);
-  const effectiveMessages = marketingSummary.messagingStarted > 0 ? marketingSummary.messagingStarted : (campaignRangeFallback?.messages ?? 0);
-
-  const costPerConversation =
-    effectiveMessages > 0 ? effectiveSpend / effectiveMessages : null;
-  const estimatedCloseRate =
-    effectiveMessages > 0 && monthSales.length > 0
-      ? (monthSales.length / effectiveMessages) * 100
-      : null;
-
-  // Definitive historical merge: ad_campaign_metrics (Excel) + ad_metrics (n8n daily)
+  // Historical section — last 6 months, spend + messages from campaigns, ROAS from KPI rows
   const historyRows = useMemo(() => {
-    // Step 1: campaign map from Excel import — most complete for older months
-    const campaignMap = new Map<string, { spend: number; messages: number }>();
-    for (const row of campaignByMonth) {
-      campaignMap.set(row.month, { spend: row.spend, messages: row.messages });
-    }
-
-    // Step 2: ad_metrics map — accurate for recent months (n8n daily sync)
-    const adMetricsMap = new Map<string, { spend: number; messages: number }>();
-    for (const row of scopedMetrics) {
-      const key = getMonthKey(row.date);
-      const prev = adMetricsMap.get(key) ?? { spend: 0, messages: 0 };
-      adMetricsMap.set(key, {
-        spend: prev.spend + (row.spend ?? 0),
-        messages: prev.messages + (row.messages ?? 0),
-      });
-    }
-
-    // Step 3: union of all known month keys
     const allMonths = new Set<string>([
-      ...campaignMap.keys(),
-      ...adMetricsMap.keys(),
+      ...campaignByMonth.map((m) => m.month),
       ...scopedMonthlyKpis.map((r) => getMonthKey(r.month)),
       ...scopedSales.map((r) => getMonthKey(r.date)),
     ]);
-
     return [...allMonths]
-      .sort()      // YYYY-MM ascending
-      .slice(-6)   // last 6 months
+      .sort()
+      .slice(-6)
       .map((monthKey) => {
-        const campaign = campaignMap.get(monthKey) ?? { spend: 0, messages: 0 };
-        const adM = adMetricsMap.get(monthKey) ?? { spend: 0, messages: 0 };
-
-        // Prefer ad_metrics (daily sync) if it has data; else fall back to Excel
-        const spend = adM.spend > 0 ? adM.spend : campaign.spend;
-        const messages = adM.messages > 0 ? adM.messages : campaign.messages;
-
-        // ROAS from consolidated monthly KPI rows (best available)
-        const roas = getMonthOperatingTotals({
-          monthKey,
-          monthlyKpis: scopedMonthlyKpis,
-          metrics: scopedMetrics,
-          sales: scopedSales,
-        }).real_roas;
-
+        const campaign = campaignByMonth.find((m) => m.month === monthKey);
+        const spend = campaign?.spend ?? 0;
+        const messages = campaign?.messages ?? 0;
+        const roas = getMonthRoas({ monthKey, monthlyKpis: scopedMonthlyKpis });
         return { monthKey, spend, messages, roas };
       })
       .filter((r) => r.spend > 0 || r.messages > 0);
-  }, [campaignByMonth, scopedMetrics, scopedMonthlyKpis, scopedSales]);
+  }, [campaignByMonth, scopedMonthlyKpis, scopedSales]);
 
   const chartData = historyRows.map((row) => ({ month: row.monthKey, spend: row.spend }));
 
-  const cStatus = costPerConversation != null ? costStatus(costPerConversation) : 'neutral' as HealthStatus;
-  const rStatus = roasStatus(operatingTotals.real_roas);
+  const cStatus: HealthStatus = costPerConv != null ? costStatus(costPerConv) : 'neutral';
 
   const kpiCards: Array<{
     icon: ReactNode;
@@ -342,43 +166,43 @@ export function MetricsPage() {
     {
       icon: <DollarSign size={15} />,
       label: 'INVERSIÓN',
-      value: formatCop(effectiveSpend),
-      sub: 'Inversión real del período',
+      value: formatCop(periodKpi?.spend ?? 0),
+      sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod),
     },
     {
       icon: <MessageCircle size={15} />,
       label: 'CONVERSACIONES',
-      value: formatNumber(effectiveMessages),
+      value: formatNumber(periodKpi?.messages ?? 0),
       sub: 'Mensajes vía Meta Ads',
     },
     {
       icon: <TrendingDown size={15} />,
-      label: 'COSTO POR CONV',
-      value: costPerConversation != null ? formatCop(costPerConversation) : '—',
-      sub: costPerConversation != null ? costSub(cStatus) : 'Sin conversaciones',
-      muted: costPerConversation == null,
+      label: 'COSTO/CONV',
+      value: costPerConv != null ? formatCop(costPerConv) : '—',
+      sub: costPerConv != null ? costSub(cStatus) : 'Sin conversaciones',
+      muted: costPerConv == null,
       badge: COST_BADGE[cStatus],
     },
     {
-      icon: <ShoppingCart size={15} />,
-      label: 'VENTAS MANUALES',
-      value: formatCop(operatingTotals.total_sales),
-      sub: `${monthSales.length} registro(s) del período`,
+      icon: <BarChart3 size={15} />,
+      label: 'CPM',
+      value: periodKpi && periodKpi.cpm > 0 ? formatCop(periodKpi.cpm) : '—',
+      sub: 'Costo por 1.000 impresiones',
+      muted: !periodKpi || periodKpi.cpm === 0,
     },
     {
-      icon: <BarChart3 size={15} />,
-      label: 'ROAS OPERATIVO',
-      value: formatRoas(operatingTotals.real_roas),
-      sub: 'Ventas manuales / inversión',
-      muted: operatingTotals.real_roas === 0,
-      badge: ROAS_BADGE[rStatus],
+      icon: <Users size={15} />,
+      label: 'REACH',
+      value: formatNumber(periodKpi?.reach ?? 0),
+      sub: 'Personas únicas alcanzadas',
+      muted: !periodKpi || periodKpi.reach === 0,
     },
     {
       icon: <Percent size={15} />,
-      label: 'TASA DE CIERRE',
-      value: estimatedCloseRate != null ? formatPct(estimatedCloseRate) : '—',
-      sub: estimatedCloseRate != null ? 'Registros / conversaciones' : 'Sin datos suficientes',
-      muted: estimatedCloseRate == null,
+      label: 'FRECUENCIA',
+      value: periodKpi && periodKpi.frequency > 0 ? periodKpi.frequency.toFixed(2) : '—',
+      sub: 'Impresiones por persona',
+      muted: !periodKpi || periodKpi.frequency === 0,
     },
   ];
 
@@ -417,34 +241,25 @@ export function MetricsPage() {
             {visibleClients[0]?.name ?? 'Sin empresa'}
           </span>
         )}
-        <div className="filter-row" style={{ flexWrap: 'wrap', gap: 4 }}>
-          {RANGE_OPTIONS.map((opt) => (
+
+        {/* Period selector — same pattern as Dashboard / Clientes */}
+        {campaignByMonth.length > 0 && (
+          <div className="filter-row" style={{ flexWrap: 'wrap', gap: 4 }}>
+            {campaignByMonth.map((m) => (
+              <button
+                key={m.month}
+                className={`filter-chip ${activePeriod === m.month ? 'active' : ''}`}
+                onClick={() => setSelectedPeriod(m.month)}
+              >
+                {getMonthLabel(m.month)}
+              </button>
+            ))}
             <button
-              key={opt.key}
-              className={`filter-chip ${rangeKey === opt.key ? 'active' : ''}`}
-              onClick={() => setRangeKey(opt.key)}
+              className={`filter-chip ${activePeriod === 'all' ? 'active' : ''}`}
+              onClick={() => setSelectedPeriod('all')}
             >
-              {opt.label}
+              Total año
             </button>
-          ))}
-        </div>
-        {rangeKey === 'custom' && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-            <input
-              type="date"
-              className="form-input"
-              style={{ width: 140 }}
-              value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
-            />
-            <span style={{ color: 'var(--gs-text-soft)' }}>→</span>
-            <input
-              type="date"
-              className="form-input"
-              style={{ width: 140 }}
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-            />
           </div>
         )}
       </div>
@@ -485,7 +300,9 @@ export function MetricsPage() {
           <span className="number-label">HISTÓRICO</span>
           <h2 className="metrics-chart-title">Inversión mensual</h2>
           {chartData.length === 0 ? (
-            <p className="empty-note" style={{ marginTop: 32 }}>Sin histórico disponible para este cliente.</p>
+            <p className="empty-note" style={{ marginTop: 32 }}>
+              Sin histórico disponible para este cliente.
+            </p>
           ) : (
             <ResponsiveContainer width="100%" height={210}>
               <AreaChart data={chartData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
@@ -495,7 +312,11 @@ export function MetricsPage() {
                     <stop offset="95%" stopColor="hsl(180,100%,50%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,15%,11%)" vertical={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(220,15%,11%)"
+                  vertical={false}
+                />
                 <XAxis
                   dataKey="month"
                   tickFormatter={shortMonthLabel}
@@ -556,14 +377,22 @@ export function MetricsPage() {
                   <tr>
                     <td
                       colSpan={4}
-                      style={{ textAlign: 'center', padding: '28px 0', color: 'hsl(215,15%,45%)', fontSize: '0.82rem' }}
+                      style={{
+                        textAlign: 'center',
+                        padding: '28px 0',
+                        color: 'hsl(215,15%,45%)',
+                        fontSize: '0.82rem',
+                      }}
                     >
                       Sin histórico disponible
                     </td>
                   </tr>
                 ) : (
                   historyRows.map((row) => (
-                    <tr key={row.monthKey} className={row.monthKey === activeMonth ? 'is-current-month' : ''}>
+                    <tr
+                      key={row.monthKey}
+                      className={row.monthKey === activePeriod ? 'is-current-month' : ''}
+                    >
                       <td>{shortMonthLabel(row.monthKey)}</td>
                       <td className="num-col">{formatCop(row.spend)}</td>
                       <td className="num-col">{formatNumber(row.messages)}</td>
@@ -582,39 +411,16 @@ export function MetricsPage() {
   );
 }
 
-function buildCombinedMonthTotals(metrics: AdMetric[], sales: DailySale[]) {
-  const metricTotals = sumMetrics(metrics);
-  const salesTotals = sumSales(sales);
-  const spend = metricTotals.spend;
-  const totalSales = salesTotals.total;
-
-  return {
-    ...metricTotals,
-    total_sales: totalSales,
-    new_client_sales: salesTotals.newClient,
-    repeat_sales: salesTotals.repeat,
-    physical_store_sales: salesTotals.physical,
-    online_sales: salesTotals.online,
-    ad_roas: metricTotals.roas,
-    real_roas: spend > 0 ? totalSales / spend : 0,
-  };
-}
-
-function getMonthOperatingTotals(params: {
+/** Returns real_roas for a given month from consolidated KPI rows; 0 if unavailable. */
+function getMonthRoas(params: {
   monthKey: string;
   monthlyKpis: ClientMonthlyOperatingKpi[];
-  metrics: AdMetric[];
-  sales: DailySale[];
-}) {
+}): number {
   const monthRows = params.monthlyKpis.filter(
     (row) => getMonthKey(row.month) === params.monthKey,
   );
-  if (monthRows.length > 0) return sumOperatingKpis(monthRows);
-
-  return buildCombinedMonthTotals(
-    params.metrics.filter((row) => getMonthKey(row.date) === params.monthKey),
-    params.sales.filter((row) => getMonthKey(row.date) === params.monthKey),
-  );
+  if (monthRows.length > 0) return sumOperatingKpis(monthRows).real_roas;
+  return 0;
 }
 
 function roasClass(roas: number): string {
