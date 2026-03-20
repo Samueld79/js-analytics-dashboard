@@ -1,4 +1,39 @@
-import { ExternalLink, X } from 'lucide-react';
+import { ExternalLink, Link, X } from 'lucide-react';
+
+function CreativeDescription({ text }: { text: string }) {
+  const trimmed = text.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return (
+      <a
+        href={trimmed}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          fontSize: '0.75rem', color: 'hsl(180,100%,55%)', textDecoration: 'none',
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%',
+        }}
+      >
+        <Link size={11} style={{ flexShrink: 0 }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{trimmed}</span>
+      </a>
+    );
+  }
+  const parts = trimmed.split(/[•\n]/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    return (
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {parts.map((part, i) => (
+          <li key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: '0.77rem', color: '#8094b8' }}>
+            <span style={{ color: 'hsl(180,100%,50%)', flexShrink: 0, lineHeight: 1.5 }}>•</span>
+            <span style={{ wordBreak: 'break-word' }}>{part}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return <span style={{ fontSize: '0.77rem', color: '#8094b8', wordBreak: 'break-word' }}>{trimmed}</span>;
+}
 import type {
   CampaignEntry,
   ChecklistItem,
@@ -216,21 +251,37 @@ export function StrategyDetailModal({
           {strategy.creatives.length > 0 && (
             <section className="strategy-section">
               <h3 className="strategy-section-title">Creativos y piezas</h3>
-              <div className="strategy-cols">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {strategy.creatives.map((creative, index) => (
-                  <div key={`${creative.type ?? 'creative'}-${index}`} className="campaign-entry">
-                    <strong>{creative.type ?? `Creativo ${index + 1}`}</strong>
-                    {creative.description && (
-                      <span className="campaign-meta">{creative.description}</span>
-                    )}
+                  <div
+                    key={`${creative.type ?? 'creative'}-${index}`}
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: 8,
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      display: 'flex', flexDirection: 'column', gap: 5,
+                      wordBreak: 'break-word', overflowWrap: 'break-word', boxSizing: 'border-box',
+                    }}
+                  >
+                    <strong style={{ fontSize: '0.86rem', color: '#d8e7ff' }}>
+                      {creative.type ?? `Creativo ${index + 1}`}
+                    </strong>
+                    {creative.description && <CreativeDescription text={creative.description} />}
                     {creative.link && (
                       <a
                         href={creative.link}
                         target="_blank"
                         rel="noreferrer"
-                        className="drive-link"
+                        style={{
+                          fontSize: '0.75rem', color: 'hsl(180,100%,55%)', textDecoration: 'none',
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%',
+                        }}
                       >
-                        <ExternalLink size={13} /> Abrir recurso
+                        <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {creative.link}
+                        </span>
                       </a>
                     )}
                   </div>

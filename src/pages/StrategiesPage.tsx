@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { useStrategies } from '../hooks/useStrategies';
 import { createOrTouchOperationalAlert } from '../services/alerts';
+import { upsertOptimizeTask } from '../services/tasks';
 import { formatCop, statusLabel } from '../lib/utils';
 import type { Strategy } from '../lib/supabase';
 
@@ -198,16 +199,37 @@ export function StrategiesPage() {
 
   async function handleSaveStrategy(
     input: import('../lib/supabase').StrategyInput,
-    options?: { changeSummary?: string | null },
+    options?: { changeSummary?: string | null; optimizeCreativesDate?: string; optimizeAdsetsDate?: string },
   ) {
     const result = editingStrategy
-      ? await updateStrategy(editingStrategy.id, input, options)
-      : await createStrategy(input, options);
+      ? await updateStrategy(editingStrategy.id, input, { changeSummary: options?.changeSummary })
+      : await createStrategy(input, { changeSummary: options?.changeSummary });
 
     if (result.data) {
-      setSelectedStrategyId(result.data.id);
-      await loadHistory(result.data.id);
+      const strategy = result.data;
+      setSelectedStrategyId(strategy.id);
+      await loadHistory(strategy.id);
       setNotice(editingStrategy ? 'Estrategia actualizada.' : 'Estrategia creada.');
+
+      // Create or update optimization tasks (no dates appended to notes)
+      if (options?.optimizeCreativesDate) {
+        await upsertOptimizeTask({
+          strategyId: strategy.id,
+          clientId: strategy.client_id,
+          title: `🎨 Optimizar creativos — ${strategy.title}`,
+          dueDate: options.optimizeCreativesDate,
+          description: 'Optimización programada desde Estrategias',
+        });
+      }
+      if (options?.optimizeAdsetsDate) {
+        await upsertOptimizeTask({
+          strategyId: strategy.id,
+          clientId: strategy.client_id,
+          title: `⚙️ Optimizar conjuntos — ${strategy.title}`,
+          dueDate: options.optimizeAdsetsDate,
+          description: 'Optimización de conjuntos programada',
+        });
+      }
     }
     return result;
   }

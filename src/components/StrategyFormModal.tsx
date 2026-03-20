@@ -15,7 +15,7 @@ interface Props {
   onClose: () => void;
   onSubmit: (
     input: StrategyInput,
-    options?: { changeSummary?: string | null },
+    options?: { changeSummary?: string | null; optimizeCreativesDate?: string; optimizeAdsetsDate?: string },
   ) => Promise<ServiceMutationResult<Strategy>>;
 }
 
@@ -258,15 +258,6 @@ export function StrategyFormModal({
 
     setErrorMessage('');
 
-    // Build notes with optimization dates if provided
-    let notesWithDates = form.notes;
-    if (form.optimize_creatives_date) {
-      notesWithDates += `\n[Optimizar creativos: ${form.optimize_creatives_date}]`;
-    }
-    if (form.optimize_adsets_date) {
-      notesWithDates += `\n[Optimizar conjuntos: ${form.optimize_adsets_date}]`;
-    }
-
     const result = await onSubmit(
       {
         client_id: form.client_id,
@@ -287,7 +278,7 @@ export function StrategyFormModal({
         },
         creatives: parseCreativeLines(form.creatives),
         drive_links: parseDriveLines(form.drive_links),
-        notes: notesWithDates.trim(),
+        notes: form.notes.trim(),
         ai_summary: form.ai_summary,
         ai_checklist: parseChecklistLines(form.ai_checklist),
         ai_diff: strategy?.ai_diff ?? draft?.ai_diff ?? null,
@@ -296,6 +287,8 @@ export function StrategyFormModal({
       },
       {
         changeSummary: form.change_summary.trim() || null,
+        optimizeCreativesDate: form.optimize_creatives_date || undefined,
+        optimizeAdsetsDate: form.optimize_adsets_date || undefined,
       },
     );
 

@@ -155,6 +155,48 @@ export async function createTasks(
   return { data: (data ?? []) as Task[], error: null };
 }
 
+export async function upsertOptimizeTask(params: {
+  strategyId: string;
+  clientId: string;
+  title: string;
+  dueDate: string;
+  description: string;
+}): Promise<ServiceMutationResult<Task>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  // Check for an existing open task with same strategy + title (no duplicate)
+  const { data: existing } = await supabase
+    .from('tasks')
+    .select('id')
+    .eq('strategy_id', params.strategyId)
+    .eq('title', params.title)
+    .neq('status', 'done')
+    .maybeSingle();
+
+  if (existing?.id) {
+    return updateTask(existing.id, { due_date: params.dueDate });
+  }
+
+  const result = await createTasks([{
+    client_id: params.clientId,
+    strategy_id: params.strategyId,
+    alert_id: null,
+    title: params.title,
+    description: params.description,
+    type: 'optimization',
+    priority: 'high',
+    status: 'pending',
+    due_date: params.dueDate,
+    assigned_to: null,
+    created_by: null,
+  }]);
+
+  if (result.error) return { data: null, error: result.error };
+  return { data: result.data?.[0] ?? null, error: null };
+}
+
 export async function deleteTask(id: string): Promise<ServiceMutationResult<null>> {
   if (!isSupabaseConfigured || !supabase) {
     return { data: null, error: SUPABASE_MISSING_MESSAGE };
