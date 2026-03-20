@@ -16,6 +16,7 @@ import {
   Info,
   Layers,
   Palette,
+  Pencil,
   Plus,
   Trash2,
   XCircle,
@@ -693,6 +694,13 @@ export function AlertsPage() {
 }
 
 // ── Tasks panel ───────────────────────────────────────────────────────────────
+const PRIORITY_COLORS: Record<string, string> = {
+  low:    'hsl(180,100%,45%)',
+  medium: 'hsl(38,100%,55%)',
+  high:   'hsl(0,84%,60%)',
+  urgent: 'hsl(300,84%,60%)',
+};
+
 function TasksPanel({
   clients,
   isInternal,
@@ -704,9 +712,14 @@ function TasksPanel({
 }) {
   const { tasks, updateTask, deleteTask, reload } = useTasks();
   const [filterClient, setFilterClient] = useState('all');
-  const [showDone, setShowDone] = useState(false);
+  const [taskTab, setTaskTab] = useState<'pending' | 'done'>('pending');
   const [modalOpen, setModalOpen] = useState(false);
   const [taskNotice, setTaskNotice] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<{
+    title: string; due_date: string; description: string; priority: 'low' | 'medium' | 'high';
+  }>({ title: '', due_date: '', description: '', priority: 'medium' });
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (fabTrigger > 0) setModalOpen(true);
@@ -714,23 +727,27 @@ function TasksPanel({
 
   const today = todayKey();
 
-  const filtered = useMemo(
-    () =>
-      tasks.filter(
-        (t) =>
-          (filterClient === 'all' || t.client_id === filterClient) &&
-          (showDone || t.status !== 'done'),
-      ),
-    [tasks, filterClient, showDone],
+  const clientFiltered = useMemo(
+    () => tasks.filter((t) => filterClient === 'all' || t.client_id === filterClient),
+    [tasks, filterClient],
   );
 
-  // Sort: overdue first → today → upcoming (by date asc) → no date → done last
-  const sortedFiltered = useMemo(() => {
+  const pendingTasks = useMemo(
+    () => clientFiltered.filter((t) => t.status !== 'done'),
+    [clientFiltered],
+  );
+
+  const doneTasks = useMemo(
+    () =>
+      [...clientFiltered.filter((t) => t.status === 'done')].sort((a, b) =>
+        (b.completed_at ?? '').localeCompare(a.completed_at ?? ''),
+      ),
+    [clientFiltered],
+  );
+
+  const sortedPending = useMemo(() => {
     const order: Record<Dueness, number> = { overdue: 0, today: 1, upcoming: 2, none: 3 };
-    return [...filtered].sort((a, b) => {
-      const aDone = a.status === 'done' ? 1 : 0;
-      const bDone = b.status === 'done' ? 1 : 0;
-      if (aDone !== bDone) return aDone - bDone;
+    return [...pendingTasks].sort((a, b) => {
       const dA = taskDueness(a);
       const dB = taskDueness(b);
       if (order[dA] !== order[dB]) return order[dA] - order[dB];
@@ -739,23 +756,55 @@ function TasksPanel({
       if (b.due_date) return 1;
       return 0;
     });
-  }, [filtered]);
+  }, [pendingTasks]);
+
+  const displayedTasks = taskTab === 'pending' ? sortedPending : doneTasks;
 
   const overdueCount = useMemo(
-    () => tasks.filter((t) => t.status !== 'done' && !!t.due_date && t.due_date < today).length,
-    [tasks, today],
+    () => pendingTasks.filter((t) => !!t.due_date && t.due_date < today).length,
+    [pendingTasks, today],
   );
   const todayCount = useMemo(
-    () => tasks.filter((t) => t.status !== 'done' && t.due_date === today).length,
-    [tasks, today],
+    () => pendingTasks.filter((t) => t.due_date === today).length,
+    [pendingTasks, today],
   );
-  const pendingCount = filtered.filter((t) => t.status !== 'done').length;
+
+  function startEdit(task: Task) {
+    const p = task.priority;
+    setEditingId(task.id);
+    setEditFields({
+      title: task.title,
+      due_date: task.due_date ?? '',
+      description: task.description ?? '',
+      priority: (p === 'low' || p === 'medium' || p === 'high') ? p : 'medium',
+    });
+  }
+
+  async function saveEdit(id: string) {
+    if (!editFields.title.trim()) return;
+    const result = await updateTask(id, {
+      title: editFields.title.trim(),
+      due_date: editFields.due_date || null,
+      description: editFields.description.trim() || null,
+      priority: editFields.priority,
+    });
+    if (result.error) setTaskNotice(result.error);
+    setEditingId(null);
+  }
 
   async function handleToggleDone(task: Task) {
     const isDone = task.status === 'done';
     await updateTask(task.id, {
       status: isDone ? 'pending' : 'done',
       completed_at: isDone ? null : new Date().toISOString(),
+    });
+  }
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
     });
   }
 
@@ -771,194 +820,264 @@ function TasksPanel({
       >
         {/* Panel header */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexShrink: 0, flexWrap: 'wrap' }}>
-          <span className="number-label" style={{ fontSize: '0.62rem', letterSpacing: '0.1em' }}>
-            TAREAS
-          </span>
-
-          {/* Due badges */}
+          <span className="number-label" style={{ fontSize: '0.62rem', letterSpacing: '0.1em' }}>TAREAS</span>
           {overdueCount > 0 && (
-            <span style={{
-              fontSize: '0.64rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-              background: 'hsl(0 84% 60% / 0.15)', color: 'hsl(0,84%,65%)',
-              border: '1px solid hsl(0 84% 60% / 0.3)',
-            }}>
+            <span style={{ fontSize: '0.64rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'hsl(0 84% 60% / 0.15)', color: 'hsl(0,84%,65%)', border: '1px solid hsl(0 84% 60% / 0.3)' }}>
               ⚠ {overdueCount} vencida{overdueCount !== 1 ? 's' : ''}
             </span>
           )}
           {todayCount > 0 && (
-            <span
-              className="task-due-today-badge"
-              style={{
-                fontSize: '0.64rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                background: 'hsl(38 100% 55% / 0.15)', color: 'hsl(38,100%,65%)',
-                border: '1px solid hsl(38 100% 55% / 0.3)',
-              }}
-            >
+            <span className="task-due-today-badge" style={{ fontSize: '0.64rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'hsl(38 100% 55% / 0.15)', color: 'hsl(38,100%,65%)', border: '1px solid hsl(38 100% 55% / 0.3)' }}>
               ⏰ {todayCount} vence hoy
             </span>
           )}
-
-          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'hsl(180,100%,50%)', fontWeight: 600 }}>
-            {pendingCount} pendientes
-          </span>
-
-          {/* + NUEVA TAREA button */}
           <button
             onClick={() => { setModalOpen(true); setTaskNotice(null); }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '5px 12px', borderRadius: 6, border: '1px solid hsl(180 100% 50% / 0.3)',
-              cursor: 'pointer', background: 'hsl(180 100% 50% / 0.08)',
-              color: 'hsl(180,100%,55%)', fontSize: '0.7rem', fontWeight: 700,
-              letterSpacing: '0.06em', fontFamily: 'JetBrains Mono, monospace',
-              flexShrink: 0,
-            }}
+            style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 6, border: '1px solid hsl(180 100% 50% / 0.3)', cursor: 'pointer', background: 'hsl(180 100% 50% / 0.08)', color: 'hsl(180,100%,55%)', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}
           >
             <Plus size={12} /> NUEVA TAREA
           </button>
         </div>
 
-        {/* Filter row */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, flexShrink: 0 }}>
+        {/* Tabs: Pendientes | Realizadas + client filter */}
+        <div style={{ display: 'flex', alignItems: 'stretch', marginBottom: 10, flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.07)', gap: 0 }}>
+          {([
+            { key: 'pending' as const, label: 'Pendientes', count: pendingTasks.length },
+            { key: 'done'    as const, label: 'Realizadas', count: doneTasks.length },
+          ]).map(({ key, label, count }) => (
+            <button
+              key={key}
+              onClick={() => setTaskTab(key)}
+              style={{
+                padding: '7px 14px', border: 'none', cursor: 'pointer', background: 'transparent',
+                borderBottom: taskTab === key ? '2px solid hsl(180,100%,50%)' : '2px solid transparent',
+                color: taskTab === key ? 'hsl(180,100%,60%)' : 'hsl(215,15%,48%)',
+                fontSize: '0.76rem', fontWeight: taskTab === key ? 700 : 400,
+                transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              {label}
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: taskTab === key ? 'hsl(180 100% 50% / 0.15)' : 'rgba(255,255,255,0.06)', color: taskTab === key ? 'hsl(180,100%,60%)' : 'hsl(215,15%,45%)' }}>
+                {count}
+              </span>
+            </button>
+          ))}
           <select
             value={filterClient}
             onChange={(e) => setFilterClient(e.target.value)}
-            style={{ flex: 1, minWidth: 130, fontSize: '0.76rem', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'inherit' }}
+            style={{ marginLeft: 'auto', fontSize: '0.72rem', padding: '3px 7px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 5, color: 'inherit', alignSelf: 'center' }}
           >
-            <option value="all">Todos los clientes</option>
+            <option value="all">Todos</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', color: 'hsl(215,15%,52%)', cursor: 'pointer', flexShrink: 0 }}>
-            <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
-            Completadas
-          </label>
         </div>
 
         {taskNotice && <p className="empty-note" style={{ marginBottom: 8, flexShrink: 0 }}>{taskNotice}</p>}
 
-        {/* Scrollable task list */}
+        {/* Task list */}
         <div style={{ ...SCROLL_AREA, paddingRight: 2 }}>
-          {sortedFiltered.length === 0 ? (
+          {displayedTasks.length === 0 ? (
             <p style={{ fontSize: '0.8rem', color: 'hsl(215,15%,42%)', textAlign: 'center', padding: '24px 0' }}>
-              Sin tareas pendientes
+              {taskTab === 'pending' ? 'Sin tareas pendientes' : 'Sin tareas realizadas'}
             </p>
           ) : (
             <div style={{ display: 'grid', gap: 6 }}>
-              {sortedFiltered.map((task) => {
+              {displayedTasks.map((task) => {
                 const dueness = taskDueness(task);
                 const borderColor = taskBorderColor(dueness);
                 const isDone = task.status === 'done';
                 const client = clients.find((c) => c.id === task.client_id);
+                const isEditing = editingId === task.id;
+                const isExpanded = expandedIds.has(task.id);
+                const prioColor = PRIORITY_COLORS[task.priority] ?? 'hsl(215,15%,45%)';
+                const doneBorder = 'hsl(145,100%,45%)';
 
                 return (
                   <div
                     key={task.id}
                     style={{
-                      display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8,
+                      borderRadius: 8,
                       background: isDone ? 'rgba(255,255,255,0.02)' : 'rgba(6,10,18,0.7)',
                       border: `1px solid ${isDone ? 'rgba(255,255,255,0.05)' : `${borderColor}25`}`,
-                      borderLeft: `3px solid ${borderColor}`,
-                      opacity: isDone ? 0.5 : 1,
-                      transition: 'opacity 0.25s ease, border-color 0.2s',
+                      borderLeft: `3px solid ${isDone ? doneBorder : borderColor}`,
+                      transition: 'border-color 0.2s',
+                      overflow: 'hidden',
                     }}
                   >
-                    {/* Checkbox */}
-                    <button
-                      type="button"
-                      onClick={() => void handleToggleDone(task)}
-                      title={isDone ? 'Marcar pendiente' : 'Marcar completa'}
-                      style={{
-                        flexShrink: 0, width: 18, height: 18, marginTop: 2, borderRadius: 4,
-                        border: `1.5px solid ${isDone ? 'hsl(145,100%,45%)' : borderColor}`,
-                        background: isDone ? 'hsl(145 100% 45% / 0.18)' : 'transparent',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'hsl(145,100%,55%)', fontSize: '0.7rem', fontWeight: 700,
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {isDone ? '✓' : ''}
-                    </button>
+                    {isEditing ? (
+                      /* ── Edit form ── */
+                      <div style={{ padding: '10px 12px', display: 'grid', gap: 8 }}>
+                        <input
+                          autoFocus
+                          value={editFields.title}
+                          onChange={(e) => setEditFields((f) => ({ ...f, title: e.target.value }))}
+                          placeholder="Título"
+                          style={{ padding: '6px 9px', fontSize: '0.82rem', background: 'rgba(255,255,255,0.06)', border: '1px solid hsl(180 100% 50% / 0.25)', borderRadius: 6, color: 'inherit', outline: 'none' }}
+                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <input
+                            type="date"
+                            value={editFields.due_date}
+                            onChange={(e) => setEditFields((f) => ({ ...f, due_date: e.target.value }))}
+                            style={{ padding: '5px 8px', fontSize: '0.78rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'inherit' }}
+                          />
+                          <select
+                            value={editFields.priority}
+                            onChange={(e) => setEditFields((f) => ({ ...f, priority: e.target.value as 'low' | 'medium' | 'high' }))}
+                            style={{ padding: '5px 8px', fontSize: '0.78rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'inherit' }}
+                          >
+                            <option value="low">LOW</option>
+                            <option value="medium">MEDIUM</option>
+                            <option value="high">HIGH</option>
+                          </select>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={editFields.description}
+                          onChange={(e) => setEditFields((f) => ({ ...f, description: e.target.value }))}
+                          placeholder="Notas (opcional)"
+                          style={{ padding: '5px 8px', fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'inherit', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.45 }}
+                        />
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => void saveEdit(task.id)}
+                            style={{ flex: 1, padding: '6px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'hsl(180,100%,45%)', color: '#000', fontWeight: 700, fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace' }}
+                          >
+                            ✓ GUARDAR
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', background: 'transparent', color: 'hsl(215,15%,55%)', fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace' }}
+                          >
+                            ✕ CANCELAR
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── View mode ── */
+                      <div style={{ padding: '10px 12px', opacity: isDone ? 0.55 : 1, transition: 'opacity 0.25s' }}>
+                        <div style={{ display: 'flex', gap: 10 }}>
 
-                    {/* Body */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 2 }}>
-                        <span style={{
-                          fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.3,
-                          textDecoration: isDone ? 'line-through' : 'none',
-                          color: isDone ? 'hsl(215,15%,45%)' : 'hsl(215,15%,88%)',
-                          transition: 'color 0.2s, text-decoration 0.2s',
-                        }}>
-                          {task.title}
-                        </span>
-
-                        {/* Status labels */}
-                        {!isDone && dueness === 'overdue' && (
-                          <span style={{
-                            fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em',
-                            color: 'hsl(0,84%,65%)', fontFamily: 'JetBrains Mono, monospace',
-                          }}>
-                            VENCIDA
-                          </span>
-                        )}
-                        {!isDone && dueness === 'today' && (
-                          <span
-                            className="task-label-today"
+                          {/* Checkbox */}
+                          <button
+                            type="button"
+                            onClick={() => void handleToggleDone(task)}
+                            title={isDone ? 'Deshacer' : 'Marcar como realizada'}
                             style={{
-                              fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em',
-                              color: 'hsl(38,100%,65%)', fontFamily: 'JetBrains Mono, monospace',
+                              flexShrink: 0, width: 18, height: 18, marginTop: 3, borderRadius: 4,
+                              border: `1.5px solid ${isDone ? doneBorder : borderColor}`,
+                              background: isDone ? 'hsl(145 100% 45% / 0.18)' : 'transparent',
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: 'hsl(145,100%,55%)', fontSize: '0.7rem', fontWeight: 700, transition: 'all 0.15s',
                             }}
                           >
-                            HOY
-                          </span>
-                        )}
-                      </div>
+                            {isDone ? '✓' : ''}
+                          </button>
 
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {client && (
-                          <span style={{ fontSize: '0.66rem', color: 'hsl(215,15%,45%)' }}>
-                            {client.name}
-                          </span>
-                        )}
-                        {task.due_date && (
-                          <span style={{
-                            fontSize: '0.66rem',
-                            color: dueness === 'overdue'
-                              ? 'hsl(0,84%,58%)'
-                              : dueness === 'today'
-                                ? 'hsl(38,100%,55%)'
-                                : 'hsl(215,15%,42%)',
-                          }}>
-                            {new Date(`${task.due_date}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
-                          </span>
-                        )}
-                        {task.description && (
-                          <span style={{ fontSize: '0.66rem', color: 'hsl(215,15%,38%)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
-                            {task.description}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                          {/* Body */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
 
-                    {/* Right side: priority + delete */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, alignItems: 'flex-end' }}>
-                      <span className={`priority-pill priority-${task.priority}`} style={{ fontSize: '0.58rem' }}>
-                        {task.priority}
-                      </span>
-                      {isInternal && (
-                        <button
-                          className="task-delete-btn"
-                          title="Eliminar tarea"
-                          onClick={async () => {
-                            if (!window.confirm(`¿Eliminar "${task.title}"?`)) return;
-                            const result = await deleteTask(task.id);
-                            if (result.error) setTaskNotice(result.error);
-                            else void reload();
-                          }}
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      )}
-                    </div>
+                            {/* Title row — click to expand */}
+                            <div
+                              onClick={() => toggleExpand(task.id)}
+                              style={{ cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 4 }}
+                            >
+                              <span style={{ fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.4, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'hsl(215,15%,45%)' : 'hsl(215,15%,88%)', flex: 1, transition: 'color 0.2s' }}>
+                                {task.title}
+                              </span>
+                              {isDone && (
+                                <span style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em', color: 'hsl(145,100%,55%)', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, marginTop: 2 }}>
+                                  REALIZADA
+                                </span>
+                              )}
+                              {!isDone && dueness === 'overdue' && (
+                                <span style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em', color: 'hsl(0,84%,65%)', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, marginTop: 2 }}>
+                                  VENCIDA
+                                </span>
+                              )}
+                              {!isDone && dueness === 'today' && (
+                                <span className="task-label-today" style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em', color: 'hsl(38,100%,65%)', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, marginTop: 2 }}>
+                                  HOY
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Meta: client + due date + priority */}
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: task.description ? 5 : 0 }}>
+                              {client && (
+                                <span style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', color: 'hsl(215,15%,55%)' }}>
+                                  {client.name}
+                                </span>
+                              )}
+                              {task.due_date && (
+                                <span style={{ fontSize: '0.65rem', fontWeight: 500, color: dueness === 'overdue' ? 'hsl(0,84%,58%)' : dueness === 'today' ? 'hsl(38,100%,55%)' : 'hsl(215,15%,48%)' }}>
+                                  Vence {new Date(`${task.due_date}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                                </span>
+                              )}
+                              <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px', borderRadius: 6, background: `${prioColor}18`, color: prioColor, border: `1px solid ${prioColor}30`, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.04em' }}>
+                                {task.priority.toUpperCase()}
+                              </span>
+                            </div>
+
+                            {/* Notes — 2-line clamp when collapsed */}
+                            {task.description && (
+                              <p style={{
+                                margin: 0, fontSize: '0.74rem', color: 'hsl(215,15%,46%)', lineHeight: 1.45,
+                                ...(isExpanded ? {} : { overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }),
+                              }}>
+                                {task.description}
+                              </p>
+                            )}
+
+                            {/* Expanded: creation date */}
+                            <div style={{ maxHeight: isExpanded ? '40px' : '0', overflow: 'hidden', transition: 'max-height 0.22s ease' }}>
+                              <p style={{ margin: '5px 0 0', fontSize: '0.64rem', color: 'hsl(215,15%,34%)' }}>
+                                Creada {new Date(task.created_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Right actions */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                            {isDone ? (
+                              <button
+                                onClick={() => void handleToggleDone(task)}
+                                style={{ fontSize: '0.62rem', padding: '3px 7px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', background: 'transparent', color: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}
+                              >
+                                Deshacer
+                              </button>
+                            ) : (
+                              <>
+                                {isInternal && (
+                                  <button
+                                    className="task-delete-btn"
+                                    title="Editar tarea"
+                                    onClick={() => startEdit(task)}
+                                    style={{ background: 'hsl(220 100% 60% / 0.1)', color: 'hsl(220,100%,70%)' }}
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                )}
+                                {isInternal && (
+                                  <button
+                                    className="task-delete-btn"
+                                    title="Eliminar tarea"
+                                    onClick={async () => {
+                                      if (!window.confirm(`¿Eliminar "${task.title}"?`)) return;
+                                      const result = await deleteTask(task.id);
+                                      if (result.error) setTaskNotice(result.error);
+                                      else void reload();
+                                    }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

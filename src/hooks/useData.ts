@@ -125,6 +125,7 @@ export function useTasks(clientId?: string) {
     if (result.data) {
       setTasks((current) => current.map((task) => (task.id === id ? result.data ?? task : task)));
     }
+    return result;
   };
 
   const deleteTask = async (id: string) => {

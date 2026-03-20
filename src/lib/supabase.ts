@@ -553,7 +553,7 @@ export type TaskInput = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'complet
 };
 
 export type TaskUpdateInput = Partial<
-  Pick<Task, 'description' | 'priority' | 'status' | 'due_date' | 'assigned_to' | 'completed_at'>
+  Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'due_date' | 'assigned_to' | 'completed_at'>
 >;
 
 export type Alert = {
