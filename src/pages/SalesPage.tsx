@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
-  BarChart,
-  Bar,
-  Cell,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -382,7 +381,11 @@ export function SalesPage() {
 
       {/* ── Section 2: KPI Cards ── */}
       <div className="metrics-kpi-grid">
-        {kpiCards.map((card, i) => (
+        {salesLoading && periodSales.length === 0 ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton-card" style={{ height: 90, borderRadius: 12 }} />
+          ))
+        ) : kpiCards.map((card, i) => (
           <motion.div
             key={card.label}
             className="card-glass metrics-kpi-card"
@@ -633,75 +636,107 @@ export function SalesPage() {
       {salesByMonth.length > 0 && (
         <div
           style={{
-            background: 'rgba(6,10,18,0.8)',
-            border: '1px solid hsl(180 100% 50% / 0.1)',
-            borderRadius: 8,
-            padding: '18px 16px 12px',
+            background: 'rgba(6,10,18,0.85)',
+            border: '1px solid hsl(180 100% 50% / 0.12)',
+            borderRadius: 12,
+            padding: '20px 16px 14px',
             marginBottom: 24,
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          <span
-            className="number-label"
-            style={{
-              fontSize: '0.6rem',
-              color: 'hsl(215,15%,42%)',
-              marginBottom: 14,
-              display: 'block',
-            }}
-          >
-            TENDENCIA DE VENTAS
-          </span>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={salesByMonth} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
+          {/* Subtle background glow */}
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: 12,
+            background: 'radial-gradient(ellipse 60% 40% at 50% 100%, hsl(180 100% 50% / 0.04) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, position: 'relative' }}>
+            <span className="number-label" style={{ fontSize: '0.6rem', color: 'hsl(215,15%,42%)', letterSpacing: '0.12em' }}>
+              TENDENCIA DE VENTAS
+            </span>
+            {salesByMonth.length > 0 && (
+              <span style={{ fontSize: '0.68rem', color: 'hsl(180,100%,55%)', fontFamily: 'JetBrains Mono' }}>
+                {formatCopCompact(Math.max(...salesByMonth.map((m) => m.total)))} máx
+              </span>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={210}>
+            <AreaChart data={salesByMonth} margin={{ top: 12, right: 4, left: 0, bottom: 0 }}>
               <defs>
-                <linearGradient id="salesBarGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(180,100%,50%)" stopOpacity={0.9} />
-                  <stop offset="100%" stopColor="hsl(280,80%,60%)" stopOpacity={0.75} />
+                <linearGradient id="salesLineGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="hsl(180,100%,55%)" />
+                  <stop offset="100%" stopColor="hsl(280,80%,65%)" />
                 </linearGradient>
+                <linearGradient id="salesAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(180,100%,55%)" stopOpacity={0.22} />
+                  <stop offset="60%" stopColor="hsl(240,80%,60%)" stopOpacity={0.07} />
+                  <stop offset="100%" stopColor="hsl(280,80%,65%)" stopOpacity={0} />
+                </linearGradient>
+                <filter id="salesGlow">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
               <CartesianGrid
-                strokeDasharray="2 6"
-                stroke="rgba(255,255,255,0.05)"
+                strokeDasharray="1 8"
+                stroke="rgba(255,255,255,0.04)"
                 vertical={false}
               />
               <XAxis
                 dataKey="month"
                 tickFormatter={shortMonth}
-                tick={{ fontSize: 11, fill: 'hsl(215,15%,42%)' }}
+                tick={{ fontSize: 10, fill: 'hsl(215,15%,40%)', fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
+                dy={6}
               />
-              <YAxis
-                tickFormatter={formatCopCompact}
-                tick={{ fontSize: 11, fill: 'hsl(215,15%,42%)' }}
-                axisLine={false}
-                tickLine={false}
-                width={60}
-              />
+              <YAxis hide />
               <Tooltip
                 formatter={(v) => [formatCop(v as number), 'Ventas']}
                 labelFormatter={(label: unknown) => shortMonth(String(label))}
                 contentStyle={{
-                  background: 'rgba(0,0,0,0.88)',
-                  border: '1px solid hsl(180 100% 50% / 0.2)',
-                  borderRadius: 8,
+                  background: 'rgba(8,12,22,0.92)',
+                  border: '1px solid hsl(180 100% 50% / 0.25)',
+                  borderRadius: 10,
                   fontSize: 12,
                   fontFamily: 'JetBrains Mono',
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: '0 4px 24px hsl(180 100% 50% / 0.12)',
                 }}
+                cursor={{ stroke: 'hsl(180 100% 50% / 0.3)', strokeWidth: 1, strokeDasharray: '4 4' }}
               />
-              <Bar dataKey="total" fill="url(#salesBarGrad)" radius={[8, 8, 0, 0]}>
-                {salesByMonth.map((entry) => (
-                  <Cell
-                    key={entry.month}
-                    fill={
-                      entry.month === activePeriod
-                        ? 'hsl(180,100%,65%)'
-                        : 'url(#salesBarGrad)'
-                    }
-                  />
-                ))}
-              </Bar>
-            </BarChart>
+              <Area
+                type="monotone"
+                dataKey="total"
+                stroke="url(#salesLineGrad)"
+                strokeWidth={2.5}
+                fill="url(#salesAreaGrad)"
+                filter="url(#salesGlow)"
+                dot={(props) => {
+                  const { cx, cy, payload } = props as { cx: number; cy: number; payload: { month: string } };
+                  const isActive = payload.month === activePeriod;
+                  return (
+                    <circle
+                      key={payload.month}
+                      cx={cx}
+                      cy={cy}
+                      r={isActive ? 6 : 4}
+                      fill={isActive ? 'hsl(180,100%,65%)' : 'hsl(180,100%,55%)'}
+                      stroke={isActive ? 'hsl(180,100%,85%)' : 'hsl(180,100%,30%)'}
+                      strokeWidth={isActive ? 2 : 1.5}
+                      style={{ filter: `drop-shadow(0 0 ${isActive ? 8 : 4}px hsl(180,100%,55%))` }}
+                    />
+                  );
+                }}
+                activeDot={{ r: 7, fill: 'hsl(180,100%,65%)', stroke: 'hsl(180,100%,85%)', strokeWidth: 2, style: { filter: 'drop-shadow(0 0 8px hsl(180,100%,55%))' } }}
+                animationDuration={900}
+                animationEasing="ease-out"
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}

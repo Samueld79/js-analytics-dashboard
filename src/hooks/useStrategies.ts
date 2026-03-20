@@ -10,6 +10,7 @@ import type {
 } from '../lib/supabase';
 import {
   createStrategy,
+  deleteStrategy,
   listStrategies,
   listStrategyHistory,
   updateStrategy,
@@ -151,6 +152,15 @@ export function useStrategies(clientId?: string) {
     [strategies],
   );
 
+  const remove = useCallback(
+    async (id: string): Promise<{ error: string | null }> => {
+      const result = await deleteStrategy(id);
+      if (!result.error) await load();
+      return { error: result.error };
+    },
+    [load],
+  );
+
   return {
     strategies,
     historyByStrategy,
@@ -161,6 +171,7 @@ export function useStrategies(clientId?: string) {
     createStrategy: create,
     updateStrategy: edit,
     updateStatus,
+    deleteStrategy: remove,
     loadHistory,
     generateTasks,
     isConfigured: isSupabaseConfigured,

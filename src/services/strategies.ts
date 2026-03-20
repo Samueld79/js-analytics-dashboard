@@ -517,6 +517,15 @@ export async function updateStrategy(
   return result;
 }
 
+export async function deleteStrategy(id: string): Promise<ServiceMutationResult<null>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+  const { error } = await supabase.from('strategies').delete().eq('id', id);
+  if (error) return { data: null, error: getErrorMessage(error, 'No se pudo eliminar la estrategia.') };
+  return { data: null, error: null };
+}
+
 export async function updateStrategyStatus(
   id: string,
   status: StrategyStatus,

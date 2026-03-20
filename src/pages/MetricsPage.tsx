@@ -310,7 +310,7 @@ export function MetricsPage() {
       : selectedClientId;
 
   // Primary data source: ad_campaign_metrics
-  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(queryClientId, 730);
+  const { rows: campaignRows, byMonth: campaignByMonth, loading: campaignLoading } = useCampaignSummary(queryClientId, 730);
 
   // Historical ROAS: monthly KPI rows + manual sales
   const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, 12);
@@ -503,7 +503,11 @@ export function MetricsPage() {
       </div>
 
       <div className="metrics-kpi-grid">
-        {kpiCards.map((card, i) => (
+        {campaignLoading && campaignByMonth.length === 0 ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="skeleton-card" style={{ height: 90, borderRadius: 12 }} />
+          ))
+        ) : kpiCards.map((card, i) => (
           <motion.div
             key={card.label}
             className="card-glass metrics-kpi-card"
@@ -527,6 +531,7 @@ export function MetricsPage() {
           </motion.div>
         ))}
       </div>
+
 
       <div className="metrics-main-grid">
         <motion.div

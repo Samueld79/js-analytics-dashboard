@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { BrandSignature } from './components/BrandSignature';
@@ -196,6 +196,41 @@ function AccessDeniedPage({
   );
 }
 
+const SETTINGS_ITEM: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '10px 0',
+  borderBottom: '1px solid rgba(255,255,255,0.05)',
+  gap: 12,
+};
+
+const SETTINGS_LABEL: CSSProperties = {
+  fontSize: '0.74rem',
+  color: 'hsl(215,15%,48%)',
+  flexShrink: 0,
+};
+
+const SETTINGS_VALUE: CSSProperties = {
+  fontSize: '0.8rem',
+  color: 'hsl(215,15%,82%)',
+  textAlign: 'right' as const,
+  fontFamily: 'JetBrains Mono, monospace',
+};
+
+function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span style={{
+      padding: '2px 9px', borderRadius: 20, fontSize: '0.66rem', fontWeight: 700,
+      background: ok ? 'hsl(145 100% 45% / 0.12)' : 'hsl(215 15% 38% / 0.15)',
+      color: ok ? 'hsl(145,100%,55%)' : 'hsl(215,15%,52%)',
+      border: `1px solid ${ok ? 'hsl(145 100% 45% / 0.2)' : 'rgba(255,255,255,0.07)'}`,
+    }}>
+      {ok ? '● ' : '○ '}{label}
+    </span>
+  );
+}
+
 function SettingsPage() {
   const { authEnabled, profile, role, memberships, accessibleClientIds, isInternal } = useAuth();
   const activeMemberships = memberships.filter((membership) => membership.status === 'active');
@@ -208,91 +243,110 @@ function SettingsPage() {
     .filter((value): value is string => Boolean(value))
     .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? null;
 
+  const displayName = profile?.full_name ?? profile?.email ?? null;
+  const initial = (displayName ?? 'U')[0]?.toUpperCase() ?? 'U';
+
   return (
     <div className="page-content">
       <div className="page-header">
         <div>
           <h1 className="page-title">Configuración</h1>
-          <p className="page-subtitle">Acceso, operación y estado del sistema</p>
+          <p className="page-subtitle" style={{ letterSpacing: '0.06em', fontSize: '0.72rem' }}>
+            ACCESO · OPERACIÓN · ESTADO
+          </p>
         </div>
       </div>
+
       <div className="settings-grid">
-        <section className="card section-block settings-card">
-          <div className="section-heading">
-            <h2>Cuenta actual</h2>
-          </div>
-          <p className="source-note">
-            Estado del acceso actual y alcance operativo dentro del sistema.
-          </p>
-          <div className="setting-item">
-            <div className="setting-label">Usuario actual</div>
-            <div className="setting-value">
-              {profile?.full_name ?? profile?.email ?? 'Sesion local sin usuario'}
+        {/* ── Card 1: Cuenta ── */}
+        <section style={{
+          background: 'rgba(255,255,255,0.03)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 12,
+          padding: '20px 22px',
+        }}>
+          {/* Avatar + name */}
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 20 }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: '50%',
+              background: 'hsl(180 100% 50% / 0.15)',
+              border: '2px solid hsl(180 100% 50% / 0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.1rem', fontWeight: 700, color: 'hsl(180,100%,60%)',
+              flexShrink: 0,
+            }}>
+              {initial}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'hsl(215,15%,88%)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {displayName ?? 'Sesión local'}
+              </div>
+              <StatusBadge ok label={roleLabel(role)} />
             </div>
           </div>
-          <div className="setting-item">
-            <div className="setting-label">Rol</div>
-            <div className="setting-value">{roleLabel(role)}</div>
-          </div>
-          <div className="setting-item">
-            <div className="setting-label">Clientes accesibles</div>
-            <div className="setting-value">
-              {accessibleClientIds.length > 0
-                ? accessibleClientIds.length
-                : 'Acceso interno total o sin asignaciones'}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div style={SETTINGS_ITEM}>
+              <span style={SETTINGS_LABEL}>Clientes</span>
+              <span style={SETTINGS_VALUE}>
+                {accessibleClientIds.length > 0 ? `${accessibleClientIds.length} asignados` : 'Acceso total'}
+              </span>
             </div>
-          </div>
-          <div className="setting-item">
-            <div className="setting-label">Membresías activas</div>
-            <div className="setting-value">{activeMemberships.length}</div>
+            <div style={SETTINGS_ITEM}>
+              <span style={SETTINGS_LABEL}>Membresías activas</span>
+              <span style={{ ...SETTINGS_VALUE, color: activeMemberships.length > 0 ? 'hsl(145,100%,55%)' : 'hsl(215,15%,48%)' }}>
+                {activeMemberships.length}
+              </span>
+            </div>
+            <div style={{ ...SETTINGS_ITEM, borderBottom: 'none' }}>
+              <span style={SETTINGS_LABEL}>Portal</span>
+              <span style={SETTINGS_VALUE} >Membresía activa</span>
+            </div>
           </div>
         </section>
 
-        <section className="card section-block settings-card">
-          <div className="section-heading">
-            <h2>Operación del sistema</h2>
-          </div>
-          <p className="source-note">
-            Resumen claro de cómo opera hoy la plataforma para el equipo y el portal cliente.
+        {/* ── Card 2: Sistema ── */}
+        <section style={{
+          background: 'rgba(255,255,255,0.03)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 12,
+          padding: '20px 22px',
+        }}>
+          <p className="number-label" style={{ fontSize: '0.6rem', marginBottom: 16, color: 'hsl(180,100%,50%)', letterSpacing: '0.12em' }}>
+            SISTEMA
           </p>
-          <div className="period-chip-row">
-            <span className="meta-chip">Meta Ads: sync diario</span>
-            <span className="meta-chip">Ventas: carga manual</span>
-            <span className="meta-chip">Portal cliente: por membresía</span>
+
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+            <StatusBadge ok={isSupabaseConfigured} label={isSupabaseConfigured ? 'Supabase' : 'Sin Supabase'} />
+            <StatusBadge ok={authEnabled} label={authEnabled ? 'Auth activo' : 'Auth local'} />
           </div>
-          <div className="setting-item">
-            <div className="setting-label">Modo de datos</div>
-            <div className="setting-value settings-status-value">
-              {isSupabaseConfigured ? 'Supabase configurado' : 'Supabase no configurado'}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div style={SETTINGS_ITEM}>
+              <span style={SETTINGS_LABEL}>Meta Ads</span>
+              <span style={{ ...SETTINGS_VALUE, color: 'hsl(180,100%,55%)' }}>Sync diario</span>
             </div>
-          </div>
-          <div className="setting-item">
-            <div className="setting-label">Autenticación</div>
-            <div className="setting-value">
-              {authEnabled ? 'Supabase Auth activo' : 'Desactivada por entorno local'}
+            <div style={SETTINGS_ITEM}>
+              <span style={SETTINGS_LABEL}>Ventas</span>
+              <span style={SETTINGS_VALUE}>Carga manual</span>
             </div>
-          </div>
-          <div className="setting-item">
-            <div className="setting-label">Portal cliente</div>
-            <div className="setting-value">
-              Cada cliente ve solo sus empresas asignadas por membresía activa
+            <div style={SETTINGS_ITEM}>
+              <span style={SETTINGS_LABEL}>Último sync Meta</span>
+              <span style={{ ...SETTINGS_VALUE, fontSize: '0.72rem' }}>
+                {latestSyncAt ? formatDateTime(latestSyncAt) : '—'}
+              </span>
             </div>
-          </div>
-          <div className="setting-item">
-            <div className="setting-label">Último sync Meta visible</div>
-            <div className="setting-value">
-              {latestSyncAt ? formatDateTime(latestSyncAt) : 'Sin sincronización registrada'}
-            </div>
-          </div>
-          <div className="setting-item">
-            <div className="setting-label">Versión</div>
-            <div className="setting-value">
-              Growth Strategy JS · Dashboard interno y workspace cliente
+            <div style={{ ...SETTINGS_ITEM, borderBottom: 'none' }}>
+              <span style={SETTINGS_LABEL}>Versión</span>
+              <span style={{ ...SETTINGS_VALUE, color: 'hsl(215,15%,42%)', fontSize: '0.7rem' }}>
+                Growth Strategy JS
+              </span>
             </div>
           </div>
         </section>
       </div>
-
     </div>
   );
 }
