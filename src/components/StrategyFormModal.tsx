@@ -1,4 +1,4 @@
-import { MessageCircle, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type {
   AdSetEntry,
@@ -27,8 +27,9 @@ interface Props {
 
 interface CreativeFormState {
   description: string;
-  type: string;
+  publicationType: 'nueva' | 'existente';
   existingUrl: string;
+  notes: string;
 }
 
 interface AdSetFormState {
@@ -39,7 +40,7 @@ interface AdSetFormState {
   locationsText: string;
   placements: string[];
   creatives: CreativeFormState[];
-  chatRecommended: boolean;
+  welcomeMessage: string;
 }
 
 interface CampaignFormState {
@@ -52,15 +53,16 @@ interface CampaignFormState {
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
-const AGE_OPTIONS = [18, 24, 25, 34, 35, 44, 45, 54, 55, 65];
 const PLACEMENTS = ['Feed', 'Reels', 'Stories', 'Explore', 'Messenger', 'Audience Network'];
 const AD_TYPES = ['Video', 'Imagen', 'Carrusel', 'Reel', 'Colección'];
 const OBJECTIVES = ['General', 'Reconocimiento', 'Tráfico', 'Interacción', 'Ventas'];
+const AGE_OPTIONS_MIN = Array.from({ length: 48 }, (_, i) => 18 + i); // 18–65
+const AGE_OPTIONS_MAX = Array.from({ length: 46 }, (_, i) => 20 + i); // 20–65
 
 // ─── Empty factories ───────────────────────────────────────────────────────
 
 function emptyCreative(): CreativeFormState {
-  return { description: '', type: '', existingUrl: '' };
+  return { description: '', publicationType: 'nueva', existingUrl: '', notes: '' };
 }
 
 function emptyAdSet(): AdSetFormState {
@@ -72,18 +74,12 @@ function emptyAdSet(): AdSetFormState {
     locationsText: '',
     placements: [],
     creatives: [emptyCreative()],
-    chatRecommended: false,
+    welcomeMessage: '',
   };
 }
 
 function emptyCampaign(): CampaignFormState {
-  return {
-    name: '',
-    budget: '',
-    budgetType: 'CBO',
-    objective: 'General',
-    adsets: [emptyAdSet()],
-  };
+  return { name: '', budget: '', budgetType: 'CBO', objective: 'General', adsets: [emptyAdSet()] };
 }
 
 // ─── Converters ───────────────────────────────────────────────────────────
@@ -105,10 +101,11 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
       creatives:
         a.creatives?.map((cr) => ({
           description: cr.description ?? '',
-          type: cr.type ?? '',
+          publicationType: (cr.publicationType ?? 'nueva') as 'nueva' | 'existente',
           existingUrl: cr.existingUrl ?? '',
+          notes: cr.notes ?? '',
         })) ?? [emptyCreative()],
-      chatRecommended: a.chatRecommended ?? false,
+      welcomeMessage: a.welcomeMessage ?? '',
     })),
   }));
 }
@@ -133,128 +130,20 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
             .filter(Boolean),
           placements: a.placements,
           creatives: a.creatives
-            .filter((cr) => cr.description || cr.type || cr.existingUrl)
+            .filter((cr) => cr.description || cr.existingUrl || cr.notes)
             .map(
               (cr): CreativeFormEntry => ({
                 description: cr.description || undefined,
-                type: cr.type || undefined,
-                existingUrl: cr.existingUrl || undefined,
+                publicationType: cr.publicationType,
+                existingUrl:
+                  cr.publicationType === 'existente' ? cr.existingUrl || undefined : undefined,
+                notes: cr.notes || undefined,
               }),
             ),
-          chatRecommended: a.chatRecommended,
+          welcomeMessage: a.welcomeMessage || undefined,
         }),
       ),
     }));
-}
-
-function parseCampaignLines(
-  value: string,
-  mode: 'new' | 'off' | 'optimize',
-): StrategyInput['campaigns_new'] {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split('|').map((part) => part.trim()))
-    .map((parts) => {
-      if (mode === 'new') {
-        const [name, objective, budget, audience, notes] = parts;
-        return {
-          name,
-          objective: objective || undefined,
-          budget: budget ? Number(budget) || 0 : undefined,
-          audience: audience || undefined,
-          notes: notes || undefined,
-        };
-      }
-      if (mode === 'off') {
-        const [name, reason] = parts;
-        return { name, reason: reason || undefined };
-      }
-      const [name, action, priority] = parts;
-      return { name, action: action || undefined, priority: priority || undefined };
-    })
-    .filter((entry) => entry.name);
-}
-
-function serializeCampaignLines(
-  entries: Strategy['campaigns_new'],
-  mode: 'new' | 'off' | 'optimize',
-): string {
-  return entries
-    .map((entry) => {
-      if (mode === 'new') {
-        return [
-          entry.name,
-          entry.objective ?? '',
-          entry.budget ?? '',
-          entry.audience ?? '',
-          entry.notes ?? '',
-        ].join(' | ');
-      }
-      if (mode === 'off') return [entry.name, entry.reason ?? ''].join(' | ');
-      return [entry.name, entry.action ?? '', entry.priority ?? ''].join(' | ');
-    })
-    .join('\n');
-}
-
-function parseCreativeLines(value: string): StrategyInput['creatives'] {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split('|').map((part) => part.trim()))
-    .map(([type, description, link]) => ({
-      type: type || undefined,
-      description: description || undefined,
-      link: link || undefined,
-    }))
-    .filter((entry) => entry.type || entry.description || entry.link);
-}
-
-function serializeCreativeLines(entries: Strategy['creatives']): string {
-  return entries
-    .map((entry) => [entry.type ?? '', entry.description ?? '', entry.link ?? ''].join(' | '))
-    .join('\n');
-}
-
-function parseDriveLines(value: string): StrategyInput['drive_links'] {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split('|').map((part) => part.trim()))
-    .map(([label, url]) => ({ label, url }))
-    .filter((entry) => entry.label && entry.url);
-}
-
-function serializeDriveLines(entries: Strategy['drive_links']): string {
-  return entries.map((entry) => [entry.label, entry.url].join(' | ')).join('\n');
-}
-
-function parseChecklistLines(value: string): StrategyInput['ai_checklist'] {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.split('|').map((part) => part.trim()))
-    .map(([task, priority, notes, done]) => ({
-      task,
-      priority: priority || undefined,
-      notes: notes || undefined,
-      done: ['true', '1', 'si', 'yes', 'done'].includes((done ?? '').toLowerCase()),
-    }))
-    .filter((entry) => entry.task);
-}
-
-function serializeChecklistLines(entries: Strategy['ai_checklist']): string {
-  return entries
-    .map((entry) =>
-      [entry.task, entry.priority ?? '', entry.notes ?? '', entry.done ? 'done' : '']
-        .join(' | ')
-        .trim(),
-    )
-    .join('\n');
 }
 
 function getCurrentMonthValue(): string {
@@ -290,6 +179,17 @@ const TEXTAREA_STYLE: React.CSSProperties = {
   lineHeight: 1.5,
 };
 
+const SELECT_COMPACT: React.CSSProperties = {
+  padding: '4px 6px',
+  fontSize: '0.78rem',
+  background: 'hsl(220,22%,10%)',
+  border: '1px solid hsl(180 100% 50% / 0.2)',
+  borderRadius: 6,
+  color: 'inherit',
+  outline: 'none',
+  cursor: 'pointer',
+};
+
 // ─── Section heading ───────────────────────────────────────────────────────
 
 function SectionHeading({ label }: { label: string }) {
@@ -311,9 +211,9 @@ function SectionHeading({ label }: { label: string }) {
   );
 }
 
-// ─── Age range pills ──────────────────────────────────────────────────────
+// ─── Age dropdowns ────────────────────────────────────────────────────────
 
-function AgePills({
+function AgeDropdowns({
   ageMin,
   ageMax,
   onChange,
@@ -322,59 +222,50 @@ function AgePills({
   ageMax: number;
   onChange: (min: number, max: number) => void;
 }) {
-  function handleClick(age: number) {
-    const mid = (ageMin + ageMax) / 2;
-    if (age <= mid) {
-      onChange(age, ageMax < age ? age : ageMax);
-    } else {
-      onChange(ageMin > age ? age : ageMin, age);
-    }
-  }
-
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-      {AGE_OPTIONS.map((age) => {
-        const inRange = age >= ageMin && age <= ageMax;
-        const isEndpoint = age === ageMin || age === ageMax;
-        return (
-          <button
-            key={age}
-            type="button"
-            onClick={() => handleClick(age)}
-            style={{
-              padding: '3px 8px',
-              borderRadius: 5,
-              fontSize: '0.72rem',
-              fontFamily: 'JetBrains Mono, monospace',
-              border: isEndpoint
-                ? '1px solid hsl(180,100%,50%)'
-                : inRange
-                  ? '1px solid hsl(180 100% 50% / 0.35)'
-                  : '1px solid rgba(255,255,255,0.1)',
-              background: isEndpoint
-                ? 'hsl(180 100% 50% / 0.18)'
-                : inRange
-                  ? 'hsl(180 100% 50% / 0.07)'
-                  : 'transparent',
-              color: inRange ? 'hsl(180,100%,70%)' : 'hsl(215,15%,50%)',
-              cursor: 'pointer',
-              fontWeight: isEndpoint ? 700 : 400,
-            }}
-          >
-            {age}
-          </button>
-        );
-      })}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <select
+        value={ageMin}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          onChange(v, Math.max(v + 1, ageMax));
+        }}
+        style={SELECT_COMPACT}
+      >
+        {AGE_OPTIONS_MIN.map((a) => (
+          <option key={a} value={a}>
+            {a}
+          </option>
+        ))}
+      </select>
+      <span style={{ color: 'hsl(215,15%,40%)', fontSize: '0.8rem' }}>—</span>
+      <select
+        value={ageMax}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          onChange(Math.min(ageMin, v - 1), v);
+        }}
+        style={SELECT_COMPACT}
+      >
+        {AGE_OPTIONS_MAX.map((a) => (
+          <option key={a} value={a}>
+            {a === 65 ? '65+' : a}
+          </option>
+        ))}
+      </select>
       <span
         style={{
+          padding: '3px 9px',
+          borderRadius: 20,
           fontSize: '0.72rem',
-          color: 'hsl(180,100%,55%)',
           fontFamily: 'JetBrains Mono, monospace',
-          alignSelf: 'center',
-          marginLeft: 4,
+          fontWeight: 700,
+          background: 'hsl(180 100% 50% / 0.12)',
+          color: 'hsl(180,100%,65%)',
+          border: '1px solid hsl(180 100% 50% / 0.25)',
         }}
       >
-        {ageMin}–{ageMax}
+        {ageMin} – {ageMax === 65 ? '65+' : ageMax} años
       </span>
     </div>
   );
@@ -386,12 +277,10 @@ function PillToggle({
   options,
   active,
   onToggle,
-  single,
 }: {
   options: string[];
   active: string | string[];
   onToggle: (value: string) => void;
-  single?: boolean;
 }) {
   const activeSet = new Set(Array.isArray(active) ? active : [active]);
   return (
@@ -420,14 +309,13 @@ function PillToggle({
           </button>
         );
       })}
-      {single && null}
     </div>
   );
 }
 
-// ─── Creative row ──────────────────────────────────────────────────────────
+// ─── Creative card ────────────────────────────────────────────────────────
 
-function CreativeRow({
+function CreativeCard({
   creative,
   index,
   onChange,
@@ -435,50 +323,105 @@ function CreativeRow({
 }: {
   creative: CreativeFormState;
   index: number;
-  onChange: (field: keyof CreativeFormState, value: string) => void;
+  onChange: (updated: CreativeFormState) => void;
   onRemove: () => void;
 }) {
+  function set<K extends keyof CreativeFormState>(field: K, value: CreativeFormState[K]) {
+    onChange({ ...creative, [field]: value });
+  }
+
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr auto',
-        gap: 6,
-        alignItems: 'center',
+        padding: '10px 12px',
+        borderRadius: 7,
+        border: '1px solid rgba(255,255,255,0.06)',
+        background: 'rgba(0,0,0,0.15)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
       }}
     >
-      <input
-        value={creative.type}
-        onChange={(e) => onChange('type', e.target.value)}
-        placeholder={`Tipo ${index + 1}`}
-        style={{ ...INPUT_STYLE, fontSize: '0.78rem', padding: '5px 8px' }}
-      />
-      <input
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span
+          style={{
+            fontSize: '0.62rem',
+            color: 'hsl(215,15%,40%)',
+            fontFamily: 'JetBrains Mono, monospace',
+          }}
+        >
+          CREATIVO {index + 1}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'hsl(0,80%,55%)',
+            cursor: 'pointer',
+            padding: 2,
+            lineHeight: 1,
+          }}
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+
+      {/* Description */}
+      <textarea
+        rows={2}
         value={creative.description}
-        onChange={(e) => onChange('description', e.target.value)}
-        placeholder="Descripción"
-        style={{ ...INPUT_STYLE, fontSize: '0.78rem', padding: '5px 8px' }}
+        onChange={(e) => set('description', e.target.value)}
+        placeholder="Describe el creativo: qué se muestra, mensaje principal, formato..."
+        style={{ ...TEXTAREA_STYLE, fontSize: '0.8rem' }}
       />
+
+      {/* Publication type pills */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {(['nueva', 'existente'] as const).map((t) => {
+          const isActive = creative.publicationType === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => set('publicationType', t)}
+              style={{
+                padding: '4px 12px',
+                borderRadius: 5,
+                fontSize: '0.72rem',
+                border: isActive
+                  ? '1px solid hsl(180,100%,50%)'
+                  : '1px solid rgba(255,255,255,0.1)',
+                background: isActive ? 'hsl(180 100% 50% / 0.15)' : 'transparent',
+                color: isActive ? 'hsl(180,100%,70%)' : 'hsl(215,15%,50%)',
+                cursor: 'pointer',
+                fontWeight: isActive ? 600 : 400,
+              }}
+            >
+              {t === 'nueva' ? '📝 Publicación nueva' : '♻️ Publicación existente'}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* URL — only when existente */}
+      {creative.publicationType === 'existente' && (
+        <input
+          value={creative.existingUrl}
+          onChange={(e) => set('existingUrl', e.target.value)}
+          placeholder="https://www.facebook.com/permalink/..."
+          style={{ ...INPUT_STYLE, fontSize: '0.78rem' }}
+        />
+      )}
+
+      {/* Notes */}
       <input
-        value={creative.existingUrl}
-        onChange={(e) => onChange('existingUrl', e.target.value)}
-        placeholder="URL existente"
-        style={{ ...INPUT_STYLE, fontSize: '0.78rem', padding: '5px 8px' }}
+        value={creative.notes}
+        onChange={(e) => set('notes', e.target.value)}
+        placeholder="Indicaciones adicionales para este creativo..."
+        style={{ ...INPUT_STYLE, fontSize: '0.78rem' }}
       />
-      <button
-        type="button"
-        onClick={onRemove}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'hsl(0,80%,55%)',
-          cursor: 'pointer',
-          padding: 4,
-          lineHeight: 1,
-        }}
-      >
-        <Trash2 size={13} />
-      </button>
     </div>
   );
 }
@@ -507,9 +450,11 @@ function AdSetBlock({
     set('placements', next);
   }
 
-  function updateCreative(crIdx: number, field: keyof CreativeFormState, value: string) {
-    const next = adset.creatives.map((cr, i) => (i === crIdx ? { ...cr, [field]: value } : cr));
-    set('creatives', next);
+  function updateCreative(crIdx: number, updated: CreativeFormState) {
+    set(
+      'creatives',
+      adset.creatives.map((cr, i) => (i === crIdx ? updated : cr)),
+    );
   }
 
   function removeCreative(crIdx: number) {
@@ -531,13 +476,7 @@ function AdSetBlock({
         gap: 10,
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span
           style={{
             fontSize: '0.65rem',
@@ -571,7 +510,6 @@ function AdSetBlock({
         <PillToggle
           options={AD_TYPES}
           active={adset.adType}
-          single
           onToggle={(v) => set('adType', adset.adType === v ? '' : v)}
         />
       </div>
@@ -579,7 +517,7 @@ function AdSetBlock({
       {/* Age range */}
       <div style={FIELD_STYLE}>
         <label style={LABEL_STYLE}>Rango de edad</label>
-        <AgePills
+        <AgeDropdowns
           ageMin={adset.ageMin}
           ageMax={adset.ageMax}
           onChange={(min, max) => onChange({ ...adset, ageMin: min, ageMax: max })}
@@ -594,7 +532,6 @@ function AdSetBlock({
           active={
             adset.gender === 'all' ? 'Todos' : adset.gender === 'male' ? 'Hombres' : 'Mujeres'
           }
-          single
           onToggle={(v) =>
             set('gender', v === 'Todos' ? 'all' : v === 'Hombres' ? 'male' : 'female')
           }
@@ -620,13 +557,7 @@ function AdSetBlock({
 
       {/* Creatives */}
       <div style={FIELD_STYLE}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <label style={LABEL_STYLE}>Creativos</label>
           <button
             type="button"
@@ -647,53 +578,30 @@ function AdSetBlock({
             <Plus size={10} /> Creativo
           </button>
         </div>
-        {/* Headers */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr auto',
-            gap: 6,
-            paddingRight: 24,
-          }}
-        >
-          {['Tipo', 'Descripción', 'URL existente'].map((h) => (
-            <span key={h} style={{ ...LABEL_STYLE, fontSize: '0.62rem' }}>
-              {h}
-            </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {adset.creatives.map((cr, crIdx) => (
+            <CreativeCard
+              key={crIdx}
+              creative={cr}
+              index={crIdx}
+              onChange={(updated) => updateCreative(crIdx, updated)}
+              onRemove={() => removeCreative(crIdx)}
+            />
           ))}
         </div>
-        {adset.creatives.map((cr, crIdx) => (
-          <CreativeRow
-            key={crIdx}
-            creative={cr}
-            index={crIdx}
-            onChange={(field, value) => updateCreative(crIdx, field, value)}
-            onRemove={() => removeCreative(crIdx)}
-          />
-        ))}
       </div>
 
-      {/* Chat recommended */}
-      <label
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          cursor: 'pointer',
-          userSelect: 'none',
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={adset.chatRecommended}
-          onChange={(e) => set('chatRecommended', e.target.checked)}
-          style={{ accentColor: 'hsl(180,100%,50%)', width: 14, height: 14 }}
+      {/* Welcome message */}
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>💬 Ejemplo de mensaje de bienvenida</label>
+        <textarea
+          rows={2}
+          value={adset.welcomeMessage}
+          onChange={(e) => set('welcomeMessage', e.target.value)}
+          placeholder="Escribe aquí el mensaje que se enviará al prospecto cuando inicie la conversación..."
+          style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem' }}
         />
-        <span style={{ fontSize: '0.75rem', color: 'hsl(215,15%,55%)' }}>
-          <MessageCircle size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-          Recomendado por chat
-        </span>
-      </label>
+      </div>
     </div>
   );
 }
@@ -738,7 +646,6 @@ function CampaignBlock({
         gap: 12,
       }}
     >
-      {/* Campaign header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span
           style={{
@@ -808,11 +715,10 @@ function CampaignBlock({
           />
         </div>
         <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>Tipo</label>
+          <label style={LABEL_STYLE}>Tipo presupuesto</label>
           <PillToggle
             options={['ABO', 'CBO']}
             active={campaign.budgetType}
-            single
             onToggle={(v) => set('budgetType', v as 'ABO' | 'CBO')}
           />
         </div>
@@ -876,12 +782,6 @@ export function StrategyFormModal({
     monthly_budget: base?.monthly_budget?.toString() ?? '',
     notes: base?.notes ?? '',
     ai_summary: base?.ai_summary ?? '',
-    raw_input: base?.raw_input ?? '',
-    campaigns_off: serializeCampaignLines(base?.campaigns_off ?? [], 'off'),
-    campaigns_optimize: serializeCampaignLines(base?.campaigns_optimize ?? [], 'optimize'),
-    creatives: serializeCreativeLines(base?.creatives ?? []),
-    drive_links: serializeDriveLines(base?.drive_links ?? []),
-    ai_checklist: serializeChecklistLines(base?.ai_checklist ?? []),
     optimize_creatives_date: '',
     optimize_adsets_date: '',
     change_summary: '',
@@ -922,16 +822,16 @@ export function StrategyFormModal({
         responsible_id: strategy?.responsible_id ?? draft?.responsible_id ?? null,
         created_by: strategy?.created_by ?? draft?.created_by ?? null,
         campaigns_new: strategy?.campaigns_new ?? draft?.campaigns_new ?? [],
-        campaigns_off: parseCampaignLines(form.campaigns_off, 'off'),
-        campaigns_optimize: parseCampaignLines(form.campaigns_optimize, 'optimize'),
+        campaigns_off: strategy?.campaigns_off ?? draft?.campaigns_off ?? [],
+        campaigns_optimize: strategy?.campaigns_optimize ?? draft?.campaigns_optimize ?? [],
         segmentation: strategy?.segmentation ?? draft?.segmentation ?? {},
-        creatives: parseCreativeLines(form.creatives),
-        drive_links: parseDriveLines(form.drive_links),
+        creatives: strategy?.creatives ?? draft?.creatives ?? [],
+        drive_links: strategy?.drive_links ?? draft?.drive_links ?? [],
         notes: form.notes.trim(),
         ai_summary: form.ai_summary,
-        ai_checklist: parseChecklistLines(form.ai_checklist),
+        ai_checklist: strategy?.ai_checklist ?? draft?.ai_checklist ?? [],
         ai_diff: strategy?.ai_diff ?? draft?.ai_diff ?? null,
-        raw_input: form.raw_input,
+        raw_input: strategy?.raw_input ?? draft?.raw_input ?? null,
         campaigns: fromFormCampaigns(campaigns),
         latest_version: strategy?.latest_version ?? strategy?.version ?? draft?.latest_version ?? 1,
       },
@@ -983,7 +883,7 @@ export function StrategyFormModal({
 
         <div className="modal-body modal-scroll">
 
-          {/* ── SECCIÓN 1: IDENTIFICACIÓN ── */}
+          {/* ── 1: IDENTIFICACIÓN ── */}
           <SectionHeading label="IDENTIFICACIÓN" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={FIELD_STYLE}>
@@ -1045,7 +945,7 @@ export function StrategyFormModal({
             </div>
           </div>
 
-          {/* ── SECCIÓN 2: CAMPAÑAS ── */}
+          {/* ── 2: CAMPAÑAS ── */}
           <SectionHeading label="CAMPAÑAS" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {campaigns.map((camp, campIdx) => (
@@ -1079,38 +979,7 @@ export function StrategyFormModal({
             </button>
           </div>
 
-          {/* ── SECCIÓN 3: CAMPAÑAS OFF / OPTIMIZAR ── */}
-          <SectionHeading label="CAMPAÑAS OFF / OPTIMIZAR" />
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={FIELD_STYLE}>
-              <label style={LABEL_STYLE}>
-                Campañas a apagar —{' '}
-                <span style={{ color: 'hsl(215,15%,40%)' }}>Nombre | Razón</span>
-              </label>
-              <textarea
-                rows={3}
-                value={form.campaigns_off}
-                onChange={(e) => setField('campaigns_off', e.target.value)}
-                placeholder="Campaña ventas mayo | bajo rendimiento"
-                style={TEXTAREA_STYLE}
-              />
-            </div>
-            <div style={FIELD_STYLE}>
-              <label style={LABEL_STYLE}>
-                Campañas a optimizar —{' '}
-                <span style={{ color: 'hsl(215,15%,40%)' }}>Nombre | Acción | Prioridad</span>
-              </label>
-              <textarea
-                rows={3}
-                value={form.campaigns_optimize}
-                onChange={(e) => setField('campaigns_optimize', e.target.value)}
-                placeholder="Retargeting | Reducir CPM | alta"
-                style={TEXTAREA_STYLE}
-              />
-            </div>
-          </div>
-
-          {/* ── SECCIÓN 4: OPTIMIZACIÓN PROGRAMADA ── */}
+          {/* ── 3: OPTIMIZACIÓN PROGRAMADA ── */}
           <SectionHeading label="OPTIMIZACIÓN PROGRAMADA" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={FIELD_STYLE}>
@@ -1133,7 +1002,7 @@ export function StrategyFormModal({
             </div>
           </div>
 
-          {/* ── SECCIÓN 5: NOTAS ── */}
+          {/* ── 4: NOTAS ── */}
           <SectionHeading label="NOTAS" />
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={FIELD_STYLE}>
@@ -1151,52 +1020,6 @@ export function StrategyFormModal({
                 rows={3}
                 value={form.notes}
                 onChange={(e) => setField('notes', e.target.value)}
-                style={TEXTAREA_STYLE}
-              />
-            </div>
-          </div>
-
-          {/* ── SECCIÓN 6: RECURSOS ── */}
-          <SectionHeading label="RECURSOS" />
-          <div style={{ display: 'grid', gap: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={FIELD_STYLE}>
-                <label style={LABEL_STYLE}>
-                  Creativos —{' '}
-                  <span style={{ color: 'hsl(215,15%,40%)' }}>Tipo | Desc | Link</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={form.creatives}
-                  onChange={(e) => setField('creatives', e.target.value)}
-                  placeholder="Video | Testimonio cliente | https://..."
-                  style={TEXTAREA_STYLE}
-                />
-              </div>
-              <div style={FIELD_STYLE}>
-                <label style={LABEL_STYLE}>
-                  Links de Drive —{' '}
-                  <span style={{ color: 'hsl(215,15%,40%)' }}>Label | URL</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={form.drive_links}
-                  onChange={(e) => setField('drive_links', e.target.value)}
-                  placeholder="Brief | https://drive.google.com/..."
-                  style={TEXTAREA_STYLE}
-                />
-              </div>
-            </div>
-            <div style={FIELD_STYLE}>
-              <label style={LABEL_STYLE}>
-                Checklist operativo —{' '}
-                <span style={{ color: 'hsl(215,15%,40%)' }}>Tarea | prioridad | notas | done</span>
-              </label>
-              <textarea
-                rows={4}
-                value={form.ai_checklist}
-                onChange={(e) => setField('ai_checklist', e.target.value)}
-                placeholder={`Subir creativos | alta | | \nConfigurar píxel | media | | done`}
                 style={TEXTAREA_STYLE}
               />
             </div>
