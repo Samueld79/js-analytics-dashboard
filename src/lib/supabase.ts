@@ -461,6 +461,31 @@ export type CampaignEntry = {
   priority?: string;
 };
 
+export type CreativeFormEntry = {
+  description?: string;
+  type?: string;
+  existingUrl?: string;
+};
+
+export type AdSetEntry = {
+  adType?: string;
+  ageMin?: number;
+  ageMax?: number;
+  gender?: 'all' | 'male' | 'female';
+  locations?: string[];
+  placements?: string[];
+  creatives?: CreativeFormEntry[];
+  chatRecommended?: boolean;
+};
+
+export type StrategyCampaign = {
+  name: string;
+  budget?: number;
+  budgetType?: 'ABO' | 'CBO';
+  objective?: string;
+  adsets?: AdSetEntry[];
+};
+
 export type SegmentationData = {
   ages?: string;
   cities?: string[];
@@ -506,6 +531,7 @@ export type Strategy = {
   ai_checklist: ChecklistItem[];
   ai_diff?: string | null;
   raw_input?: string | null;
+  campaigns?: StrategyCampaign[] | null;
   version?: number;
   latest_version?: number;
   created_at: string;

@@ -160,6 +160,7 @@ function toStrategyPayload(
     ai_summary: normalizeOptionalText(input.ai_summary),
     ai_checklist: normalizeChecklist(input.ai_checklist),
     ai_diff: normalizeOptionalText(input.ai_diff),
+    campaigns: input.campaigns ?? null,
     latest_version: latestVersion ?? input.latest_version ?? 1,
   };
 }
@@ -184,6 +185,7 @@ function toStrategyInput(strategy: Strategy): StrategyInput {
     ai_checklist: strategy.ai_checklist,
     ai_diff: strategy.ai_diff ?? null,
     raw_input: strategy.raw_input ?? null,
+    campaigns: strategy.campaigns ?? null,
     latest_version: strategy.latest_version ?? strategy.version ?? 1,
   };
 }

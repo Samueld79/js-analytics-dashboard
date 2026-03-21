@@ -31,12 +31,14 @@ const OBJECTIVE_STYLE: Record<string, { background: string; color: string }> = {
 };
 
 function inferObjective(strategy: Strategy): string {
+  const explicit = strategy.campaigns?.[0]?.objective;
+  if (explicit && explicit !== 'General') return explicit;
   const text = `${strategy.title ?? ''} ${strategy.notes ?? ''}`.toUpperCase();
   if (text.includes('RECON')) return 'Reconocimiento';
   if (text.includes('TRAFI')) return 'Tráfico';
   if (text.includes('INTER') || text.includes('ENGAGE')) return 'Interacción';
   if (text.includes('VENT') || text.includes('CONVER') || text.includes('VENTA')) return 'Ventas';
-  return 'General';
+  return explicit ?? 'General';
 }
 
 const DATE_INPUT_STYLE: React.CSSProperties = {
