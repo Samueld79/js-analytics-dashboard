@@ -207,7 +207,10 @@ export async function listStrategies(clientId?: string): Promise<Strategy[]> {
     return [];
   }
 
-  return ((data ?? []) as Strategy[]).map(normalizeStrategy);
+  const strategies = ((data ?? []) as Strategy[]).map(normalizeStrategy);
+  console.log('[strategies] listStrategies →', strategies.length, 'items. campaigns check:',
+    strategies.map((s) => ({ id: s.id.slice(0, 8), title: s.title.slice(0, 20), campaigns: s.campaigns?.length ?? null })));
+  return strategies;
 }
 
 export async function getStrategyById(id: string): Promise<Strategy | null> {
@@ -298,9 +301,11 @@ async function saveStrategyViaRpc(params: {
     p_change_summary: normalizeOptionalText(params.changeSummary),
   };
 
+  console.log('[strategies] saveStrategyViaRpc → campaigns in payload:', params.input.campaigns?.length ?? 0, 'items');
   const { data, error } = await supabase.rpc('save_strategy_with_history', rpcPayload);
   if (error) {
     if (isMissingRpcFunction(error, 'save_strategy_with_history')) {
+      console.log('[strategies] saveStrategyViaRpc → RPC not found, falling back to manual path');
       return null;
     }
 
@@ -311,8 +316,30 @@ async function saveStrategyViaRpc(params: {
     };
   }
 
+  const savedStrategy = data ? normalizeStrategy(data as Strategy) : null;
+
+  // Patch: if the RPC succeeded but didn't persist campaigns (function body doesn't map p_campaigns),
+  // do an explicit UPDATE so the data isn't lost.
+  if (savedStrategy && params.input.campaigns?.length) {
+    if (!savedStrategy.campaigns?.length) {
+      console.log('[strategies] saveStrategyViaRpc → RPC did not save campaigns, applying patch...');
+      const { error: patchError } = await supabase
+        .from('strategies')
+        .update({ campaigns: params.input.campaigns })
+        .eq('id', savedStrategy.id);
+      if (patchError) {
+        console.error('[strategies] campaigns patch after RPC', patchError);
+      } else {
+        savedStrategy.campaigns = params.input.campaigns;
+        console.log('[strategies] saveStrategyViaRpc → campaigns patch OK ✓');
+      }
+    } else {
+      console.log('[strategies] saveStrategyViaRpc → RPC saved campaigns ✓', savedStrategy.campaigns?.length, 'items');
+    }
+  }
+
   return {
-    data: data ? normalizeStrategy(data as Strategy) : null,
+    data: savedStrategy,
     error: null,
   };
 }

@@ -354,6 +354,13 @@ export function StrategyDetailModal({
             </section>
           )}
 
+          {richCampaigns.length === 0 && (
+            <section className="strategy-section">
+              <h3 className="strategy-section-title">Campañas</h3>
+              <p className="empty-note">Sin campañas registradas</p>
+            </section>
+          )}
+
           {richCampaigns.length > 0 && (
             <section className="strategy-section">
               <h3 className="strategy-section-title">Campañas</h3>
