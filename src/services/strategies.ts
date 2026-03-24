@@ -319,26 +319,53 @@ async function saveStrategyViaRpc(params: {
     };
   }
 
-  const savedStrategy = data ? normalizeStrategy(data as Strategy) : null;
+  // The RPC may return: a full strategy row object, a UUID string, or null.
+  // Resolve the strategy ID robustly for the campaigns patch.
+  let savedStrategy: Strategy | null = null;
+  // For updates we always know the ID; use it as a baseline.
+  let resolvedId: string | null = params.strategyId ?? null;
 
-  // Patch: if the RPC succeeded but didn't persist campaigns (function body doesn't map p_campaigns),
-  // do an explicit UPDATE so the data isn't lost.
-  if (savedStrategy && params.input.campaigns?.length) {
-    if (!savedStrategy.campaigns?.length) {
-      console.log('[strategies] saveStrategyViaRpc → RPC did not save campaigns, applying patch...');
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    // Most common: RPC returned the full row (RETURNS public.strategies).
+    savedStrategy = normalizeStrategy(data as Strategy);
+    if (savedStrategy.id) resolvedId = savedStrategy.id;
+  } else if (typeof data === 'string' && data) {
+    // RPC returned just a UUID string.
+    resolvedId = resolvedId ?? data;
+  }
+  // else data is null/void: resolvedId stays as params.strategyId (or null for new creates).
+
+  // Campaigns patch: ensure campaigns are written even if the old RPC body didn't map p_campaigns.
+  if (resolvedId && params.input.campaigns?.length) {
+    if (!savedStrategy?.campaigns?.length) {
+      console.log('[strategies] saveStrategyViaRpc → patching campaigns on id:', resolvedId);
       const { error: patchError } = await supabase
         .from('strategies')
         .update({ campaigns: params.input.campaigns })
-        .eq('id', savedStrategy.id);
+        .eq('id', resolvedId);
       if (patchError) {
         console.error('[strategies] campaigns patch after RPC', patchError);
       } else {
-        savedStrategy.campaigns = params.input.campaigns;
+        if (savedStrategy) {
+          savedStrategy = { ...savedStrategy, campaigns: params.input.campaigns };
+        }
         console.log('[strategies] saveStrategyViaRpc → campaigns patch OK ✓');
       }
     } else {
-      console.log('[strategies] saveStrategyViaRpc → RPC saved campaigns ✓', savedStrategy.campaigns?.length, 'items');
+      console.log('[strategies] saveStrategyViaRpc → RPC saved campaigns ✓', savedStrategy.campaigns.length, 'items');
     }
+  }
+
+  // If we only have an ID (RPC returned a string/null), fetch the full strategy row.
+  if (!savedStrategy && resolvedId) {
+    console.log('[strategies] saveStrategyViaRpc → fetching full strategy from DB...');
+    savedStrategy = await getStrategyById(resolvedId);
+  }
+
+  if (!savedStrategy) {
+    // Cannot resolve the saved strategy at all — fall through to the manual path.
+    console.warn('[strategies] saveStrategyViaRpc → could not resolve saved strategy, falling back');
+    return null;
   }
 
   return {

@@ -1053,6 +1053,20 @@ export function StrategyFormModal({
     if (!canSave) return;
     setErrorMessage('');
 
+    const builtCampaigns = fromFormCampaigns(campaigns);
+    console.log('[StrategyFormModal] PAYLOAD COMPLETO:', JSON.stringify({
+      client_id: form.client_id,
+      title: form.title.trim(),
+      month: `${form.month}-01`,
+      status: form.status,
+      campaigns: builtCampaigns,
+      campaigns_count: builtCampaigns.length,
+      adsets_per_campaign: builtCampaigns.map((c) => ({
+        campaign: c.name,
+        adsets: c.adsets?.length ?? 0,
+      })),
+    }, null, 2));
+
     const result = await onSubmit(
       {
         client_id: form.client_id,
@@ -1073,7 +1087,7 @@ export function StrategyFormModal({
         ai_checklist: strategy?.ai_checklist ?? draft?.ai_checklist ?? [],
         ai_diff: strategy?.ai_diff ?? draft?.ai_diff ?? null,
         raw_input: strategy?.raw_input ?? draft?.raw_input ?? null,
-        campaigns: fromFormCampaigns(campaigns),
+        campaigns: builtCampaigns,
         latest_version: strategy?.latest_version ?? strategy?.version ?? draft?.latest_version ?? 1,
       },
       {
