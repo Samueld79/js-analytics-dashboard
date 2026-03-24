@@ -28,9 +28,10 @@ export type ClientStatus = 'active' | 'paused' | 'churned';
 export type StrategyStatus =
   | 'draft'
   | 'pending'
-  | 'mounted'
-  | 'reviewed'
-  | 'approved'
+  | 'active'
+  | 'mounted'    // legacy — maps to 'active' in UI
+  | 'reviewed'   // legacy — maps to 'active' in UI
+  | 'approved'   // legacy — maps to 'active' in UI
   | 'archived';
 export type UserRole =
   | 'admin'
@@ -535,6 +536,7 @@ export type Strategy = {
   ai_diff?: string | null;
   raw_input?: string | null;
   campaigns?: StrategyCampaign[] | null;
+  is_optimizing?: boolean | null;
   version?: number;
   latest_version?: number;
   created_at: string;

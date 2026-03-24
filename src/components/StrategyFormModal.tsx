@@ -927,9 +927,7 @@ export function StrategyFormModal({
                 style={INPUT_STYLE as React.CSSProperties}
               >
                 <option value="pending">Pendiente</option>
-                <option value="mounted">Montada</option>
-                <option value="reviewed">Revisada</option>
-                <option value="approved">Aprobada</option>
+                <option value="active">Activa</option>
               </select>
             </div>
             <div style={FIELD_STYLE}>

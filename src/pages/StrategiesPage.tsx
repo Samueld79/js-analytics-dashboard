@@ -11,15 +11,14 @@ import { upsertOptimizeTask } from '../services/tasks';
 import { formatCop, statusLabel } from '../lib/utils';
 import type { Strategy } from '../lib/supabase';
 
-const OPERATING_STATUSES: Strategy['status'][] = ['pending', 'mounted', 'reviewed', 'approved'];
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
-/** Left-border color per status */
+/** Statuses that map to the "Activa" column */
+const ACTIVE_STATUSES: Strategy['status'][] = ['active', 'mounted', 'reviewed', 'approved'];
+
 const STATUS_BORDER: Record<string, string> = {
-  pending: 'hsl(180,100%,50%)',   // cyan
-  mounted: 'hsl(215,80%,55%)',    // blue
-  reviewed: 'hsl(38,100%,55%)',   // amber
-  approved: 'hsl(145,100%,45%)',  // green
+  pending: 'hsl(180,100%,50%)',  // cyan
+  active: 'hsl(145,100%,45%)',   // green
 };
 
 const OBJECTIVE_STYLE: Record<string, { background: string; color: string }> = {
@@ -114,11 +113,15 @@ export function StrategiesPage() {
     updateStrategy,
     updateStatus,
     deleteStrategy,
+    toggleOptimizing,
     loadHistory,
     generateTasks,
     loadingHistoryIds,
     generatingTaskIds,
   } = useStrategies(queryClientId);
+
+  // Which "En optimización" section is expanded per kanban column (only one: 'active')
+  const [optimizingSectionOpen, setOptimizingSectionOpen] = useState(true);
 
   useEffect(() => {
     if (!isInternal) {
@@ -290,6 +293,229 @@ export function StrategiesPage() {
     }
   }
 
+  function renderCard(strategy: Strategy, borderColor: string) {
+    const client = getClient(strategy.client_id);
+    const checklist = strategy.ai_checklist ?? [];
+    const obj = inferObjective(strategy);
+    const objStyle = OBJECTIVE_STYLE[obj] ?? OBJECTIVE_STYLE.General;
+    const isExpanded = expandedIds.has(strategy.id);
+    const isConfirmingDelete = confirmDeleteId === strategy.id;
+    const isActiveCard = ACTIVE_STATUSES.includes(strategy.status);
+
+    return (
+      <div
+        key={strategy.id}
+        className="strategy-card"
+        onClick={() => void openStrategyDetail(strategy.id)}
+        style={{
+          background: 'rgba(255,255,255,0.03)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderLeftColor: borderColor,
+          borderLeftWidth: 3,
+          borderLeftStyle: 'solid',
+          transition: 'box-shadow 0.2s ease, border-color 0.2s',
+          position: 'relative',
+        }}
+      >
+        {/* Delete button */}
+        {isInternal && (
+          <button
+            type="button"
+            title="Eliminar estrategia"
+            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(strategy.id); }}
+            style={{
+              position: 'absolute', top: 8, right: 8,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 22, height: 22, borderRadius: 5,
+              border: 'none', cursor: 'pointer',
+              background: 'hsl(0 84% 60% / 0.1)', color: 'hsl(0,84%,60%)',
+              opacity: 0.7, transition: 'opacity 0.15s',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.7'; }}
+          >
+            <Trash2 size={11} />
+          </button>
+        )}
+
+        {/* Confirm delete overlay */}
+        {isConfirmingDelete && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute', inset: 0, zIndex: 10, borderRadius: 8,
+              background: 'rgba(10,14,24,0.92)', backdropFilter: 'blur(6px)',
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16,
+            }}
+          >
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'hsl(0,84%,70%)', textAlign: 'center', fontWeight: 600 }}>
+              ¿Eliminar esta estrategia?
+            </p>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: 'hsl(215,15%,52%)', textAlign: 'center' }}>
+              Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                disabled={deletingId === strategy.id}
+                onClick={() => void handleDeleteConfirm(strategy.id)}
+                style={{ padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'hsl(0,84%,55%)', color: '#fff', fontSize: '0.76rem', fontWeight: 700, opacity: deletingId === strategy.id ? 0.5 : 1 }}
+              >
+                {deletingId === strategy.id ? 'Eliminando...' : 'Eliminar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', background: 'transparent', color: 'hsl(215,15%,65%)', fontSize: '0.76rem' }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Header: client + date */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: isInternal ? 26 : 0 }}>
+          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'hsl(180,100%,55%)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {client?.name ?? '—'}
+          </span>
+          {strategy.month && (
+            <span style={{ fontSize: '0.65rem', color: 'hsl(215,15%,42%)', background: 'rgba(255,255,255,0.05)', borderRadius: 5, padding: '2px 7px', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {new Date(`${strategy.month}T12:00:00`).toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })}
+            </span>
+          )}
+        </div>
+
+        {/* Title */}
+        <h4 className="strategy-card-title" style={{ margin: '7px 0 6px', fontSize: '0.92rem', fontWeight: 700, lineHeight: 1.3 }}>
+          {strategy.title}
+        </h4>
+
+        {/* Budget + Objective */}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+          {strategy.monthly_budget != null && (
+            <span style={{ fontSize: '0.74rem', color: 'hsl(145,100%,55%)', fontWeight: 600, fontFamily: 'JetBrains Mono' }}>
+              {formatCop(strategy.monthly_budget)}
+            </span>
+          )}
+          <span style={{ padding: '2px 9px', borderRadius: 10, fontSize: '0.64rem', fontWeight: 700, ...objStyle }}>
+            {obj}
+          </span>
+        </div>
+
+        {/* Badges + status select */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {strategy.campaigns_off.length > 0 && (
+              <span className="mini-chip chip-red">-{strategy.campaigns_off.length} off</span>
+            )}
+            {checklist.length > 0 && (
+              <span className="mini-chip chip-blue">
+                {checklist.filter((i) => i.done).length}/{checklist.length}✓
+              </span>
+            )}
+          </div>
+          {isInternal ? (
+            <select
+              className="status-select"
+              value={ACTIVE_STATUSES.includes(strategy.status) ? 'active' : strategy.status}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation();
+                void handleStatusChange(strategy.id, e.target.value as Strategy['status']);
+              }}
+            >
+              <option value="pending">Pendiente</option>
+              <option value="active">Activa</option>
+            </select>
+          ) : (
+            <span className="mini-chip">{statusLabel(strategy.status)}</span>
+          )}
+        </div>
+
+        {/* "En optimización" toggle — only for active cards */}
+        {isInternal && isActiveCard && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void toggleOptimizing(strategy.id, !strategy.is_optimizing);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', marginTop: 8, borderRadius: 6, width: '100%',
+              border: strategy.is_optimizing
+                ? '1px solid hsl(38 100% 55% / 0.4)'
+                : '1px solid rgba(255,255,255,0.07)',
+              background: strategy.is_optimizing
+                ? 'hsl(38 100% 55% / 0.08)'
+                : 'none',
+              cursor: 'pointer', fontSize: '0.68rem',
+              color: strategy.is_optimizing ? 'hsl(38,100%,62%)' : 'hsl(215,15%,45%)',
+              transition: 'all 0.15s',
+            }}
+          >
+            <span style={{
+              width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+              border: strategy.is_optimizing ? '1px solid hsl(38,100%,55%)' : '1px solid hsl(215,15%,35%)',
+              background: strategy.is_optimizing ? 'hsl(38,100%,55%)' : 'transparent',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.6rem', color: strategy.is_optimizing ? '#000' : 'transparent',
+            }}>✓</span>
+            En optimización
+          </button>
+        )}
+
+        {/* Expand optimization date pickers */}
+        {isInternal && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); toggleExpanded(strategy.id); }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              padding: '5px 0', background: 'none', marginTop: isActiveCard ? 4 : 8,
+              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6,
+              cursor: 'pointer', fontSize: '0.68rem',
+              color: 'hsl(180,100%,50%)', width: '100%',
+            }}
+          >
+            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            Fechas optimización
+          </button>
+        )}
+
+        {isExpanded && isInternal && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingTop: 10, marginTop: 2, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gap: 10 }}
+          >
+            <div>
+              <p style={{ margin: '0 0 5px', fontSize: '0.6rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CREATIVOS</p>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="date" value={creativeDates[strategy.id] ?? ''} onChange={(e) => setCreativeDates((d) => ({ ...d, [strategy.id]: e.target.value }))} style={DATE_INPUT_STYLE} />
+                <button type="button" title="Crear alerta" disabled={!creativeDates[strategy.id] || alertSaving.has(`${strategy.id}:creatives`)} onClick={() => void handleCreateOptimizeAlert(strategy, 'creatives')} style={{ ...CAL_BTN_STYLE, opacity: !creativeDates[strategy.id] ? 0.35 : 1 }}>
+                  <Calendar size={12} />
+                </button>
+              </div>
+            </div>
+            <div>
+              <p style={{ margin: '0 0 5px', fontSize: '0.6rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CONJUNTOS DE ANUNCIOS</p>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="date" value={adsetDates[strategy.id] ?? ''} onChange={(e) => setAdsetDates((d) => ({ ...d, [strategy.id]: e.target.value }))} style={DATE_INPUT_STYLE} />
+                <button type="button" title="Crear alerta" disabled={!adsetDates[strategy.id] || alertSaving.has(`${strategy.id}:adsets`)} onClick={() => void handleCreateOptimizeAlert(strategy, 'adsets')} style={{ ...CAL_BTN_STYLE, opacity: !adsetDates[strategy.id] ? 0.35 : 1 }}>
+                  <Calendar size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="page-content">
       <div className="page-header">
@@ -349,11 +575,11 @@ export function StrategiesPage() {
 
       {loading ? (
         <div className="status-lanes">
-          {OPERATING_STATUSES.map((status) => (
-            <div key={status} className="status-lane">
+          {(['pending', 'active'] as const).map((col) => (
+            <div key={col} className="status-lane">
               <div className="lane-header">
-                <span className={`lane-dot status-dot-${status}`} />
-                <span className="lane-title">{statusLabel(status)}</span>
+                <span className="lane-dot" style={{ background: STATUS_BORDER[col], boxShadow: `0 0 6px ${STATUS_BORDER[col]}55` }} />
+                <span className="lane-title">{col === 'pending' ? 'Pendiente' : 'Activa'}</span>
               </div>
               <div className="lane-cards">
                 {[1, 2].map((n) => (
@@ -365,265 +591,47 @@ export function StrategiesPage() {
         </div>
       ) : (
         <div className="status-lanes">
-          {OPERATING_STATUSES.map((status) => {
-            const group = visibleStrategies.filter((strategy) => strategy.status === status);
-            const borderColor = STATUS_BORDER[status] ?? 'hsl(215,20%,38%)';
+          {(['pending', 'active'] as const).map((col) => {
+            const isPending = col === 'pending';
+            const borderColor = STATUS_BORDER[col];
+            const group = isPending
+              ? visibleStrategies.filter((s) => s.status === 'pending')
+              : visibleStrategies.filter((s) => ACTIVE_STATUSES.includes(s.status));
+            const normalGroup = isPending ? group : group.filter((s) => !s.is_optimizing);
+            const optimizingGroup = isPending ? [] : group.filter((s) => s.is_optimizing);
+
             return (
-              <div key={status} className="status-lane">
+              <div key={col} className="status-lane">
                 <div className="lane-header">
-                  <span
-                    className="lane-dot"
-                    style={{ background: borderColor, boxShadow: `0 0 6px ${borderColor}55` }}
-                  />
-                  <span className="lane-title">{statusLabel(status)}</span>
+                  <span className="lane-dot" style={{ background: borderColor, boxShadow: `0 0 6px ${borderColor}55` }} />
+                  <span className="lane-title">{isPending ? 'Pendiente' : 'Activa'}</span>
                   <span className="lane-count">{group.length}</span>
                 </div>
                 <div className="lane-cards">
-                  {group.map((strategy) => {
-                    const client = getClient(strategy.client_id);
-                    const checklist = strategy.ai_checklist ?? [];
-                    const obj = inferObjective(strategy);
-                    const objStyle = OBJECTIVE_STYLE[obj] ?? OBJECTIVE_STYLE.General;
-                    const isExpanded = expandedIds.has(strategy.id);
-                    const isConfirmingDelete = confirmDeleteId === strategy.id;
+                  {normalGroup.map((s) => renderCard(s, borderColor))}
+                  {normalGroup.length === 0 && optimizingGroup.length === 0 && (
+                    <div className="lane-empty">Sin estrategias</div>
+                  )}
 
-                    return (
-                      <div
-                        key={strategy.id}
-                        className="strategy-card"
-                        onClick={() => void openStrategyDetail(strategy.id)}
+                  {!isPending && optimizingGroup.length > 0 && (
+                    <div style={{ marginTop: normalGroup.length > 0 ? 10 : 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => setOptimizingSectionOpen((v) => !v)}
                         style={{
-                          borderLeft: `3px solid ${borderColor}`,
-                          background: 'rgba(255,255,255,0.03)',
-                          backdropFilter: 'blur(8px)',
-                          WebkitBackdropFilter: 'blur(8px)',
-                          border: '1px solid rgba(255,255,255,0.07)',
-                          borderLeftColor: borderColor,
-                          borderLeftWidth: 3,
-                          borderLeftStyle: 'solid',
-                          transition: 'box-shadow 0.2s ease, border-color 0.2s',
-                          position: 'relative',
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 7,
+                          padding: '5px 10px', borderRadius: 7, marginBottom: 6,
+                          background: 'hsl(38 100% 55% / 0.08)',
+                          border: '1px solid hsl(38 100% 55% / 0.2)',
+                          cursor: 'pointer', color: 'hsl(38,100%,62%)', fontSize: '0.72rem', fontWeight: 700,
                         }}
                       >
-                        {/* Delete button — top right corner */}
-                        {isInternal && (
-                          <button
-                            type="button"
-                            title="Eliminar estrategia"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmDeleteId(strategy.id);
-                            }}
-                            style={{
-                              position: 'absolute', top: 8, right: 8,
-                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                              width: 22, height: 22, borderRadius: 5,
-                              border: 'none', cursor: 'pointer',
-                              background: 'hsl(0 84% 60% / 0.1)',
-                              color: 'hsl(0,84%,60%)',
-                              opacity: 0.7,
-                              transition: 'opacity 0.15s, background 0.15s',
-                            }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.7'; }}
-                          >
-                            <Trash2 size={11} />
-                          </button>
-                        )}
-
-                        {/* Confirm delete overlay */}
-                        {isConfirmingDelete && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              position: 'absolute', inset: 0, zIndex: 10,
-                              borderRadius: 8,
-                              background: 'rgba(10,14,24,0.92)',
-                              backdropFilter: 'blur(6px)',
-                              display: 'flex', flexDirection: 'column',
-                              alignItems: 'center', justifyContent: 'center',
-                              gap: 10, padding: 16,
-                            }}
-                          >
-                            <p style={{ margin: 0, fontSize: '0.8rem', color: 'hsl(0,84%,70%)', textAlign: 'center', fontWeight: 600 }}>
-                              ¿Eliminar esta estrategia?
-                            </p>
-                            <p style={{ margin: 0, fontSize: '0.72rem', color: 'hsl(215,15%,52%)', textAlign: 'center' }}>
-                              Esta acción no se puede deshacer.
-                            </p>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <button
-                                type="button"
-                                disabled={deletingId === strategy.id}
-                                onClick={() => void handleDeleteConfirm(strategy.id)}
-                                style={{
-                                  padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                                  background: 'hsl(0,84%,55%)', color: '#fff', fontSize: '0.76rem', fontWeight: 700,
-                                  opacity: deletingId === strategy.id ? 0.5 : 1,
-                                }}
-                              >
-                                {deletingId === strategy.id ? 'Eliminando...' : 'Eliminar'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(null)}
-                                style={{
-                                  padding: '5px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
-                                  cursor: 'pointer', background: 'transparent', color: 'hsl(215,15%,65%)', fontSize: '0.76rem',
-                                }}
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Header: client + date */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: isInternal ? 26 : 0 }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'hsl(180,100%,55%)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                            {client?.name ?? '—'}
-                          </span>
-                          {strategy.month && (
-                            <span style={{ fontSize: '0.65rem', color: 'hsl(215,15%,42%)', background: 'rgba(255,255,255,0.05)', borderRadius: 5, padding: '2px 7px', border: '1px solid rgba(255,255,255,0.07)' }}>
-                              {new Date(`${strategy.month}T12:00:00`).toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Title */}
-                        <h4 className="strategy-card-title" style={{ margin: '7px 0 6px', fontSize: '0.92rem', fontWeight: 700, lineHeight: 1.3 }}>
-                          {strategy.title}
-                        </h4>
-
-                        {/* Budget + Objective */}
-                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-                          {strategy.monthly_budget != null && (
-                            <span style={{ fontSize: '0.74rem', color: 'hsl(145,100%,55%)', fontWeight: 600, fontFamily: 'JetBrains Mono' }}>
-                              {formatCop(strategy.monthly_budget)}
-                            </span>
-                          )}
-                          <span style={{ padding: '2px 9px', borderRadius: 10, fontSize: '0.64rem', fontWeight: 700, ...objStyle }}>
-                            {obj}
-                          </span>
-                        </div>
-
-                        {/* Compact badges + status select */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {strategy.campaigns_off.length > 0 && (
-                              <span className="mini-chip chip-red">-{strategy.campaigns_off.length} off</span>
-                            )}
-                            {checklist.length > 0 && (
-                              <span className="mini-chip chip-blue">
-                                {checklist.filter((i) => i.done).length}/{checklist.length}✓
-                              </span>
-                            )}
-                          </div>
-                          {isInternal ? (
-                            <select
-                              className="status-select"
-                              value={strategy.status}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                void handleStatusChange(strategy.id, e.target.value as Strategy['status']);
-                              }}
-                            >
-                              <option value="pending">Pendiente</option>
-                              <option value="mounted">Montada</option>
-                              <option value="reviewed">Revisada</option>
-                              <option value="approved">Aprobada</option>
-                            </select>
-                          ) : (
-                            <span className="mini-chip">{statusLabel(strategy.status)}</span>
-                          )}
-                        </div>
-
-                        {/* Expand optimization section */}
-                        {isInternal && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleExpanded(strategy.id);
-                            }}
-                            style={{
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                              padding: '5px 0', background: 'none', marginTop: 8,
-                              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6,
-                              cursor: 'pointer', fontSize: '0.68rem',
-                              color: 'hsl(180,100%,50%)', width: '100%',
-                              transition: 'border-color 0.15s',
-                            }}
-                          >
-                            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                            Optimización
-                          </button>
-                        )}
-
-                        {/* Expanded: optimization date pickers */}
-                        {isExpanded && isInternal && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              paddingTop: 10, marginTop: 2,
-                              borderTop: '1px solid rgba(255,255,255,0.06)',
-                              display: 'grid', gap: 10,
-                            }}
-                          >
-                            {/* Optimize creatives */}
-                            <div>
-                              <p style={{ margin: '0 0 5px', fontSize: '0.6rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>
-                                📅 CREATIVOS
-                              </p>
-                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                <input
-                                  type="date"
-                                  value={creativeDates[strategy.id] ?? ''}
-                                  onChange={(e) => setCreativeDates((d) => ({ ...d, [strategy.id]: e.target.value }))}
-                                  style={DATE_INPUT_STYLE}
-                                />
-                                <button
-                                  type="button"
-                                  title="Crear alerta"
-                                  disabled={!creativeDates[strategy.id] || alertSaving.has(`${strategy.id}:creatives`)}
-                                  onClick={() => void handleCreateOptimizeAlert(strategy, 'creatives')}
-                                  style={{ ...CAL_BTN_STYLE, opacity: !creativeDates[strategy.id] ? 0.35 : 1 }}
-                                >
-                                  <Calendar size={12} />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Optimize adsets */}
-                            <div>
-                              <p style={{ margin: '0 0 5px', fontSize: '0.6rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>
-                                📅 CONJUNTOS DE ANUNCIOS
-                              </p>
-                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                <input
-                                  type="date"
-                                  value={adsetDates[strategy.id] ?? ''}
-                                  onChange={(e) => setAdsetDates((d) => ({ ...d, [strategy.id]: e.target.value }))}
-                                  style={DATE_INPUT_STYLE}
-                                />
-                                <button
-                                  type="button"
-                                  title="Crear alerta"
-                                  disabled={!adsetDates[strategy.id] || alertSaving.has(`${strategy.id}:adsets`)}
-                                  onClick={() => void handleCreateOptimizeAlert(strategy, 'adsets')}
-                                  style={{ ...CAL_BTN_STYLE, opacity: !adsetDates[strategy.id] ? 0.35 : 1 }}
-                                >
-                                  <Calendar size={12} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {group.length === 0 && <div className="lane-empty">Sin estrategias</div>}
+                        {optimizingSectionOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                        🔧 En optimización ({optimizingGroup.length})
+                      </button>
+                      {optimizingSectionOpen && optimizingGroup.map((s) => renderCard(s, 'hsl(38,100%,55%)'))}
+                    </div>
+                  )}
                 </div>
               </div>
             );

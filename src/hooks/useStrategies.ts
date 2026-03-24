@@ -13,6 +13,7 @@ import {
   deleteStrategy,
   listStrategies,
   listStrategyHistory,
+  setStrategyOptimizing,
   updateStrategy,
   updateStrategyStatus,
 } from '../services/strategies';
@@ -161,6 +162,19 @@ export function useStrategies(clientId?: string) {
     [load],
   );
 
+  const toggleOptimizing = useCallback(
+    async (id: string, value: boolean): Promise<ServiceMutationResult<Strategy>> => {
+      const result = await setStrategyOptimizing(id, value);
+      if (result.data) {
+        setStrategies((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, is_optimizing: value } : s)),
+        );
+      }
+      return result;
+    },
+    [],
+  );
+
   return {
     strategies,
     historyByStrategy,
@@ -172,6 +186,7 @@ export function useStrategies(clientId?: string) {
     updateStrategy: edit,
     updateStatus,
     deleteStrategy: remove,
+    toggleOptimizing,
     loadHistory,
     generateTasks,
     isConfigured: isSupabaseConfigured,

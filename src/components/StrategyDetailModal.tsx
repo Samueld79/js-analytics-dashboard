@@ -115,9 +115,7 @@ export function StrategyDetailModal({
                 onChange={(event) => onStatusChange(event.target.value as Strategy['status'])}
               >
                 <option value="pending">Pendiente</option>
-                <option value="mounted">Montada</option>
-                <option value="reviewed">Revisada</option>
-                <option value="approved">Aprobada</option>
+                <option value="active">Activa</option>
               </select>
             ) : (
               <span className="meta-chip">{statusLabel(strategy.status)}</span>

@@ -441,9 +441,10 @@ export function statusLabel(status: string): string {
   const map: Record<string, string> = {
     draft: 'Borrador',
     pending: 'Pendiente',
-    mounted: 'Montada',
-    reviewed: 'Revisada',
-    approved: 'Aprobada',
+    active: 'Activa',
+    mounted: 'Activa',    // legacy
+    reviewed: 'Activa',   // legacy
+    approved: 'Activa',   // legacy
     archived: 'Archivada',
     in_progress: 'En proceso',
     done: 'Lista',

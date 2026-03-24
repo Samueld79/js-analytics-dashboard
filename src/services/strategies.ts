@@ -161,6 +161,7 @@ function toStrategyPayload(
     ai_checklist: normalizeChecklist(input.ai_checklist),
     ai_diff: normalizeOptionalText(input.ai_diff),
     campaigns: input.campaigns ?? null,
+    is_optimizing: input.is_optimizing ?? false,
     latest_version: latestVersion ?? input.latest_version ?? 1,
   };
 }
@@ -186,6 +187,7 @@ function toStrategyInput(strategy: Strategy): StrategyInput {
     ai_diff: strategy.ai_diff ?? null,
     raw_input: strategy.raw_input ?? null,
     campaigns: strategy.campaigns ?? null,
+    is_optimizing: strategy.is_optimizing ?? false,
     latest_version: strategy.latest_version ?? strategy.version ?? 1,
   };
 }
@@ -298,6 +300,7 @@ async function saveStrategyViaRpc(params: {
     p_ai_checklist: normalizeChecklist(params.input.ai_checklist),
     p_ai_diff: normalizeOptionalText(params.input.ai_diff),
     p_campaigns: params.input.campaigns ?? null,
+    p_is_optimizing: params.input.is_optimizing ?? false,
     p_change_summary: normalizeOptionalText(params.changeSummary),
   };
 
@@ -556,6 +559,29 @@ export async function deleteStrategy(id: string): Promise<ServiceMutationResult<
   const { error } = await supabase.from('strategies').delete().eq('id', id);
   if (error) return { data: null, error: getErrorMessage(error, 'No se pudo eliminar la estrategia.') };
   return { data: null, error: null };
+}
+
+export async function setStrategyOptimizing(
+  id: string,
+  value: boolean,
+): Promise<ServiceMutationResult<Strategy>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const { data, error } = await supabase
+    .from('strategies')
+    .update({ is_optimizing: value })
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[strategies] setStrategyOptimizing', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo actualizar el estado de optimización.') };
+  }
+
+  return { data: data ? normalizeStrategy(data as Strategy) : null, error: null };
 }
 
 export async function updateStrategyStatus(
