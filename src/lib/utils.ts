@@ -449,7 +449,6 @@ export function statusLabel(status: string): string {
     in_progress: 'En proceso',
     done: 'Lista',
     skipped: 'Omitida',
-    active: 'Activo',
     paused: 'Pausado',
     churned: 'Cancelado',
   };
