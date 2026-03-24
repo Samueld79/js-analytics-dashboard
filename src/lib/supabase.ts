@@ -468,6 +468,7 @@ export type CreativeFormEntry = {
   existingUrl?: string;
   publicationType?: 'nueva' | 'existente';
   notes?: string;
+  imageBase64?: string;
 };
 
 export type AdSetEntry = {
@@ -480,6 +481,11 @@ export type AdSetEntry = {
   creatives?: CreativeFormEntry[];
   chatRecommended?: boolean;
   welcomeMessage?: string;
+  interests?: string;
+  behaviors?: string;
+  customAudiences?: string;
+  lookalikeAudiences?: string;
+  exclusions?: string;
 };
 
 export type StrategyCampaign = {

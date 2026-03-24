@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AdSetEntry,
   Client,
@@ -30,6 +30,8 @@ interface CreativeFormState {
   publicationType: 'nueva' | 'existente';
   existingUrl: string;
   notes: string;
+  imageBase64: string;
+  imageFilename: string;
 }
 
 interface AdSetFormState {
@@ -41,6 +43,11 @@ interface AdSetFormState {
   placements: string[];
   creatives: CreativeFormState[];
   welcomeMessage: string;
+  interests: string;
+  behaviors: string;
+  customAudiences: string;
+  lookalikeAudiences: string;
+  exclusions: string;
 }
 
 interface CampaignFormState {
@@ -59,10 +66,19 @@ const OBJECTIVES = ['General', 'Reconocimiento', 'Tráfico', 'Interacción', 'Ve
 const AGE_OPTIONS_MIN = Array.from({ length: 48 }, (_, i) => 18 + i); // 18–65
 const AGE_OPTIONS_MAX = Array.from({ length: 46 }, (_, i) => 20 + i); // 20–65
 
+const DRAFT_KEY = 'strategy_draft';
+
 // ─── Empty factories ───────────────────────────────────────────────────────
 
 function emptyCreative(): CreativeFormState {
-  return { description: '', publicationType: 'nueva', existingUrl: '', notes: '' };
+  return {
+    description: '',
+    publicationType: 'nueva',
+    existingUrl: '',
+    notes: '',
+    imageBase64: '',
+    imageFilename: '',
+  };
 }
 
 function emptyAdSet(): AdSetFormState {
@@ -75,6 +91,11 @@ function emptyAdSet(): AdSetFormState {
     placements: [],
     creatives: [emptyCreative()],
     welcomeMessage: '',
+    interests: '',
+    behaviors: '',
+    customAudiences: '',
+    lookalikeAudiences: '',
+    exclusions: '',
   };
 }
 
@@ -104,8 +125,15 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
           publicationType: (cr.publicationType ?? 'nueva') as 'nueva' | 'existente',
           existingUrl: cr.existingUrl ?? '',
           notes: cr.notes ?? '',
+          imageBase64: cr.imageBase64 ?? '',
+          imageFilename: cr.imageBase64 ? 'imagen_guardada' : '',
         })) ?? [emptyCreative()],
       welcomeMessage: a.welcomeMessage ?? '',
+      interests: a.interests ?? '',
+      behaviors: a.behaviors ?? '',
+      customAudiences: a.customAudiences ?? '',
+      lookalikeAudiences: a.lookalikeAudiences ?? '',
+      exclusions: a.exclusions ?? '',
     })),
   }));
 }
@@ -130,7 +158,7 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
             .filter(Boolean),
           placements: a.placements,
           creatives: a.creatives
-            .filter((cr) => cr.description || cr.existingUrl || cr.notes)
+            .filter((cr) => cr.description || cr.existingUrl || cr.notes || cr.imageBase64)
             .map(
               (cr): CreativeFormEntry => ({
                 description: cr.description || undefined,
@@ -138,9 +166,15 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
                 existingUrl:
                   cr.publicationType === 'existente' ? cr.existingUrl || undefined : undefined,
                 notes: cr.notes || undefined,
+                imageBase64: cr.imageBase64 || undefined,
               }),
             ),
           welcomeMessage: a.welcomeMessage || undefined,
+          interests: a.interests || undefined,
+          behaviors: a.behaviors || undefined,
+          customAudiences: a.customAudiences || undefined,
+          lookalikeAudiences: a.lookalikeAudiences || undefined,
+          exclusions: a.exclusions || undefined,
         }),
       ),
     }));
@@ -326,8 +360,26 @@ function CreativeCard({
   onChange: (updated: CreativeFormState) => void;
   onRemove: () => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   function set<K extends keyof CreativeFormState>(field: K, value: CreativeFormState[K]) {
     onChange({ ...creative, [field]: value });
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('La imagen no puede superar 2 MB.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      onChange({ ...creative, imageBase64: reader.result as string, imageFilename: file.name });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   }
 
   return (
@@ -422,6 +474,81 @@ function CreativeCard({
         placeholder="Indicaciones adicionales para este creativo..."
         style={{ ...INPUT_STYLE, fontSize: '0.78rem' }}
       />
+
+      {/* Image attachment */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleImageSelect}
+        />
+        {creative.imageBase64 ? (
+          <>
+            <img
+              src={creative.imageBase64}
+              alt="preview"
+              style={{
+                width: 80,
+                height: 80,
+                objectFit: 'cover',
+                borderRadius: 6,
+                border: '1px solid rgba(255,255,255,0.1)',
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  color: 'hsl(215,15%,55%)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {creative.imageFilename}
+              </span>
+              <button
+                type="button"
+                onClick={() => onChange({ ...creative, imageBase64: '', imageFilename: '' })}
+                style={{
+                  alignSelf: 'flex-start',
+                  background: 'transparent',
+                  border: '1px solid hsl(0 70% 50% / 0.4)',
+                  borderRadius: 5,
+                  color: 'hsl(0,80%,60%)',
+                  cursor: 'pointer',
+                  padding: '2px 8px',
+                  fontSize: '0.68rem',
+                }}
+              >
+                ✕ Quitar imagen
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              background: 'transparent',
+              border: '1px dashed rgba(255,255,255,0.15)',
+              borderRadius: 6,
+              color: 'hsl(215,15%,50%)',
+              cursor: 'pointer',
+              padding: '6px 12px',
+              fontSize: '0.72rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            🖼️ Adjuntar imagen (máx. 2 MB)
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -555,6 +682,50 @@ function AdSetBlock({
         <PillToggle options={PLACEMENTS} active={adset.placements} onToggle={togglePlacement} />
       </div>
 
+      {/* Segmentation grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Intereses</label>
+          <textarea
+            rows={2}
+            value={adset.interests}
+            onChange={(e) => set('interests', e.target.value)}
+            placeholder="Moda, Fitness, Tecnología..."
+            style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
+          />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Comportamientos</label>
+          <textarea
+            rows={2}
+            value={adset.behaviors}
+            onChange={(e) => set('behaviors', e.target.value)}
+            placeholder="Compradores activos, Viajeros frecuentes..."
+            style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
+          />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Audiencias personalizadas</label>
+          <textarea
+            rows={2}
+            value={adset.customAudiences}
+            onChange={(e) => set('customAudiences', e.target.value)}
+            placeholder="Clientes actuales, Lista de emails..."
+            style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
+          />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Audiencias similares</label>
+          <textarea
+            rows={2}
+            value={adset.lookalikeAudiences}
+            onChange={(e) => set('lookalikeAudiences', e.target.value)}
+            placeholder="Lookalike 1% compradores..."
+            style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
+          />
+        </div>
+      </div>
+
       {/* Creatives */}
       <div style={FIELD_STYLE}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -600,6 +771,24 @@ function AdSetBlock({
           onChange={(e) => set('welcomeMessage', e.target.value)}
           placeholder="Escribe aquí el mensaje que se enviará al prospecto cuando inicie la conversación..."
           style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem' }}
+        />
+      </div>
+
+      {/* Exclusions */}
+      <div
+        style={{
+          ...FIELD_STYLE,
+          borderLeft: '3px solid hsl(38,100%,50%)',
+          paddingLeft: 10,
+        }}
+      >
+        <label style={{ ...LABEL_STYLE, color: 'hsl(38,100%,65%)' }}>🚫 Exclusiones</label>
+        <textarea
+          rows={2}
+          value={adset.exclusions}
+          onChange={(e) => set('exclusions', e.target.value)}
+          placeholder="Clientes recientes, audiencias a excluir..."
+          style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', borderColor: 'hsl(38 100% 50% / 0.2)' }}
         />
       </div>
     </div>
@@ -791,6 +980,27 @@ export function StrategyFormModal({
     toFormCampaigns(base?.campaigns),
   );
 
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [hasDraft, setHasDraft] = useState(() => {
+    if (isEditing) return false;
+    return Boolean(localStorage.getItem(DRAFT_KEY));
+  });
+
+  const hasMountedRef = useRef(false);
+  const isDirtyRef = useRef(false);
+
+  // Auto-save draft on every form/campaign change (new strategies only); mark dirty always
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    isDirtyRef.current = true;
+    if (!isEditing) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, campaigns }));
+    }
+  }, [form, campaigns, isEditing]);
+
   const canSave = useMemo(
     () => Boolean(form.client_id && form.title.trim() && form.month),
     [form.client_id, form.title, form.month],
@@ -806,6 +1016,37 @@ export function StrategyFormModal({
 
   function removeCampaign(idx: number) {
     setCampaigns((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function handleClose() {
+    if (isDirtyRef.current) {
+      setShowExitConfirm(true);
+      return;
+    }
+    onClose();
+  }
+
+  function confirmClose() {
+    if (!isEditing) localStorage.removeItem(DRAFT_KEY);
+    onClose();
+  }
+
+  function recoverDraft() {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) { setHasDraft(false); return; }
+    try {
+      const saved = JSON.parse(raw) as { form: typeof form; campaigns: CampaignFormState[] };
+      setForm(saved.form);
+      setCampaigns(saved.campaigns);
+    } catch {
+      // ignore parse errors
+    }
+    setHasDraft(false);
+  }
+
+  function discardDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+    setHasDraft(false);
   }
 
   async function handleSubmit() {
@@ -846,11 +1087,12 @@ export function StrategyFormModal({
       setErrorMessage(result.error);
       return;
     }
+    if (!isEditing) localStorage.removeItem(DRAFT_KEY);
     onClose();
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div
         className="modal-box modal-large"
         onClick={(event) => event.stopPropagation()}
@@ -858,8 +1100,70 @@ export function StrategyFormModal({
           background: 'hsl(220,22%,7%)',
           border: '1px solid hsl(180 100% 50% / 0.15)',
           boxShadow: '0 0 40px hsl(180 100% 50% / 0.06), 0 24px 80px rgba(0,0,0,0.6)',
+          position: 'relative',
         }}
       >
+        {/* Exit confirmation overlay */}
+        {showExitConfirm && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: 'inherit',
+              background: 'rgba(0,0,0,0.82)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+            }}
+          >
+            <div
+              style={{
+                background: 'hsl(220,22%,10%)',
+                border: '1px solid hsl(0 70% 50% / 0.3)',
+                borderRadius: 10,
+                padding: '24px 28px',
+                maxWidth: 320,
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+              }}
+            >
+              <p style={{ fontSize: '0.88rem', color: 'hsl(215,15%,80%)', margin: 0 }}>
+                Tienes cambios sin guardar.
+                <br />
+                ¿Descartar y salir?
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setShowExitConfirm(false)}
+                >
+                  Seguir editando
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmClose}
+                  style={{
+                    padding: '7px 18px',
+                    borderRadius: 7,
+                    border: 'none',
+                    background: 'hsl(0,70%,45%)',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Descartar y salir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div
           className="modal-header"
@@ -876,12 +1180,66 @@ export function StrategyFormModal({
               Estructura operativa · Growth Strategy
             </p>
           </div>
-          <button className="modal-close" onClick={onClose}>
+          <button className="modal-close" onClick={handleClose}>
             ✕
           </button>
         </div>
 
         <div className="modal-body modal-scroll">
+
+          {/* Draft recovery banner */}
+          {hasDraft && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: 'hsl(180 100% 50% / 0.08)',
+                border: '1px solid hsl(180 100% 50% / 0.2)',
+                marginBottom: 4,
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: '0.8rem', color: 'hsl(180,100%,70%)' }}>
+                📝 Hay un borrador guardado. ¿Recuperarlo?
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={recoverDraft}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 5,
+                    border: '1px solid hsl(180,100%,50%)',
+                    background: 'hsl(180 100% 50% / 0.15)',
+                    color: 'hsl(180,100%,70%)',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  Recuperar
+                </button>
+                <button
+                  type="button"
+                  onClick={discardDraft}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 5,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'transparent',
+                    color: 'hsl(215,15%,50%)',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  Descartar
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ── 1: IDENTIFICACIÓN ── */}
           <SectionHeading label="IDENTIFICACIÓN" />
@@ -1051,7 +1409,7 @@ export function StrategyFormModal({
           className="modal-footer"
           style={{ borderTop: '1px solid hsl(180 100% 50% / 0.1)' }}
         >
-          <button className="btn-ghost" onClick={onClose}>
+          <button className="btn-ghost" onClick={handleClose}>
             Cancelar
           </button>
           <button
