@@ -116,6 +116,7 @@ export function StrategyDetailModal({
               >
                 <option value="pending">Pendiente</option>
                 <option value="active">Activa</option>
+                <option value="archived">📦 Archivar</option>
               </select>
             ) : (
               <span className="meta-chip">{statusLabel(strategy.status)}</span>

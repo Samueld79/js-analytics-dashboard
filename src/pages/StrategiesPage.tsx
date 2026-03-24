@@ -96,6 +96,8 @@ export function StrategiesPage() {
   const [creativeDates, setCreativeDates] = useState<Record<string, string>>({});
   const [adsetDates, setAdsetDates] = useState<Record<string, string>>({});
   const [alertSaving, setAlertSaving] = useState<Set<string>>(new Set());
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const [archivedOpen, setArchivedOpen] = useState(false);
 
   const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;
   const queryClientId =
@@ -295,129 +297,112 @@ export function StrategiesPage() {
 
   function renderCard(strategy: Strategy, borderColor: string) {
     const client = getClient(strategy.client_id);
-    const checklist = strategy.ai_checklist ?? [];
     const obj = inferObjective(strategy);
     const objStyle = OBJECTIVE_STYLE[obj] ?? OBJECTIVE_STYLE.General;
     const isExpanded = expandedIds.has(strategy.id);
     const isConfirmingDelete = confirmDeleteId === strategy.id;
     const isActiveCard = ACTIVE_STATUSES.includes(strategy.status);
+    const isHovered = hoveredCardId === strategy.id;
 
     return (
       <div
         key={strategy.id}
         className="strategy-card"
         onClick={() => void openStrategyDetail(strategy.id)}
+        onMouseEnter={() => setHoveredCardId(strategy.id)}
+        onMouseLeave={() => setHoveredCardId(null)}
         style={{
           background: 'rgba(255,255,255,0.03)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
           border: '1px solid rgba(255,255,255,0.07)',
           borderLeftColor: borderColor,
           borderLeftWidth: 3,
           borderLeftStyle: 'solid',
-          transition: 'box-shadow 0.2s ease, border-color 0.2s',
+          borderRadius: 10,
+          padding: '10px 12px',
+          display: 'flex', flexDirection: 'column', gap: 7,
+          cursor: 'pointer',
           position: 'relative',
+          transition: 'box-shadow 0.2s, border-color 0.2s',
         }}
       >
-        {/* Delete button */}
-        {isInternal && (
-          <button
-            type="button"
-            title="Eliminar estrategia"
-            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(strategy.id); }}
-            style={{
-              position: 'absolute', top: 8, right: 8,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 22, borderRadius: 5,
-              border: 'none', cursor: 'pointer',
-              background: 'hsl(0 84% 60% / 0.1)', color: 'hsl(0,84%,60%)',
-              opacity: 0.7, transition: 'opacity 0.15s',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.7'; }}
-          >
-            <Trash2 size={11} />
-          </button>
-        )}
-
         {/* Confirm delete overlay */}
         {isConfirmingDelete && (
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: 'absolute', inset: 0, zIndex: 10, borderRadius: 8,
-              background: 'rgba(10,14,24,0.92)', backdropFilter: 'blur(6px)',
+              position: 'absolute', inset: 0, zIndex: 10, borderRadius: 9,
+              background: 'rgba(10,14,24,0.94)', backdropFilter: 'blur(6px)',
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16,
             }}
           >
-            <p style={{ margin: 0, fontSize: '0.8rem', color: 'hsl(0,84%,70%)', textAlign: 'center', fontWeight: 600 }}>
-              ¿Eliminar esta estrategia?
-            </p>
-            <p style={{ margin: 0, fontSize: '0.72rem', color: 'hsl(215,15%,52%)', textAlign: 'center' }}>
-              Esta acción no se puede deshacer.
-            </p>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'hsl(0,84%,70%)', textAlign: 'center', fontWeight: 600 }}>¿Eliminar esta estrategia?</p>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: 'hsl(215,15%,52%)', textAlign: 'center' }}>Esta acción no se puede deshacer.</p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                disabled={deletingId === strategy.id}
-                onClick={() => void handleDeleteConfirm(strategy.id)}
-                style={{ padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'hsl(0,84%,55%)', color: '#fff', fontSize: '0.76rem', fontWeight: 700, opacity: deletingId === strategy.id ? 0.5 : 1 }}
-              >
+              <button type="button" disabled={deletingId === strategy.id} onClick={() => void handleDeleteConfirm(strategy.id)}
+                style={{ padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'hsl(0,84%,55%)', color: '#fff', fontSize: '0.76rem', fontWeight: 700, opacity: deletingId === strategy.id ? 0.5 : 1 }}>
                 {deletingId === strategy.id ? 'Eliminando...' : 'Eliminar'}
               </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteId(null)}
-                style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', background: 'transparent', color: 'hsl(215,15%,65%)', fontSize: '0.76rem' }}
-              >
+              <button type="button" onClick={() => setConfirmDeleteId(null)}
+                style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', background: 'transparent', color: 'hsl(215,15%,65%)', fontSize: '0.76rem' }}>
                 Cancelar
               </button>
             </div>
           </div>
         )}
 
-        {/* Header: client + date */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: isInternal ? 26 : 0 }}>
-          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'hsl(180,100%,55%)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {/* ROW 1: client + date pill + trash (hover only) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+          <span style={{ flex: 1, fontSize: '0.63rem', fontWeight: 700, color: 'hsl(180,100%,55%)', textTransform: 'uppercase', letterSpacing: '0.07em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {client?.name ?? '—'}
           </span>
           {strategy.month && (
-            <span style={{ fontSize: '0.65rem', color: 'hsl(215,15%,42%)', background: 'rgba(255,255,255,0.05)', borderRadius: 5, padding: '2px 7px', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <span style={{ fontSize: '0.6rem', color: 'hsl(215,15%,42%)', background: 'rgba(255,255,255,0.05)', borderRadius: 4, padding: '1px 6px', border: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
               {new Date(`${strategy.month}T12:00:00`).toLocaleDateString('es-CO', { month: 'short', year: '2-digit' })}
             </span>
           )}
+          {isInternal && (
+            <button type="button" title="Eliminar estrategia"
+              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(strategy.id); }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 20, height: 20, borderRadius: 4, border: 'none', cursor: 'pointer',
+                background: isHovered ? 'hsl(0 84% 60% / 0.15)' : 'transparent',
+                color: 'hsl(0,84%,60%)',
+                opacity: isHovered ? 1 : 0,
+                transition: 'opacity 0.15s, background 0.15s',
+                flexShrink: 0,
+              }}
+            >
+              <Trash2 size={11} />
+            </button>
+          )}
         </div>
 
-        {/* Title */}
-        <h4 className="strategy-card-title" style={{ margin: '7px 0 6px', fontSize: '0.92rem', fontWeight: 700, lineHeight: 1.3 }}>
+        {/* ROW 2: title */}
+        <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.25, color: '#e8f0ff' }}>
           {strategy.title}
         </h4>
 
-        {/* Budget + Objective */}
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+        {/* ROW 3: budget badge + objective + "Optimizando" amber badge */}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
           {strategy.monthly_budget != null && (
-            <span style={{ fontSize: '0.74rem', color: 'hsl(145,100%,55%)', fontWeight: 600, fontFamily: 'JetBrains Mono' }}>
+            <span style={{ fontSize: '0.68rem', color: 'hsl(145,100%,55%)', fontWeight: 700, fontFamily: 'JetBrains Mono', background: 'hsl(145 100% 45% / 0.1)', padding: '1px 7px', borderRadius: 5, border: '1px solid hsl(145 100% 45% / 0.15)' }}>
               {formatCop(strategy.monthly_budget)}
             </span>
           )}
-          <span style={{ padding: '2px 9px', borderRadius: 10, fontSize: '0.64rem', fontWeight: 700, ...objStyle }}>
+          <span style={{ padding: '1px 8px', borderRadius: 8, fontSize: '0.61rem', fontWeight: 700, ...objStyle }}>
             {obj}
           </span>
+          {strategy.is_optimizing && (
+            <span style={{ padding: '1px 8px', borderRadius: 8, fontSize: '0.61rem', fontWeight: 700, background: 'hsl(38 100% 55% / 0.12)', color: 'hsl(38,100%,62%)', border: '1px solid hsl(38 100% 55% / 0.2)' }}>
+              🔧 Optimizando
+            </span>
+          )}
         </div>
 
-        {/* Badges + status select */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {strategy.campaigns_off.length > 0 && (
-              <span className="mini-chip chip-red">-{strategy.campaigns_off.length} off</span>
-            )}
-            {checklist.length > 0 && (
-              <span className="mini-chip chip-blue">
-                {checklist.filter((i) => i.done).length}/{checklist.length}✓
-              </span>
-            )}
-          </div>
+        {/* ROW 4: footer — status select + optimizing switch + calendar icon */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={(e) => e.stopPropagation()}>
           {isInternal ? (
             <select
               className="status-select"
@@ -427,86 +412,79 @@ export function StrategiesPage() {
                 e.stopPropagation();
                 void handleStatusChange(strategy.id, e.target.value as Strategy['status']);
               }}
+              style={{ flex: 1, minWidth: 0 }}
             >
               <option value="pending">Pendiente</option>
               <option value="active">Activa</option>
+              <option value="archived">📦 Archivar</option>
             </select>
           ) : (
-            <span className="mini-chip">{statusLabel(strategy.status)}</span>
+            <span className="mini-chip" style={{ flex: 1 }}>{statusLabel(strategy.status)}</span>
+          )}
+
+          {/* Optimizing toggle switch — active cards only */}
+          {isInternal && isActiveCard && (
+            <button
+              type="button"
+              title={strategy.is_optimizing ? 'Quitar de optimización' : 'Marcar en optimización'}
+              onClick={(e) => { e.stopPropagation(); void toggleOptimizing(strategy.id, !strategy.is_optimizing); }}
+              style={{
+                width: 34, height: 18, borderRadius: 9, padding: 0, border: 'none',
+                background: strategy.is_optimizing ? 'hsl(38,100%,50%)' : 'rgba(255,255,255,0.1)',
+                cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 2,
+                left: strategy.is_optimizing ? 16 : 2,
+                width: 14, height: 14, borderRadius: '50%',
+                background: strategy.is_optimizing ? '#000' : 'rgba(255,255,255,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.5rem', transition: 'left 0.2s',
+                pointerEvents: 'none',
+              }}>🔧</span>
+            </button>
+          )}
+
+          {/* Calendar icon — expand date pickers */}
+          {isInternal && (
+            <button
+              type="button"
+              title="Fechas optimización"
+              onClick={(e) => { e.stopPropagation(); toggleExpanded(strategy.id); }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 22, height: 22, borderRadius: 5, cursor: 'pointer',
+                border: `1px solid ${isExpanded ? 'hsl(180 100% 50% / 0.4)' : 'rgba(255,255,255,0.1)'}`,
+                background: isExpanded ? 'hsl(180 100% 45% / 0.1)' : 'transparent',
+                color: isExpanded ? 'hsl(180,100%,55%)' : 'hsl(215,15%,38%)',
+                flexShrink: 0,
+              }}
+            >
+              <Calendar size={11} />
+            </button>
           )}
         </div>
 
-        {/* "En optimización" toggle — only for active cards */}
-        {isInternal && isActiveCard && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              void toggleOptimizing(strategy.id, !strategy.is_optimizing);
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '4px 10px', marginTop: 8, borderRadius: 6, width: '100%',
-              border: strategy.is_optimizing
-                ? '1px solid hsl(38 100% 55% / 0.4)'
-                : '1px solid rgba(255,255,255,0.07)',
-              background: strategy.is_optimizing
-                ? 'hsl(38 100% 55% / 0.08)'
-                : 'none',
-              cursor: 'pointer', fontSize: '0.68rem',
-              color: strategy.is_optimizing ? 'hsl(38,100%,62%)' : 'hsl(215,15%,45%)',
-              transition: 'all 0.15s',
-            }}
-          >
-            <span style={{
-              width: 12, height: 12, borderRadius: 3, flexShrink: 0,
-              border: strategy.is_optimizing ? '1px solid hsl(38,100%,55%)' : '1px solid hsl(215,15%,35%)',
-              background: strategy.is_optimizing ? 'hsl(38,100%,55%)' : 'transparent',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.6rem', color: strategy.is_optimizing ? '#000' : 'transparent',
-            }}>✓</span>
-            En optimización
-          </button>
-        )}
-
-        {/* Expand optimization date pickers */}
-        {isInternal && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); toggleExpanded(strategy.id); }}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              padding: '5px 0', background: 'none', marginTop: isActiveCard ? 4 : 8,
-              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6,
-              cursor: 'pointer', fontSize: '0.68rem',
-              color: 'hsl(180,100%,50%)', width: '100%',
-            }}
-          >
-            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            Fechas optimización
-          </button>
-        )}
-
+        {/* Date pickers panel (expandable) */}
         {isExpanded && isInternal && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ paddingTop: 10, marginTop: 2, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gap: 10 }}
-          >
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'grid', gap: 8 }}>
             <div>
-              <p style={{ margin: '0 0 5px', fontSize: '0.6rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CREATIVOS</p>
+              <p style={{ margin: '0 0 4px', fontSize: '0.58rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CREATIVOS</p>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input type="date" value={creativeDates[strategy.id] ?? ''} onChange={(e) => setCreativeDates((d) => ({ ...d, [strategy.id]: e.target.value }))} style={DATE_INPUT_STYLE} />
-                <button type="button" title="Crear alerta" disabled={!creativeDates[strategy.id] || alertSaving.has(`${strategy.id}:creatives`)} onClick={() => void handleCreateOptimizeAlert(strategy, 'creatives')} style={{ ...CAL_BTN_STYLE, opacity: !creativeDates[strategy.id] ? 0.35 : 1 }}>
-                  <Calendar size={12} />
+                <button type="button" disabled={!creativeDates[strategy.id] || alertSaving.has(`${strategy.id}:creatives`)} onClick={() => void handleCreateOptimizeAlert(strategy, 'creatives')} style={{ ...CAL_BTN_STYLE, opacity: !creativeDates[strategy.id] ? 0.35 : 1 }}>
+                  <Calendar size={11} />
                 </button>
               </div>
             </div>
             <div>
-              <p style={{ margin: '0 0 5px', fontSize: '0.6rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CONJUNTOS DE ANUNCIOS</p>
+              <p style={{ margin: '0 0 4px', fontSize: '0.58rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CONJUNTOS</p>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input type="date" value={adsetDates[strategy.id] ?? ''} onChange={(e) => setAdsetDates((d) => ({ ...d, [strategy.id]: e.target.value }))} style={DATE_INPUT_STYLE} />
-                <button type="button" title="Crear alerta" disabled={!adsetDates[strategy.id] || alertSaving.has(`${strategy.id}:adsets`)} onClick={() => void handleCreateOptimizeAlert(strategy, 'adsets')} style={{ ...CAL_BTN_STYLE, opacity: !adsetDates[strategy.id] ? 0.35 : 1 }}>
-                  <Calendar size={12} />
+                <button type="button" disabled={!adsetDates[strategy.id] || alertSaving.has(`${strategy.id}:adsets`)} onClick={() => void handleCreateOptimizeAlert(strategy, 'adsets')} style={{ ...CAL_BTN_STYLE, opacity: !adsetDates[strategy.id] ? 0.35 : 1 }}>
+                  <Calendar size={11} />
                 </button>
               </div>
             </div>
@@ -524,9 +502,10 @@ export function StrategiesPage() {
           <p className="page-subtitle">
             {loading
               ? 'Cargando estrategias...'
-              : `${visibleStrategies.length} estrategia${visibleStrategies.length !== 1 ? 's' : ''}${
-                  !isInternal ? ' visibles para tu empresa' : ''
-                }`}
+              : (() => {
+                  const activeCount = visibleStrategies.filter((s) => s.status !== 'archived').length;
+                  return `${activeCount} estrategia${activeCount !== 1 ? 's' : ''}${!isInternal ? ' visibles para tu empresa' : ''}`;
+                })()}
           </p>
         </div>
         <div className="header-actions">
@@ -638,6 +617,87 @@ export function StrategiesPage() {
           })}
         </div>
       )}
+
+      {/* ── Archived section ─────────────────────────────────── */}
+      {!loading && (() => {
+        const archivedStrategies = visibleStrategies.filter((s) => s.status === 'archived');
+        if (archivedStrategies.length === 0) return null;
+        return (
+          <div style={{ marginTop: 24 }}>
+            <button
+              type="button"
+              onClick={() => setArchivedOpen((v) => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 14px', borderRadius: 8, marginBottom: archivedOpen ? 12 : 0,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                cursor: 'pointer', color: 'hsl(215,15%,50%)', fontSize: '0.75rem', fontWeight: 700,
+                width: '100%',
+              }}
+            >
+              {archivedOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              📦 ARCHIVADAS ({archivedStrategies.length})
+            </button>
+            {archivedOpen && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8, opacity: 0.55 }}>
+                {archivedStrategies.map((s) => {
+                  const client = getClient(s.client_id);
+                  const obj = inferObjective(s);
+                  const objStyle = OBJECTIVE_STYLE[obj] ?? OBJECTIVE_STYLE.General;
+                  return (
+                    <div
+                      key={s.id}
+                      style={{
+                        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
+                        borderLeftWidth: 3, borderLeftStyle: 'solid', borderLeftColor: 'hsl(215,15%,35%)',
+                        borderRadius: 10, padding: '10px 12px',
+                        display: 'flex', flexDirection: 'column', gap: 6,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ flex: 1, fontSize: '0.63rem', fontWeight: 700, color: 'hsl(215,15%,50%)', textTransform: 'uppercase', letterSpacing: '0.07em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {client?.name ?? '—'}
+                        </span>
+                        <span style={{ fontSize: '0.6rem', color: 'hsl(215,15%,35%)', background: 'rgba(255,255,255,0.04)', borderRadius: 4, padding: '1px 6px', border: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+                          ARCHIVADA
+                        </span>
+                      </div>
+                      <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, lineHeight: 1.25, color: 'hsl(215,15%,65%)' }}>
+                        {s.title}
+                      </h4>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {s.monthly_budget != null && (
+                          <span style={{ fontSize: '0.67rem', color: 'hsl(215,15%,45%)', fontWeight: 700, fontFamily: 'JetBrains Mono' }}>
+                            {formatCop(s.monthly_budget)}
+                          </span>
+                        )}
+                        <span style={{ padding: '1px 7px', borderRadius: 8, fontSize: '0.6rem', fontWeight: 700, ...objStyle, opacity: 0.6 }}>
+                          {obj}
+                        </span>
+                      </div>
+                      {isInternal && (
+                        <button
+                          type="button"
+                          onClick={() => void handleStatusChange(s.id, 'pending')}
+                          style={{
+                            padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'transparent', cursor: 'pointer',
+                            color: 'hsl(180,100%,55%)', fontSize: '0.68rem', fontWeight: 600,
+                            alignSelf: 'flex-start', opacity: 1,
+                          }}
+                        >
+                          Restaurar
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {selectedStrategy && formMode !== 'edit' && (
         <StrategyDetailModal
