@@ -1,4 +1,5 @@
-import { ExternalLink, Link, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, Link, X } from 'lucide-react';
+import { useState } from 'react';
 
 function CreativeDescription({ text }: { text: string }) {
   const trimmed = text.trim();
@@ -41,6 +42,7 @@ import type {
   DriveLink,
   SegmentationData,
   Strategy,
+  StrategyCampaign,
   StrategyHistory,
 } from '../lib/supabase';
 import { formatCop, statusLabel } from '../lib/utils';
@@ -76,6 +78,17 @@ export function StrategyDetailModal({
   const campaignsOpt = strategy.campaigns_optimize as CampaignEntry[];
   const driveLinks = strategy.drive_links as DriveLink[];
   const seg = strategy.segmentation as SegmentationData;
+  const richCampaigns = (strategy.campaigns ?? []) as StrategyCampaign[];
+
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<number>>(new Set());
+  function toggleCampaign(idx: number) {
+    setExpandedCampaigns((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -337,6 +350,160 @@ export function StrategyDetailModal({
                     <ExternalLink size={13} /> {link.label}
                   </a>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {richCampaigns.length > 0 && (
+            <section className="strategy-section">
+              <h3 className="strategy-section-title">Campañas</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {richCampaigns.map((camp, idx) => {
+                  const isOpen = expandedCampaigns.has(idx);
+                  const objColors: Record<string, { bg: string; color: string }> = {
+                    Reconocimiento: { bg: 'hsl(180 100% 50% / 0.12)', color: 'hsl(180,100%,55%)' },
+                    Tráfico: { bg: 'hsl(215 80% 55% / 0.15)', color: 'hsl(215,80%,70%)' },
+                    Interacción: { bg: 'hsl(280 80% 60% / 0.15)', color: 'hsl(280,80%,70%)' },
+                    Ventas: { bg: 'hsl(145 100% 45% / 0.12)', color: 'hsl(145,100%,55%)' },
+                    General: { bg: 'rgba(255,255,255,0.07)', color: 'hsl(215,15%,55%)' },
+                  };
+                  const objStyle = objColors[camp.objective ?? 'General'] ?? objColors.General;
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        borderRadius: 9,
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'rgba(255,255,255,0.02)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Campaign header (clickable) */}
+                      <button
+                        type="button"
+                        onClick={() => toggleCampaign(idx)}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center',
+                          justifyContent: 'space-between', gap: 10,
+                          padding: '10px 14px', background: 'none',
+                          border: 'none', cursor: 'pointer', textAlign: 'left',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#d8e7ff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {camp.name}
+                          </span>
+                          {camp.objective && (
+                            <span style={{ padding: '2px 9px', borderRadius: 10, fontSize: '0.64rem', fontWeight: 700, background: objStyle.bg, color: objStyle.color, flexShrink: 0 }}>
+                              {camp.objective}
+                            </span>
+                          )}
+                          {camp.budgetType && (
+                            <span style={{ padding: '2px 7px', borderRadius: 6, fontSize: '0.62rem', fontWeight: 700, background: 'hsl(180 100% 50% / 0.1)', color: 'hsl(180,100%,55%)', border: '1px solid hsl(180 100% 50% / 0.2)', flexShrink: 0, fontFamily: 'JetBrains Mono, monospace' }}>
+                              {camp.budgetType}
+                            </span>
+                          )}
+                          {camp.budget != null && (
+                            <span style={{ fontSize: '0.78rem', color: 'hsl(145,100%,55%)', fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
+                              ${camp.budget.toLocaleString('es-CO')}
+                            </span>
+                          )}
+                        </div>
+                        {isOpen ? <ChevronUp size={14} style={{ color: 'hsl(180,100%,50%)', flexShrink: 0 }} /> : <ChevronDown size={14} style={{ color: 'hsl(215,15%,50%)', flexShrink: 0 }} />}
+                      </button>
+
+                      {/* Ad sets detail (expanded) */}
+                      {isOpen && (camp.adsets ?? []).length > 0 && (
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {(camp.adsets ?? []).map((adset, adsetIdx) => (
+                            <div
+                              key={adsetIdx}
+                              style={{ padding: '10px 12px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 7 }}
+                            >
+                              {/* Ad type + age + gender row */}
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                {adset.adType && (
+                                  <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,255,255,0.07)', color: '#c0d0f0' }}>
+                                    {adset.adType}
+                                  </span>
+                                )}
+                                <span style={{ fontSize: '0.72rem', color: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono, monospace' }}>
+                                  {adset.ageMin ?? 18} – {adset.ageMax === 65 ? '65+' : (adset.ageMax ?? 65)} años
+                                </span>
+                                {adset.gender && adset.gender !== 'all' && (
+                                  <span style={{ fontSize: '0.7rem', color: 'hsl(215,15%,55%)' }}>
+                                    · {adset.gender === 'male' ? 'Hombres' : 'Mujeres'}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Locations */}
+                              {(adset.locations ?? []).length > 0 && (
+                                <div>
+                                  <span style={{ fontSize: '0.62rem', color: 'hsl(180,100%,50%)', fontWeight: 700, letterSpacing: '0.08em', display: 'block', marginBottom: 3 }}>CIUDADES</span>
+                                  <span style={{ fontSize: '0.76rem', color: '#8094b8' }}>{adset.locations!.join(' · ')}</span>
+                                </div>
+                              )}
+
+                              {/* Placements */}
+                              {(adset.placements ?? []).length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                  {adset.placements!.map((p) => (
+                                    <span key={p} style={{ padding: '2px 8px', borderRadius: 4, fontSize: '0.66rem', background: 'rgba(255,255,255,0.05)', color: 'hsl(215,15%,60%)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                      {p}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Creatives */}
+                              {(adset.creatives ?? []).length > 0 && (
+                                <div>
+                                  <span style={{ fontSize: '0.62rem', color: 'hsl(180,100%,50%)', fontWeight: 700, letterSpacing: '0.08em', display: 'block', marginBottom: 5 }}>CREATIVOS</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                    {adset.creatives!.map((cr, crIdx) => (
+                                      <div key={crIdx} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                          {cr.publicationType && (
+                                            <span style={{ fontSize: '0.62rem', padding: '1px 7px', borderRadius: 4, fontWeight: 700, background: cr.publicationType === 'existente' ? 'hsl(38 100% 55% / 0.15)' : 'hsl(145 100% 45% / 0.12)', color: cr.publicationType === 'existente' ? 'hsl(38,100%,60%)' : 'hsl(145,100%,55%)' }}>
+                                              {cr.publicationType === 'existente' ? 'existente' : 'nueva'}
+                                            </span>
+                                          )}
+                                          {cr.description && <span style={{ fontSize: '0.76rem', color: '#8094b8', wordBreak: 'break-word' }}>{cr.description}</span>}
+                                        </div>
+                                        {cr.existingUrl && (
+                                          <a href={cr.existingUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: 'hsl(180,100%,55%)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {cr.existingUrl}
+                                          </a>
+                                        )}
+                                        {cr.notes && <span style={{ fontSize: '0.7rem', color: 'hsl(215,15%,45%)', fontStyle: 'italic' }}>{cr.notes}</span>}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Welcome message */}
+                              {adset.welcomeMessage && (
+                                <div>
+                                  <span style={{ fontSize: '0.62rem', color: 'hsl(180,100%,50%)', fontWeight: 700, letterSpacing: '0.08em', display: 'block', marginBottom: 3 }}>MSG. BIENVENIDA</span>
+                                  <span style={{ fontSize: '0.76rem', color: '#8094b8' }}>{adset.welcomeMessage}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Empty adsets indicator */}
+                      {isOpen && (camp.adsets ?? []).length === 0 && (
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '10px 14px' }}>
+                          <span style={{ fontSize: '0.76rem', color: 'hsl(215,15%,40%)' }}>Sin conjuntos de anuncios</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}

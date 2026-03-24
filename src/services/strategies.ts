@@ -294,6 +294,7 @@ async function saveStrategyViaRpc(params: {
     p_ai_summary: normalizeOptionalText(params.input.ai_summary),
     p_ai_checklist: normalizeChecklist(params.input.ai_checklist),
     p_ai_diff: normalizeOptionalText(params.input.ai_diff),
+    p_campaigns: params.input.campaigns ?? null,
     p_change_summary: normalizeOptionalText(params.changeSummary),
   };
 
@@ -326,6 +327,7 @@ async function manualCreateStrategy(
   }
 
   const payload = toStrategyPayload(input, changedBy, 1);
+  console.log('[strategies] createStrategy payload →', JSON.stringify({ campaigns: payload.campaigns }));
   const { data, error } = await supabase
     .from('strategies')
     .insert(payload)
@@ -387,6 +389,7 @@ async function manualUpdateStrategy(
     nextVersion,
   );
 
+  console.log('[strategies] updateStrategy payload →', JSON.stringify({ campaigns: payload.campaigns }));
   const { data, error } = await supabase
     .from('strategies')
     .update(payload)
