@@ -483,6 +483,25 @@ export function StrategyDetailModal({
                                           </a>
                                         )}
                                         {cr.notes && <span style={{ fontSize: '0.7rem', color: 'hsl(215,15%,45%)', fontStyle: 'italic' }}>{cr.notes}</span>}
+                                        {cr.imageBase64 && (
+                                          <div style={{ marginTop: 4 }}>
+                                            <a href={cr.imageBase64} target="_blank" rel="noreferrer" style={{ display: 'inline-block' }}>
+                                              <img
+                                                src={cr.imageBase64}
+                                                alt="Imagen adjunta"
+                                                style={{
+                                                  maxWidth: 200,
+                                                  borderRadius: 8,
+                                                  border: '1px solid rgba(6,182,212,0.2)',
+                                                  display: 'block',
+                                                }}
+                                              />
+                                            </a>
+                                            <span style={{ fontSize: '0.65rem', color: 'hsl(180,100%,50%)', marginTop: 3, display: 'block' }}>
+                                              📎 Imagen adjunta
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
