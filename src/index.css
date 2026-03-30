@@ -6951,3 +6951,413 @@ table tbody td {
   flex-shrink: 0 !important;
 }
 
+/* ============================================================
+   THEME SYSTEM — SMOOTH TRANSITIONS + LIGHT THEME
+   ============================================================ */
+
+/* Transiciones suaves al cambiar tema */
+body,
+.sidebar, .sidebar-brand, .sidebar-footer, .sidebar-link,
+.sidebar-user-card, .sidebar-user-avatar, .sidebar-signout,
+.card, .kpi-card, .section-block, .card-glass,
+.executive-kpi-card, .period-toolbar-card, .chart-card,
+.alert-card, .ranking-card, .focus-card, .risk-card,
+.health-card, .closure-card,
+.page-header, .page-bg,
+.modal-box, .modal-header, .modal-body, .modal-scroll,
+.strategy-card, .strategy-card-compact,
+.btn-primary, .btn-secondary, .btn-ghost,
+.form-input, .form-select,
+input[type="text"], input[type="date"], input[type="number"],
+select, textarea,
+.filter-chip, .period-chip, .theme-toggle,
+.modal-close, .status-select {
+  transition: background-color 0.3s ease, color 0.3s ease,
+              border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 16px);
+  margin: 0 8px 4px;
+  padding: 9px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: hsl(215, 15%, 55%);
+  text-align: left;
+}
+
+.theme-toggle:hover {
+  background: hsl(0 0% 100% / 0.04) !important;
+  color: hsl(0, 0%, 90%) !important;
+}
+
+/* ─── LIGHT THEME ────────────────────────────────────────── */
+
+html.light body {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+html.light .page-bg {
+  background: #f1f5f9 !important;
+}
+
+html.light .app-shell::before {
+  background-image:
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px) !important;
+}
+
+/* Sidebar */
+html.light .sidebar {
+  background: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 1px 0 12px rgba(0,0,0,0.06) !important;
+}
+
+html.light .sidebar-brand {
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+html.light .sidebar-brand-name {
+  color: #0f172a !important;
+}
+
+html.light .sidebar-brand-name span.accent {
+  color: #0891b2 !important;
+}
+
+html.light .sidebar-brand-sub {
+  color: #94a3b8 !important;
+}
+
+html.light .sidebar-link {
+  color: #64748b !important;
+}
+
+html.light .sidebar-link:hover {
+  background: rgba(8,145,178,0.06) !important;
+  color: #0f172a !important;
+  border-color: transparent !important;
+}
+
+html.light .sidebar-link.active {
+  background: rgba(8,145,178,0.08) !important;
+  color: #0891b2 !important;
+  border-color: rgba(8,145,178,0.15) !important;
+  box-shadow: inset 2px 0 0 #0891b2 !important;
+}
+
+html.light .sidebar-footer {
+  border-top: 1px solid #e2e8f0 !important;
+}
+
+html.light .sidebar-user-card {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+html.light .sidebar-user-name {
+  color: #0f172a !important;
+}
+
+html.light .sidebar-user-role {
+  color: #94a3b8 !important;
+}
+
+html.light .sidebar-user-avatar {
+  background: rgba(8,145,178,0.08) !important;
+  border: 1px solid rgba(8,145,178,0.2) !important;
+  color: #0891b2 !important;
+}
+
+html.light .sidebar-signout {
+  border-color: #e2e8f0 !important;
+  color: #94a3b8 !important;
+}
+
+html.light .sidebar-signout:hover {
+  background: rgba(8,145,178,0.08) !important;
+  color: #0891b2 !important;
+  border-color: rgba(8,145,178,0.2) !important;
+}
+
+html.light .theme-toggle {
+  color: #64748b !important;
+}
+
+html.light .theme-toggle:hover {
+  background: rgba(8,145,178,0.06) !important;
+  color: #0f172a !important;
+}
+
+/* Cards y panels */
+html.light .card, html.light .kpi-card, html.light .section-block,
+html.light .card-glass, html.light .period-toolbar-card,
+html.light .chart-card, html.light .alert-card,
+html.light .executive-kpi-card, html.light .ranking-card,
+html.light .focus-card, html.light .risk-card,
+html.light .health-card, html.light .closure-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+}
+
+html.light .card:hover, html.light .kpi-card:hover,
+html.light .section-block:hover, html.light .executive-kpi-card:hover,
+html.light .ranking-card:hover {
+  border-color: rgba(8,145,178,0.3) !important;
+  background: #ffffff !important;
+}
+
+html.light .card-glass:hover {
+  border-color: rgba(8,145,178,0.25) !important;
+}
+
+/* Valores KPI */
+html.light .kpi-value, html.light .metric-value,
+html.light .kpi-number, html.light .stat-value,
+html.light .executive-kpi-value {
+  color: #0f172a !important;
+}
+
+html.light .kpi-value.positive, html.light .metric-positive,
+html.light .ranking-value {
+  color: #0891b2 !important;
+}
+
+/* Labels KPI */
+html.light .kpi-label, html.light .metric-label,
+html.light .executive-kpi-label, html.light .stat-label,
+html.light .section-label, html.light .chart-label,
+html.light .number-label, html.light .kpi-sublabel,
+html.light .kpi-sub, html.light .metric-sub,
+html.light .text-muted, html.light .text-soft {
+  color: #64748b !important;
+}
+
+/* Headings */
+html.light h1, html.light h2, html.light h3,
+html.light h4, html.light h5, html.light h6,
+html.light .page-title, html.light .section-title,
+html.light .card-title {
+  color: #0f172a !important;
+}
+
+/* Page header */
+html.light .page-header {
+  background: rgba(255,255,255,0.92) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+html.light .page-subtitle {
+  color: #64748b !important;
+}
+
+/* Buttons */
+html.light .btn-primary {
+  border-color: #0891b2 !important;
+  color: #0891b2 !important;
+  background: transparent !important;
+}
+
+html.light .btn-primary:hover:not(:disabled) {
+  background: #0891b2 !important;
+  color: #ffffff !important;
+}
+
+html.light .btn-secondary {
+  border-color: #e2e8f0 !important;
+  color: #64748b !important;
+  background: transparent !important;
+}
+
+html.light .btn-secondary:hover {
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  background: rgba(0,0,0,0.03) !important;
+}
+
+html.light .btn-ghost {
+  color: #64748b !important;
+  background: transparent !important;
+}
+
+html.light .btn-ghost:hover {
+  background: rgba(0,0,0,0.04) !important;
+  color: #0f172a !important;
+}
+
+/* Inputs */
+html.light .form-input, html.light .form-select,
+html.light input[type="text"], html.light input[type="date"],
+html.light input[type="number"], html.light select,
+html.light textarea {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html.light .form-input:focus, html.light .form-select:focus,
+html.light input:focus, html.light select:focus,
+html.light textarea:focus {
+  border-color: rgba(8,145,178,0.5) !important;
+  box-shadow: 0 0 0 2px rgba(8,145,178,0.08) !important;
+}
+
+html.light input::placeholder, html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Tablas */
+html.light table thead tr {
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+html.light table thead th {
+  color: #64748b !important;
+}
+
+html.light table tbody tr {
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+html.light table tbody tr:hover {
+  background: #f8fafc !important;
+}
+
+html.light table tbody td {
+  color: #0f172a !important;
+}
+
+/* Modals */
+html.light .modal-backdrop {
+  background: rgba(15,23,42,0.45) !important;
+}
+
+html.light .modal-overlay {
+  background: rgba(15,23,42,0.45) !important;
+}
+
+html.light .modal-box {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.12) !important;
+}
+
+html.light .modal-header {
+  border-bottom: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+}
+
+html.light .modal-title { color: #0f172a !important; }
+html.light .modal-subtitle { color: #64748b !important; }
+
+html.light .modal-body, html.light .modal-scroll {
+  background: #ffffff !important;
+}
+
+html.light .modal, html.light .modal-content {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+html.light .modal-close {
+  color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .modal-close:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Status select */
+html.light .status-select {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Strategy cards */
+html.light .strategy-card, html.light .strategy-card-compact {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+}
+
+html.light .strategy-card:hover {
+  border-color: rgba(8,145,178,0.3) !important;
+}
+
+html.light .strategy-card-title,
+html.light .strategy-card-header h3 {
+  color: #0f172a !important;
+}
+
+/* Strategy detail */
+html.light .strategy-summary-text,
+html.light .notes-text {
+  color: #475569 !important;
+}
+
+html.light .empty-note {
+  color: #94a3b8 !important;
+}
+
+/* Filter / period chips */
+html.light .filter-chip, html.light .period-chip, html.light .range-chip {
+  border-color: #e2e8f0 !important;
+  color: #64748b !important;
+  background: #f8fafc !important;
+}
+
+html.light .filter-chip:hover, html.light .period-chip:hover {
+  border-color: #0f172a !important;
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
+}
+
+html.light .filter-chip.active, html.light .period-chip.active,
+html.light .range-chip.active {
+  border-color: #0891b2 !important;
+  color: #0891b2 !important;
+  background: rgba(8,145,178,0.08) !important;
+}
+
+/* Meta chips */
+html.light .meta-chip, html.light .badge-info {
+  background: rgba(8,145,178,0.08) !important;
+  color: #0891b2 !important;
+  border-color: rgba(8,145,178,0.15) !important;
+}
+
+/* Recharts */
+html.light .recharts-cartesian-grid-horizontal line,
+html.light .recharts-cartesian-grid-vertical line {
+  stroke: rgba(0,0,0,0.06) !important;
+}
+
+html.light .recharts-default-tooltip {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Scrollbar */
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15) !important;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25) !important;
+}

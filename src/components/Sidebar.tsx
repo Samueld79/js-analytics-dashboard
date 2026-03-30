@@ -17,6 +17,8 @@ import {
   ChevronsRight,
   Menu,
   X,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useAuth } from '../hooks/useAuth';
@@ -58,6 +60,14 @@ export function Sidebar() {
       return window.localStorage.getItem('sidebar:collapsed') === '1';
     } catch {
       return false;
+    }
+  });
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    try {
+      return (window.localStorage.getItem('ui:theme') as 'dark' | 'light') ?? 'dark';
+    } catch {
+      return 'dark';
     }
   });
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -118,6 +128,27 @@ export function Sidebar() {
       document.body.classList.remove('mobile-nav-open');
     };
   }, [mobileOpen]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    document.documentElement.classList.toggle('light', theme === 'light');
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    return undefined;
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((current) => {
+      const next = current === 'dark' ? 'light' : 'dark';
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem('ui:theme', next);
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+  }
 
   function toggleSidebar() {
     setCollapsed((current) => {
@@ -218,6 +249,17 @@ export function Sidebar() {
               </button>
             </div>
           )}
+          <button
+            className="theme-toggle"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            <span className="sidebar-link-text">
+              {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            </span>
+          </button>
           {isInternal && (
             <Link
               to="/settings"
