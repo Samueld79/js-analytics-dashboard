@@ -3,8 +3,8 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   PieChart,
   Pie,
   Cell,
@@ -573,14 +573,14 @@ export function ClientDetailPage() {
         </div>
       )}
 
-      {/* ── Year Bar Chart: Ventas vs Inversión ── */}
+      {/* ── Year Line Chart: Inversión vs Ventas ── */}
       {yearBarData.length > 0 && (
         <div className="card-glass" style={{ padding: '20px 24px' }}>
           <div className="number-label" style={{ marginBottom: 16 }}>
-            Ventas vs Inversión — {new Date().getFullYear()}
+            Inversión vs Ventas — {new Date().getFullYear()}
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={yearBarData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={yearBarData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis
                 dataKey="month"
@@ -588,8 +588,17 @@ export function ClientDetailPage() {
                 tickFormatter={(v: unknown) => getMonthLabel(String(v)).slice(0, 3)}
               />
               <YAxis
-                tick={{ fill: '#888', fontSize: 11 }}
-                tickFormatter={(v: number) => `$${(v / 1000000).toFixed(0)}M`}
+                yAxisId="left"
+                tick={{ fill: 'hsl(180,100%,55%)', fontSize: 10 }}
+                tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`}
+                width={44}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fill: 'hsl(280,80%,65%)', fontSize: 10 }}
+                tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`}
+                width={44}
               />
               <Tooltip
                 labelFormatter={(label: unknown) => getMonthLabel(String(label))}
@@ -604,15 +613,25 @@ export function ClientDetailPage() {
                 }}
               />
               <Legend />
-              <Bar
+              <Line
+                yAxisId="left"
+                type="monotone"
                 dataKey="Inversión"
-                fill="rgba(0,255,255,0.25)"
                 stroke="hsl(180,100%,50%)"
-                strokeWidth={1}
-                radius={[3, 3, 0, 0]}
+                strokeWidth={2}
+                dot={{ fill: 'hsl(180,100%,50%)', r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5 }}
               />
-              <Bar dataKey="Ventas" fill="hsl(280,80%,60%)" radius={[3, 3, 0, 0]} />
-            </BarChart>
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="Ventas"
+                stroke="hsl(280,80%,60%)"
+                strokeWidth={2}
+                dot={{ fill: 'hsl(280,80%,60%)', r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       )}

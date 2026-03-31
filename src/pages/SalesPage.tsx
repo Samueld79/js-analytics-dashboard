@@ -701,7 +701,7 @@ export function SalesPage() {
               />
               <YAxis hide />
               <Tooltip
-                formatter={(v) => [formatCop(v as number), 'Ventas']}
+                formatter={(v) => [formatCopFull(v as number), 'Ventas']}
                 labelFormatter={(label: unknown) => shortMonth(String(label))}
                 contentStyle={{
                   background: 'rgba(8,12,22,0.92)',

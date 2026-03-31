@@ -13,6 +13,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
+  Banknote,
   BarChart3,
   DollarSign,
   MessageCircle,
@@ -266,6 +267,16 @@ export function DashboardPage() {
   const kpiCpm = selectedKpis?.cpm ?? 0;
   const kpiFrequency = selectedKpis?.frequency ?? 0;
 
+  const kpiSalesTotal = useMemo(
+    () =>
+      activePeriod === 'all'
+        ? scopedSales.reduce((sum, s) => sum + s.total_sales, 0)
+        : scopedSales
+            .filter((s) => s.date.startsWith(activePeriod))
+            .reduce((sum, s) => sum + s.total_sales, 0),
+    [scopedSales, activePeriod],
+  );
+
   // ── Alerts ───────────────────────────────────────────────────────────────────
   const visibleOpenAlerts = useMemo(
     () =>
@@ -446,6 +457,11 @@ export function DashboardPage() {
       label: `Conversaciones ${activePeriodLabel}`,
       value: formatNumber(kpiMessages),
       Icon: MessageCircle,
+    },
+    {
+      label: `Ventas ${activePeriodLabel}`,
+      value: kpiSalesTotal > 0 ? formatCop(kpiSalesTotal) : '—',
+      Icon: Banknote,
     },
     {
       label: 'Alcance (Reach)',
