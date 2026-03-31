@@ -1,6 +1,34 @@
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800&display=swap");
 
+/* ============================================================
+   CSS DESIGN TOKENS — dark defaults, light overrides
+   ============================================================ */
+
 :root {
+  /* Dark theme token defaults */
+  --color-bg-primary:        hsl(220, 20%, 3%);
+  --color-bg-secondary:      hsl(220, 18%, 5%);
+  --color-bg-card:           hsl(220, 18%, 7%, 0.6);
+  --color-bg-card-hover:     hsl(220, 18%, 7%, 0.8);
+  --color-bg-input:          hsl(220, 18%, 9%);
+  --color-border:            hsl(0 0% 100% / 0.08);
+  --color-border-strong:     hsl(0 0% 100% / 0.15);
+  --color-text-primary:      hsl(0, 0%, 98%);
+  --color-text-secondary:    hsl(215, 15%, 55%);
+  --color-text-muted:        hsl(215, 15%, 40%);
+  --color-accent-cyan:       hsl(180, 100%, 50%);
+  --color-accent-purple:     hsl(280, 80%, 60%);
+  --color-sidebar-bg:        hsl(220, 18%, 5%);
+  --color-sidebar-active-bg: hsl(180 100% 50% / 0.1);
+  --color-sidebar-active-fg: hsl(180, 100%, 50%);
+  --color-chart-grid:        hsl(0 0% 100% / 0.05);
+  --color-chart-text:        hsl(215, 15%, 55%);
+  --color-tooltip-bg:        hsl(220, 18%, 9%);
+  --color-tooltip-border:    hsl(0 0% 100% / 0.1);
+  --color-tooltip-text:      hsl(0, 0%, 98%);
+  --color-badge-bg:          hsl(0 0% 100% / 0.08);
+  --color-badge-text:        hsl(215, 15%, 55%);
+
   font-family: "Manrope", "Segoe UI", sans-serif;
   line-height: 1.45;
   font-weight: 400;
@@ -10,6 +38,33 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Light theme token overrides */
+[data-theme="light"] {
+  color-scheme: light;
+  --color-bg-primary:        #f1f5f9;
+  --color-bg-secondary:      #f8fafc;
+  --color-bg-card:           #ffffff;
+  --color-bg-card-hover:     #f8fafc;
+  --color-bg-input:          #ffffff;
+  --color-border:            #e2e8f0;
+  --color-border-strong:     #cbd5e1;
+  --color-text-primary:      #0f172a;
+  --color-text-secondary:    #475569;
+  --color-text-muted:        #94a3b8;
+  --color-accent-cyan:       #0891b2;
+  --color-accent-purple:     #7c3aed;
+  --color-sidebar-bg:        #ffffff;
+  --color-sidebar-active-bg: rgba(8, 145, 178, 0.08);
+  --color-sidebar-active-fg: #0891b2;
+  --color-chart-grid:        #e2e8f0;
+  --color-chart-text:        #475569;
+  --color-tooltip-bg:        #ffffff;
+  --color-tooltip-border:    #e2e8f0;
+  --color-tooltip-text:      #0f172a;
+  --color-badge-bg:          #f1f5f9;
+  --color-badge-text:        #475569;
 }
 
 *,
@@ -7001,363 +7056,780 @@ select, textarea,
 
 /* ─── LIGHT THEME ────────────────────────────────────────── */
 
-html.light body {
+[data-theme="light"] body {
   background: #f1f5f9 !important;
   color: #0f172a !important;
 }
 
-html.light .page-bg {
+[data-theme="light"] .page-bg {
   background: #f1f5f9 !important;
 }
 
-html.light .app-shell::before {
+[data-theme="light"] .app-shell::before {
   background-image:
     linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px) !important;
 }
 
 /* Sidebar */
-html.light .sidebar {
+[data-theme="light"] .sidebar {
   background: #ffffff !important;
   border-right: 1px solid #e2e8f0 !important;
   box-shadow: 1px 0 12px rgba(0,0,0,0.06) !important;
 }
 
-html.light .sidebar-brand {
+[data-theme="light"] .sidebar-brand {
   border-bottom: 1px solid #e2e8f0 !important;
 }
 
-html.light .sidebar-brand-name {
+[data-theme="light"] .sidebar-brand-name {
   color: #0f172a !important;
 }
 
-html.light .sidebar-brand-name span.accent {
+[data-theme="light"] .sidebar-brand-name span.accent {
   color: #0891b2 !important;
 }
 
-html.light .sidebar-brand-sub {
+[data-theme="light"] .sidebar-brand-sub {
   color: #94a3b8 !important;
 }
 
-html.light .sidebar-link {
+[data-theme="light"] .sidebar-link {
   color: #64748b !important;
 }
 
-html.light .sidebar-link:hover {
+[data-theme="light"] .sidebar-link:hover {
   background: rgba(8,145,178,0.06) !important;
   color: #0f172a !important;
   border-color: transparent !important;
 }
 
-html.light .sidebar-link.active {
+[data-theme="light"] .sidebar-link.active {
   background: rgba(8,145,178,0.08) !important;
   color: #0891b2 !important;
   border-color: rgba(8,145,178,0.15) !important;
   box-shadow: inset 2px 0 0 #0891b2 !important;
 }
 
-html.light .sidebar-footer {
+[data-theme="light"] .sidebar-footer {
   border-top: 1px solid #e2e8f0 !important;
 }
 
-html.light .sidebar-user-card {
+[data-theme="light"] .sidebar-user-card {
   background: #f8fafc !important;
   border: 1px solid #e2e8f0 !important;
 }
 
-html.light .sidebar-user-name {
+[data-theme="light"] .sidebar-user-name {
   color: #0f172a !important;
 }
 
-html.light .sidebar-user-role {
+[data-theme="light"] .sidebar-user-role {
   color: #94a3b8 !important;
 }
 
-html.light .sidebar-user-avatar {
+[data-theme="light"] .sidebar-user-avatar {
   background: rgba(8,145,178,0.08) !important;
   border: 1px solid rgba(8,145,178,0.2) !important;
   color: #0891b2 !important;
 }
 
-html.light .sidebar-signout {
+[data-theme="light"] .sidebar-signout {
   border-color: #e2e8f0 !important;
   color: #94a3b8 !important;
 }
 
-html.light .sidebar-signout:hover {
+[data-theme="light"] .sidebar-signout:hover {
   background: rgba(8,145,178,0.08) !important;
   color: #0891b2 !important;
   border-color: rgba(8,145,178,0.2) !important;
 }
 
-html.light .theme-toggle {
+[data-theme="light"] .theme-toggle {
   color: #64748b !important;
 }
 
-html.light .theme-toggle:hover {
+[data-theme="light"] .theme-toggle:hover {
   background: rgba(8,145,178,0.06) !important;
   color: #0f172a !important;
 }
 
 /* Cards y panels */
-html.light .card, html.light .kpi-card, html.light .section-block,
-html.light .card-glass, html.light .period-toolbar-card,
-html.light .chart-card, html.light .alert-card,
-html.light .executive-kpi-card, html.light .ranking-card,
-html.light .focus-card, html.light .risk-card,
-html.light .health-card, html.light .closure-card {
+[data-theme="light"] .card, [data-theme="light"] .kpi-card, [data-theme="light"] .section-block,
+[data-theme="light"] .card-glass, [data-theme="light"] .period-toolbar-card,
+[data-theme="light"] .chart-card, [data-theme="light"] .alert-card,
+[data-theme="light"] .executive-kpi-card, [data-theme="light"] .ranking-card,
+[data-theme="light"] .focus-card, [data-theme="light"] .risk-card,
+[data-theme="light"] .health-card, [data-theme="light"] .closure-card {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
 }
 
-html.light .card:hover, html.light .kpi-card:hover,
-html.light .section-block:hover, html.light .executive-kpi-card:hover,
-html.light .ranking-card:hover {
+[data-theme="light"] .card:hover, [data-theme="light"] .kpi-card:hover,
+[data-theme="light"] .section-block:hover, [data-theme="light"] .executive-kpi-card:hover,
+[data-theme="light"] .ranking-card:hover {
   border-color: rgba(8,145,178,0.3) !important;
   background: #ffffff !important;
 }
 
-html.light .card-glass:hover {
+[data-theme="light"] .card-glass:hover {
   border-color: rgba(8,145,178,0.25) !important;
 }
 
 /* Valores KPI */
-html.light .kpi-value, html.light .metric-value,
-html.light .kpi-number, html.light .stat-value,
-html.light .executive-kpi-value {
+[data-theme="light"] .kpi-value, [data-theme="light"] .metric-value,
+[data-theme="light"] .kpi-number, [data-theme="light"] .stat-value,
+[data-theme="light"] .executive-kpi-value {
   color: #0f172a !important;
 }
 
-html.light .kpi-value.positive, html.light .metric-positive,
-html.light .ranking-value {
+[data-theme="light"] .kpi-value.positive, [data-theme="light"] .metric-positive,
+[data-theme="light"] .ranking-value {
   color: #0891b2 !important;
 }
 
 /* Labels KPI */
-html.light .kpi-label, html.light .metric-label,
-html.light .executive-kpi-label, html.light .stat-label,
-html.light .section-label, html.light .chart-label,
-html.light .number-label, html.light .kpi-sublabel,
-html.light .kpi-sub, html.light .metric-sub,
-html.light .text-muted, html.light .text-soft {
+[data-theme="light"] .kpi-label, [data-theme="light"] .metric-label,
+[data-theme="light"] .executive-kpi-label, [data-theme="light"] .stat-label,
+[data-theme="light"] .section-label, [data-theme="light"] .chart-label,
+[data-theme="light"] .number-label, [data-theme="light"] .kpi-sublabel,
+[data-theme="light"] .kpi-sub, [data-theme="light"] .metric-sub,
+[data-theme="light"] .text-muted, [data-theme="light"] .text-soft {
   color: #64748b !important;
 }
 
 /* Headings */
-html.light h1, html.light h2, html.light h3,
-html.light h4, html.light h5, html.light h6,
-html.light .page-title, html.light .section-title,
-html.light .card-title {
+[data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3,
+[data-theme="light"] h4, [data-theme="light"] h5, [data-theme="light"] h6,
+[data-theme="light"] .page-title, [data-theme="light"] .section-title,
+[data-theme="light"] .card-title {
   color: #0f172a !important;
 }
 
 /* Page header */
-html.light .page-header {
+[data-theme="light"] .page-header {
   background: rgba(255,255,255,0.92) !important;
   border-bottom: 1px solid #e2e8f0 !important;
 }
 
-html.light .page-subtitle {
+[data-theme="light"] .page-subtitle {
   color: #64748b !important;
 }
 
 /* Buttons */
-html.light .btn-primary {
+[data-theme="light"] .btn-primary {
   border-color: #0891b2 !important;
   color: #0891b2 !important;
   background: transparent !important;
 }
 
-html.light .btn-primary:hover:not(:disabled) {
+[data-theme="light"] .btn-primary:hover:not(:disabled) {
   background: #0891b2 !important;
   color: #ffffff !important;
 }
 
-html.light .btn-secondary {
+[data-theme="light"] .btn-secondary {
   border-color: #e2e8f0 !important;
   color: #64748b !important;
   background: transparent !important;
 }
 
-html.light .btn-secondary:hover {
+[data-theme="light"] .btn-secondary:hover {
   border-color: #94a3b8 !important;
   color: #0f172a !important;
   background: rgba(0,0,0,0.03) !important;
 }
 
-html.light .btn-ghost {
+[data-theme="light"] .btn-ghost {
   color: #64748b !important;
   background: transparent !important;
 }
 
-html.light .btn-ghost:hover {
+[data-theme="light"] .btn-ghost:hover {
   background: rgba(0,0,0,0.04) !important;
   color: #0f172a !important;
 }
 
 /* Inputs */
-html.light .form-input, html.light .form-select,
-html.light input[type="text"], html.light input[type="date"],
-html.light input[type="number"], html.light select,
-html.light textarea {
+[data-theme="light"] .form-input, [data-theme="light"] .form-select,
+[data-theme="light"] input[type="text"], [data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="number"], [data-theme="light"] select,
+[data-theme="light"] textarea {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   color: #0f172a !important;
 }
 
-html.light .form-input:focus, html.light .form-select:focus,
-html.light input:focus, html.light select:focus,
-html.light textarea:focus {
+[data-theme="light"] .form-input:focus, [data-theme="light"] .form-select:focus,
+[data-theme="light"] input:focus, [data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
   border-color: rgba(8,145,178,0.5) !important;
   box-shadow: 0 0 0 2px rgba(8,145,178,0.08) !important;
 }
 
-html.light input::placeholder, html.light textarea::placeholder {
+[data-theme="light"] input::placeholder, [data-theme="light"] textarea::placeholder {
   color: #94a3b8 !important;
 }
 
 /* Tablas */
-html.light table thead tr {
+[data-theme="light"] table thead tr {
   background: #f8fafc !important;
   border-bottom: 1px solid #e2e8f0 !important;
 }
 
-html.light table thead th {
+[data-theme="light"] table thead th {
   color: #64748b !important;
 }
 
-html.light table tbody tr {
+[data-theme="light"] table tbody tr {
   border-bottom: 1px solid #f1f5f9 !important;
 }
 
-html.light table tbody tr:hover {
+[data-theme="light"] table tbody tr:hover {
   background: #f8fafc !important;
 }
 
-html.light table tbody td {
+[data-theme="light"] table tbody td {
   color: #0f172a !important;
 }
 
 /* Modals */
-html.light .modal-backdrop {
+[data-theme="light"] .modal-backdrop {
   background: rgba(15,23,42,0.45) !important;
 }
 
-html.light .modal-overlay {
+[data-theme="light"] .modal-overlay {
   background: rgba(15,23,42,0.45) !important;
 }
 
-html.light .modal-box {
+[data-theme="light"] .modal-box {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   box-shadow: 0 20px 60px rgba(0,0,0,0.12) !important;
 }
 
-html.light .modal-header {
+[data-theme="light"] .modal-header {
   border-bottom: 1px solid #e2e8f0 !important;
   background: #f8fafc !important;
 }
 
-html.light .modal-title { color: #0f172a !important; }
-html.light .modal-subtitle { color: #64748b !important; }
+[data-theme="light"] .modal-title { color: #0f172a !important; }
+[data-theme="light"] .modal-subtitle { color: #64748b !important; }
 
-html.light .modal-body, html.light .modal-scroll {
+[data-theme="light"] .modal-body, [data-theme="light"] .modal-scroll {
   background: #ffffff !important;
 }
 
-html.light .modal, html.light .modal-content {
+[data-theme="light"] .modal, [data-theme="light"] .modal-content {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
 }
 
-html.light .modal-close {
+[data-theme="light"] .modal-close {
   color: #94a3b8 !important;
   border-color: #e2e8f0 !important;
 }
 
-html.light .modal-close:hover {
+[data-theme="light"] .modal-close:hover {
   background: #f1f5f9 !important;
   color: #0f172a !important;
 }
 
 /* Status select */
-html.light .status-select {
+[data-theme="light"] .status-select {
   background: #f8fafc !important;
   border-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
 
 /* Strategy cards */
-html.light .strategy-card, html.light .strategy-card-compact {
+[data-theme="light"] .strategy-card, [data-theme="light"] .strategy-card-compact {
   background: #ffffff !important;
   border-color: #e2e8f0 !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
 }
 
-html.light .strategy-card:hover {
+[data-theme="light"] .strategy-card:hover {
   border-color: rgba(8,145,178,0.3) !important;
 }
 
-html.light .strategy-card-title,
-html.light .strategy-card-header h3 {
+[data-theme="light"] .strategy-card-title,
+[data-theme="light"] .strategy-card-header h3 {
   color: #0f172a !important;
 }
 
 /* Strategy detail */
-html.light .strategy-summary-text,
-html.light .notes-text {
+[data-theme="light"] .strategy-summary-text,
+[data-theme="light"] .notes-text {
   color: #475569 !important;
 }
 
-html.light .empty-note {
+[data-theme="light"] .empty-note {
   color: #94a3b8 !important;
 }
 
 /* Filter / period chips */
-html.light .filter-chip, html.light .period-chip, html.light .range-chip {
+[data-theme="light"] .filter-chip, [data-theme="light"] .period-chip, [data-theme="light"] .range-chip {
   border-color: #e2e8f0 !important;
   color: #64748b !important;
   background: #f8fafc !important;
 }
 
-html.light .filter-chip:hover, html.light .period-chip:hover {
+[data-theme="light"] .filter-chip:hover, [data-theme="light"] .period-chip:hover {
   border-color: #0f172a !important;
   color: #0f172a !important;
   background: #f1f5f9 !important;
 }
 
-html.light .filter-chip.active, html.light .period-chip.active,
-html.light .range-chip.active {
+[data-theme="light"] .filter-chip.active, [data-theme="light"] .period-chip.active,
+[data-theme="light"] .range-chip.active {
   border-color: #0891b2 !important;
   color: #0891b2 !important;
   background: rgba(8,145,178,0.08) !important;
 }
 
 /* Meta chips */
-html.light .meta-chip, html.light .badge-info {
+[data-theme="light"] .meta-chip, [data-theme="light"] .badge-info {
   background: rgba(8,145,178,0.08) !important;
   color: #0891b2 !important;
   border-color: rgba(8,145,178,0.15) !important;
 }
 
 /* Recharts */
-html.light .recharts-cartesian-grid-horizontal line,
-html.light .recharts-cartesian-grid-vertical line {
+[data-theme="light"] .recharts-cartesian-grid-horizontal line,
+[data-theme="light"] .recharts-cartesian-grid-vertical line {
   stroke: rgba(0,0,0,0.06) !important;
 }
 
-html.light .recharts-default-tooltip {
+[data-theme="light"] .recharts-default-tooltip {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   color: #0f172a !important;
 }
 
 /* Scrollbar */
-html.light ::-webkit-scrollbar-thumb {
+[data-theme="light"] ::-webkit-scrollbar-thumb {
   background: rgba(0,0,0,0.15) !important;
 }
 
-html.light ::-webkit-scrollbar-thumb:hover {
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(0,0,0,0.25) !important;
+}
+
+/* ============================================================
+   LIGHT THEME — COMPREHENSIVE ADDITIONAL FIXES
+   ============================================================ */
+
+/* ─── Global text cascade ─────────────────────────────────── */
+
+/* Ensure generic white text turns dark in light mode.
+   These target common patterns from the dark-theme !important overrides */
+[data-theme="light"] body {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Override the dark-mode body !important rule so all unstyled text inherits */
+[data-theme="light"] p,
+[data-theme="light"] span:not([class*="badge"]):not([class*="pill"]):not([class*="chip"]):not([class*="status"]) {
+  color: inherit;
+}
+
+/* font-display (used for big KPI values with inline style color) */
+[data-theme="light"] .font-display {
+  color: #0f172a !important;
+}
+
+/* ─── KPI values inside card-glass / dashboard grids ────────── */
+[data-theme="light"] .card-glass .font-display,
+[data-theme="light"] .card-glass [class*="kpi"] {
+  color: #0f172a !important;
+}
+
+/* Executive KPI cards — value and label */
+[data-theme="light"] .executive-kpi-value {
+  color: #0f172a !important;
+}
+[data-theme="light"] .executive-kpi-label {
+  color: #64748b !important;
+}
+
+/* ─── Recharts — SVG axis text ─────────────────────────────── */
+
+[data-theme="light"] .recharts-cartesian-axis-tick text,
+[data-theme="light"] .recharts-cartesian-axis-tick-value,
+[data-theme="light"] .recharts-text,
+[data-theme="light"] .recharts-text tspan {
+  fill: #475569 !important;
+}
+
+[data-theme="light"] .recharts-cartesian-axis-line,
+[data-theme="light"] .recharts-cartesian-axis-tick-line {
+  stroke: #e2e8f0 !important;
+}
+
+[data-theme="light"] .recharts-cartesian-grid-horizontal line,
+[data-theme="light"] .recharts-cartesian-grid-vertical line,
+[data-theme="light"] .recharts-cartesian-grid line {
+  stroke: #e2e8f0 !important;
+}
+
+/* ─── Recharts — Legend ─────────────────────────────────────── */
+
+[data-theme="light"] .recharts-legend-wrapper,
+[data-theme="light"] .recharts-legend-item-text {
+  color: #475569 !important;
+  fill: #475569 !important;
+}
+
+/* ─── Recharts — Default tooltip ────────────────────────────── */
+
+[data-theme="light"] .recharts-default-tooltip,
+[data-theme="light"] .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+}
+
+[data-theme="light"] .recharts-tooltip-label {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .recharts-tooltip-item,
+[data-theme="light"] .recharts-tooltip-item-value,
+[data-theme="light"] .recharts-tooltip-item-name {
+  color: #475569 !important;
+}
+
+/* Custom tooltip divs rendered inside recharts-tooltip-wrapper */
+[data-theme="light"] .recharts-tooltip-wrapper > div {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Inner p/span inside custom tooltips */
+[data-theme="light"] .recharts-tooltip-wrapper p,
+[data-theme="light"] .recharts-tooltip-wrapper span {
+  color: #475569 !important;
+}
+
+/* ─── Sales / Metrics page — chart container overrides ─────── */
+
+[data-theme="light"] .recharts-area-curve,
+[data-theme="light"] .recharts-area-area {
+  /* keep existing stroke colors — they're deliberate accents */
+}
+
+/* ─── Page shells & backgrounds ────────────────────────────── */
+
+[data-theme="light"] .page-shell,
+[data-theme="light"] .app-shell,
+[data-theme="light"] #root {
+  background: #f1f5f9 !important;
+}
+
+[data-theme="light"] .app-main {
+  background: transparent !important;
+}
+
+/* Remove dark gradient grid lines */
+[data-theme="light"] .app-shell::before {
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px) !important;
+}
+
+/* ─── Form controls — option elements ──────────────────────── */
+
+[data-theme="light"] select option {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* ─── Table wrap ────────────────────────────────────────────── */
+
+[data-theme="light"] .table-wrap {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* ─── Strategy detail — inline-styled sub-elements ─────────── */
+
+[data-theme="light"] .strategy-section-title {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .strategy-detail-meta-label {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .strategy-detail-meta-item strong {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .checklist-task {
+  color: #0f172a !important;
+}
+[data-theme="light"] .checklist-notes {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .campaign-entry,
+[data-theme="light"] .campaign-meta,
+[data-theme="light"] .campaign-notes {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .campaign-entry strong {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .raw-input {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+[data-theme="light"] .strategy-disclosure summary {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .strategy-history-item {
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .strategy-history-date,
+[data-theme="light"] .strategy-history-summary {
+  color: #64748b !important;
+}
+
+/* ─── Alert cards ────────────────────────────────────────────── */
+
+[data-theme="light"] .alert-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .alert-card-section {
+  color: #0f172a !important;
+}
+
+/* ─── Dashboard — period selector inline buttons ─────────────── */
+
+[data-theme="light"] .dashboard-kpi-grid .card-glass {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* ─── Metrics / Sales page — background containers ──────────── */
+
+[data-theme="light"] .metrics-kpi-card,
+[data-theme="light"] .metrics-kpi-card.card-glass {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .metrics-kpi-value {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .metrics-kpi-sub,
+[data-theme="light"] .metrics-kpi-header .number-label {
+  color: #64748b !important;
+}
+
+/* ─── Section heading ────────────────────────────────────────── */
+
+[data-theme="light"] .section-heading h2 {
+  color: #0f172a !important;
+}
+
+/* ─── Client card ────────────────────────────────────────────── */
+
+[data-theme="light"] .client-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .client-card:hover {
+  border-color: rgba(8, 145, 178, 0.3) !important;
+}
+
+/* ─── Dashboard — inline-styled period selector buttons ─────── */
+
+[data-theme="light"] button[style*="hsl(215,15%,55%)"] {
+  color: #64748b !important;
+}
+
+/* ─── Modal form labels inside StrategyFormModal ────────────── */
+
+[data-theme="light"] .form-label,
+[data-theme="light"] label {
+  color: #475569 !important;
+}
+
+/* ─── Sidebar toggle icon and collapsed state ───────────────── */
+
+[data-theme="light"] .sidebar-toggle {
+  color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .sidebar-toggle:hover {
+  background: rgba(8, 145, 178, 0.06) !important;
+  color: #0891b2 !important;
+}
+
+[data-theme="light"] .sidebar-chevron {
+  color: #0891b2 !important;
+}
+
+/* ─── Mobile nav trigger ────────────────────────────────────── */
+
+[data-theme="light"] .mobile-nav-trigger {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* ─── Neon/glow effects — suppress in light mode ────────────── */
+
+[data-theme="light"] .page-bg {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(8, 145, 178, 0.04), transparent 35%),
+    radial-gradient(circle at 90% 20%, rgba(124, 58, 237, 0.03), transparent 30%),
+    linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%) !important;
+}
+
+/* ─── Priority pills ─────────────────────────────────────────── */
+
+[data-theme="light"] .priority-pill {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* ─── Badge variants in light mode ──────────────────────────── */
+
+[data-theme="light"] .badge-success, [data-theme="light"] .status-ok {
+  background: rgba(22, 163, 74, 0.1) !important;
+  color: #15803d !important;
+  border-color: rgba(22, 163, 74, 0.2) !important;
+}
+
+[data-theme="light"] .badge-warning, [data-theme="light"] .status-warning {
+  background: rgba(234, 179, 8, 0.1) !important;
+  color: #a16207 !important;
+  border-color: rgba(234, 179, 8, 0.2) !important;
+}
+
+[data-theme="light"] .badge-danger, [data-theme="light"] .badge-critical,
+[data-theme="light"] .status-error {
+  background: rgba(220, 38, 38, 0.1) !important;
+  color: #dc2626 !important;
+  border-color: rgba(220, 38, 38, 0.2) !important;
+}
+
+/* ─── Sidebar badge (alerts count) ──────────────────────────── */
+
+[data-theme="light"] .sidebar-badge {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+/* ─── Sidebar collapsed text visibility ─────────────────────── */
+
+[data-theme="light"] .sidebar-link-text {
+  color: inherit !important;
+}
+
+/* ─── Dashboard chart container (custom tooltip children) ───── */
+
+[data-theme="light"] .recharts-surface {
+  background: transparent !important;
+}
+
+/* ─── Separator lines ────────────────────────────────────────── */
+
+[data-theme="light"] hr,
+[data-theme="light"] .divider {
+  border-color: #e2e8f0 !important;
+}
+
+/* ─── strategy-detail-budget ─────────────────────────────────── */
+
+[data-theme="light"] .strategy-detail-budget {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .strategy-detail-budget strong {
+  color: #0f172a !important;
+}
+
+/* ─── Page content areas with dark inline backgrounds ────────── */
+
+[data-theme="light"] .page-content {
+  background: transparent !important;
+}
+
+/* ─── skeleton cards ─────────────────────────────────────────── */
+
+[data-theme="light"] .skeleton-card {
+  background: #e2e8f0 !important;
+}
+
+/* ─── Modals — fix all inner text colors ────────────────────── */
+
+[data-theme="light"] .modal-box *:not(button):not(input):not(select):not(textarea):not(a) {
+  color: inherit;
+}
+
+[data-theme="light"] .modal-header-actions .status-select {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* ─── Drive links ────────────────────────────────────────────── */
+
+[data-theme="light"] .drive-link {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0891b2 !important;
+}
+
+[data-theme="light"] .drive-link:hover {
+  background: rgba(8, 145, 178, 0.06) !important;
+}
+
+/* ─── Seg grid (strategy segmentation) ──────────────────────── */
+
+[data-theme="light"] .seg-item {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .seg-label {
+  color: #0891b2 !important;
+}
+
+[data-theme="light"] .seg-item span:last-child {
+  color: #475569 !important;
+}
+
+/* ─── Dashboard sales bar chart ─────────────────────────────── */
+
+[data-theme="light"] .recharts-bar-rectangle path {
+  /* bar fill colors are inline-styled — keep as-is */
+}
+
+/* ─── Disable backdrop-filter glassmorphism in light mode ────── */
+
+[data-theme="light"] .card-glass,
+[data-theme="light"] .card,
+[data-theme="light"] .executive-kpi-card {
+  backdrop-filter: none !important;
 }

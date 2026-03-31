@@ -65,7 +65,7 @@ export function Sidebar() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window === 'undefined') return 'dark';
     try {
-      return (window.localStorage.getItem('ui:theme') as 'dark' | 'light') ?? 'dark';
+      return (window.localStorage.getItem('theme') as 'dark' | 'light') ?? 'dark';
     } catch {
       return 'dark';
     }
@@ -131,8 +131,7 @@ export function Sidebar() {
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
-    document.documentElement.classList.toggle('light', theme === 'light');
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.setAttribute('data-theme', theme);
     return undefined;
   }, [theme]);
 
@@ -141,7 +140,7 @@ export function Sidebar() {
       const next = current === 'dark' ? 'light' : 'dark';
       if (typeof window !== 'undefined') {
         try {
-          window.localStorage.setItem('ui:theme', next);
+          window.localStorage.setItem('theme', next);
         } catch {
           // ignore
         }
