@@ -18,7 +18,6 @@ import {
   DollarSign,
   MessageCircle,
   ShoppingCart,
-  TrendingDown,
   TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -264,7 +263,6 @@ export function DashboardPage() {
   const kpiMessages = selectedKpis?.messages ?? 0;
   const kpiReach = selectedKpis?.reach ?? 0;
   const kpiImpressions = selectedKpis?.impressions ?? 0;
-  const kpiCpm = selectedKpis?.cpm ?? 0;
   const kpiFrequency = selectedKpis?.frequency ?? 0;
 
   const kpiSalesTotal = useMemo(
@@ -474,11 +472,6 @@ export function DashboardPage() {
       Icon: BarChart3,
     },
     {
-      label: 'CPM',
-      value: kpiCpm > 0 ? formatCop(kpiCpm) : '—',
-      Icon: TrendingDown,
-    },
-    {
       label: 'Frecuencia',
       value: kpiFrequency > 0 ? kpiFrequency.toFixed(2) : '—',
       Icon: ShoppingCart,
@@ -590,7 +583,7 @@ export function DashboardPage() {
           <motion.div
             key={kpi.label}
             className="card-glass"
-            style={{ padding: '20px', borderRadius: '4px' }}
+            style={{ padding: '20px 24px', minHeight: 130 }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05, duration: 0.4, ease: 'easeOut' } as Transition}
@@ -609,7 +602,7 @@ export function DashboardPage() {
             <div
               className="font-display"
               style={{
-                fontSize: '1.75rem',
+                fontSize: '2rem',
                 fontWeight: 700,
                 color: 'hsl(0,0%,98%)',
                 letterSpacing: '-0.03em',
