@@ -61,22 +61,25 @@ function AppContent() {
     }
   }, [initialized, session, profile]);
 
-  if (authEnabled && !initialized) {
-    return (
-      <div className="auth-shell">
-        <div className="page-bg" />
-        <div className="auth-card card section-block">
-          <BrandSignature
-            subtitle="Validando acceso y contexto operativo..."
-            className="auth-brand-signature"
-          />
+  // Portal routes are fully public — skip the auth gate entirely
+  if (!isPortalRoute) {
+    if (authEnabled && !initialized) {
+      return (
+        <div className="auth-shell">
+          <div className="page-bg" />
+          <div className="auth-card card section-block">
+            <BrandSignature
+              subtitle="Validando acceso y contexto operativo..."
+              className="auth-brand-signature"
+            />
+          </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (authEnabled && !session) {
-    return <LoginPage />;
+    if (authEnabled && !session) {
+      return <LoginPage />;
+    }
   }
 
   const appRoutes = (
@@ -85,7 +88,7 @@ function AppContent() {
       <Route path="/mi-espacio" element={<ClientWorkspaceEntry />} />
       <Route path="/clients" element={<RequireInternal><ClientsPage /></RequireInternal>} />
       <Route path="/clients/:id" element={<RequireClientAccess><ClientDetailPage /></RequireClientAccess>} />
-      <Route path="/portal/:id" element={<RequireClientAccess><ClientDetailPage /></RequireClientAccess>} />
+      <Route path="/portal/:id" element={<ClientDetailPage />} />
       <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
       <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />
       <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
