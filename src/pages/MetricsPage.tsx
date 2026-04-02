@@ -27,11 +27,9 @@ import {
 import type { ClientMonthlyOperatingKpi } from '../lib/supabase';
 import { formatCop, formatNumber, formatRoas, sumOperatingKpis } from '../lib/utils';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
-import { CHART, CHART_PALETTE, TOOLTIP_STYLE } from '../lib/chartColors';
+import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
-
-const CHART_COLORS = CHART_PALETTE;
 
 function shortMonthLabel(monthKey: string): string {
   const [year, month] = monthKey.split('-');
