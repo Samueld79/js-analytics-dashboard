@@ -31,6 +31,7 @@ import {
 } from '../services/adCampaignMetrics';
 import { formatCop, formatNumber } from '../lib/utils';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
+import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
 
 const FADE = { duration: 0.3, ease: 'easeOut' } as Transition;
 
@@ -38,13 +39,13 @@ const FADE = { duration: 0.3, ease: 'easeOut' } as Transition;
 type ObjectiveInfo = { label: string; color: string };
 function objectiveInfo(label: string | null | undefined): ObjectiveInfo {
   switch (label) {
-    case 'Reconocimiento': return { label, color: 'hsl(40,90%,55%)' };
-    case 'Interacción':    return { label, color: 'hsl(280,80%,60%)' };
-    case 'Tráfico':        return { label, color: 'hsl(180,100%,50%)' };
-    case 'Ventas':         return { label, color: 'hsl(140,60%,50%)' };
-    case 'Presentación':   return { label, color: 'hsl(200,80%,55%)' };
-    case 'Evaluación':     return { label, color: 'hsl(20,90%,55%)' };
-    default:               return { label: label || 'Otro', color: 'hsl(220,15%,45%)' };
+    case 'Reconocimiento': return { label, color: CHART.amber };
+    case 'Interacción':    return { label, color: CHART.violet };
+    case 'Tráfico':        return { label, color: CHART.cyan };
+    case 'Ventas':         return { label, color: CHART.green };
+    case 'Presentación':   return { label, color: '#38bdf8' };
+    case 'Evaluación':     return { label, color: CHART.orange };
+    default:               return { label: label || 'Otro', color: 'rgba(255,255,255,0.3)' };
   }
 }
 
@@ -330,55 +331,57 @@ export function ClientDetailPage() {
               <AreaChart data={areaChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="cdpGradSpend" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(180,100%,50%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(180,100%,50%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART.cyan} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART.cyan} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="cdpGradMsgs" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(280,80%,60%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(280,80%,60%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART.violet} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART.violet} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
                 <XAxis
                   dataKey="month"
-                  tick={{ fill: '#888', fontSize: 11 }}
+                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: 'JetBrains Mono' }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(v: unknown) => getMonthLabel(String(v)).slice(0, 3)}
                 />
                 <YAxis
                   yAxisId="spend"
-                  tick={{ fill: '#888', fontSize: 11 }}
+                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: 'JetBrains Mono' }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
                 />
-                <YAxis yAxisId="msgs" orientation="right" tick={{ fill: '#888', fontSize: 11 }} />
+                <YAxis yAxisId="msgs" orientation="right" tick={{ fill: CHART.axis, fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
                 <Tooltip
                   labelFormatter={(label: unknown) => getMonthLabel(String(label))}
                   formatter={(value: unknown, name: unknown) => [
                     name === 'Inversión' ? formatCop(Number(value)) : formatNumber(Number(value)),
                     String(name),
                   ]}
-                  contentStyle={{
-                    background: 'hsl(220,20%,8%)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 8,
-                  }}
+                  contentStyle={TOOLTIP_STYLE}
                 />
                 <Area
                   yAxisId="spend"
                   type="monotone"
                   dataKey="Inversión"
-                  stroke="hsl(180,100%,50%)"
+                  stroke={CHART.cyan}
                   fill="url(#cdpGradSpend)"
                   strokeWidth={2}
                   dot={false}
+                  activeDot={{ r: 4, fill: CHART.cyan, strokeWidth: 0 }}
                 />
                 <Area
                   yAxisId="msgs"
                   type="monotone"
                   dataKey="Mensajes"
-                  stroke="hsl(280,80%,60%)"
+                  stroke={CHART.violet}
                   fill="url(#cdpGradMsgs)"
                   strokeWidth={2}
                   dot={false}
+                  activeDot={{ r: 4, fill: CHART.violet, strokeWidth: 0 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -418,11 +421,7 @@ export function ClientDetailPage() {
                   </Pie>
                   <Tooltip
                     formatter={(value: unknown) => formatCop(Number(value))}
-                    contentStyle={{
-                      background: 'hsl(220,20%,8%)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 8,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -581,23 +580,29 @@ export function ClientDetailPage() {
           </div>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={yearBarData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
               <XAxis
                 dataKey="month"
-                tick={{ fill: '#888', fontSize: 11 }}
+                tick={{ fill: CHART.axis, fontSize: 11, fontFamily: 'JetBrains Mono' }}
+                axisLine={false}
+                tickLine={false}
                 tickFormatter={(v: unknown) => getMonthLabel(String(v)).slice(0, 3)}
               />
               <YAxis
                 yAxisId="left"
-                tick={{ fill: 'hsl(180,100%,55%)', fontSize: 10 }}
+                tick={{ fill: CHART.cyan, fontSize: 10, fontFamily: 'JetBrains Mono' }}
                 tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`}
+                axisLine={false}
+                tickLine={false}
                 width={44}
               />
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fill: 'hsl(280,80%,65%)', fontSize: 10 }}
+                tick={{ fill: CHART.green, fontSize: 10, fontFamily: 'JetBrains Mono' }}
                 tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`}
+                axisLine={false}
+                tickLine={false}
                 width={44}
               />
               <Tooltip
@@ -606,30 +611,26 @@ export function ClientDetailPage() {
                   formatCop(Number(value)),
                   String(name),
                 ]}
-                contentStyle={{
-                  background: 'hsl(220,20%,8%)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8,
-                }}
+                contentStyle={TOOLTIP_STYLE}
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'JetBrains Mono', color: CHART.axis }} />
               <Line
                 yAxisId="left"
                 type="monotone"
                 dataKey="Inversión"
-                stroke="hsl(180,100%,50%)"
+                stroke={CHART.cyan}
                 strokeWidth={2}
-                dot={{ fill: 'hsl(180,100%,50%)', r: 3, strokeWidth: 0 }}
-                activeDot={{ r: 5 }}
+                dot={{ fill: CHART.cyan, r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: CHART.cyan }}
               />
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="Ventas"
-                stroke="hsl(280,80%,60%)"
+                stroke={CHART.green}
                 strokeWidth={2}
-                dot={{ fill: 'hsl(280,80%,60%)', r: 3, strokeWidth: 0 }}
-                activeDot={{ r: 5 }}
+                dot={{ fill: CHART.green, r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: CHART.green }}
               />
             </LineChart>
           </ResponsiveContainer>

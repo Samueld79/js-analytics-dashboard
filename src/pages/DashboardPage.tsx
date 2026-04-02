@@ -1,13 +1,15 @@
 import {
+  AreaChart,
+  Area,
   BarChart,
   Bar,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
 import { motion, type Transition } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -89,11 +91,8 @@ function CustomTooltip({
   return (
     <div
       style={{
-        background: 'hsl(220,18%,9%)',
-        border: '1px solid hsl(0 0% 100% / 0.1)',
-        borderRadius: '4px',
+        ...TOOLTIP_STYLE,
         padding: '10px 14px',
-        fontFamily: 'JetBrains Mono',
       }}
     >
       <p
@@ -583,7 +582,7 @@ export function DashboardPage() {
           <motion.div
             key={kpi.label}
             className="card-glass"
-            style={{ padding: '20px 24px', minHeight: 130 }}
+            style={{ padding: '14px 18px', minHeight: 100 }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05, duration: 0.4, ease: 'easeOut' } as Transition}
@@ -602,7 +601,7 @@ export function DashboardPage() {
             <div
               className="font-display"
               style={{
-                fontSize: '2rem',
+                fontSize: '1.5rem',
                 fontWeight: 700,
                 color: 'hsl(0,0%,98%)',
                 letterSpacing: '-0.03em',
@@ -669,48 +668,42 @@ export function DashboardPage() {
             </div>
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <div style={{ width: '9px', height: '9px', borderRadius: '2px', background: 'hsl(180,100%,50%)' }} />
+                <div style={{ width: '9px', height: '9px', borderRadius: '2px', background: CHART.cyan }} />
                 <span className="number-label">Inversión</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <div style={{ width: '9px', height: '9px', borderRadius: '2px', background: 'hsl(280,80%,60%)' }} />
+                <div style={{ width: '9px', height: '9px', borderRadius: '2px', background: CHART.violet }} />
                 <span className="number-label">Mensajes</span>
               </div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={monthlyChartData} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 100% / 0.05)" vertical={false} />
+              <defs>
+                <linearGradient id="dashSpendGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={CHART.cyan} stopOpacity={0.9} />
+                  <stop offset="100%" stopColor={CHART.cyan} stopOpacity={0.3} />
+                </linearGradient>
+                <linearGradient id="dashMsgsGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={CHART.violet} stopOpacity={0.9} />
+                  <stop offset="100%" stopColor={CHART.violet} stopOpacity={0.3} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="spend" name="Inversión" radius={[2, 2, 0, 0]}>
-                {monthlyChartData.map((entry, idx) => (
-                  <Cell
-                    key={idx}
-                    fill="hsl(180,100%,50%)"
-                    fillOpacity={entry.isSelected || activePeriod === 'all' ? 1 : 0.35}
-                  />
-                ))}
-              </Bar>
-              <Bar dataKey="messages" name="Mensajes" radius={[2, 2, 0, 0]}>
-                {monthlyChartData.map((entry, idx) => (
-                  <Cell
-                    key={idx}
-                    fill="hsl(280,80%,60%)"
-                    fillOpacity={entry.isSelected || activePeriod === 'all' ? 1 : 0.35}
-                  />
-                ))}
-              </Bar>
+              <Bar dataKey="spend" name="Inversión" fill="url(#dashSpendGrad)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="messages" name="Mensajes" fill="url(#dashMsgsGrad)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
@@ -740,10 +733,16 @@ export function DashboardPage() {
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={clientSpendData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 100% / 0.05)" />
+              <defs>
+                <linearGradient id="dashClientGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={CHART.cyan} stopOpacity={0.4} />
+                  <stop offset="100%" stopColor={CHART.cyan} stopOpacity={0.9} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} horizontal={false} />
               <XAxis
                 type="number"
-                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -751,7 +750,7 @@ export function DashboardPage() {
                 type="category"
                 dataKey="name"
                 width={100}
-                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -759,9 +758,8 @@ export function DashboardPage() {
               <Bar
                 dataKey="spend"
                 name="Inversión"
-                fill="hsl(180,100%,50%)"
-                radius={[0, 2, 2, 0]}
-                fillOpacity={0.85}
+                fill="url(#dashClientGrad)"
+                radius={[0, 4, 4, 0]}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -810,7 +808,7 @@ export function DashboardPage() {
               style={{
                 fontSize: '1.75rem',
                 fontWeight: 700,
-                color: 'hsl(180,100%,50%)',
+                color: CHART.green,
                 letterSpacing: '-0.03em',
                 lineHeight: 1,
               }}
@@ -831,34 +829,37 @@ export function DashboardPage() {
         >
           {/* Left: monthly bar chart */}
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={yearSalesData} barSize={20}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="hsl(0 0% 100% / 0.05)"
-                vertical={false}
-              />
+            <AreaChart data={yearSalesData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="ventasGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={CHART.green} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={CHART.green} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono' }}
+                tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="sales" name="Ventas" radius={[2, 2, 0, 0]}>
-                {yearSalesData.map((entry, idx) => (
-                  <Cell
-                    key={idx}
-                    fill="hsl(180,100%,50%)"
-                    fillOpacity={entry.isCurrent ? 1 : entry.isFuture ? 0.12 : 0.45}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
+              <Area
+                type="monotone"
+                dataKey="sales"
+                name="Ventas"
+                stroke={CHART.green}
+                strokeWidth={2}
+                fill="url(#ventasGradient)"
+                dot={false}
+                activeDot={{ r: 4, fill: CHART.green, strokeWidth: 0 }}
+              />
+            </AreaChart>
           </ResponsiveContainer>
 
           {/* Right: stats + top clients */}
@@ -949,7 +950,7 @@ export function DashboardPage() {
                         style={{
                           height: '100%',
                           width: `${yearClientSales[0].total > 0 ? (entry.total / yearClientSales[0].total) * 100 : 0}%`,
-                          background: 'hsl(180,100%,50%)',
+                          background: CHART.green,
                           opacity: i === 0 ? 1 : i === 1 ? 0.6 : 0.35,
                           borderRadius: '2px',
                         }}

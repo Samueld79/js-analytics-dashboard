@@ -6,7 +6,6 @@ import {
   BarChart,
   Bar,
   ComposedChart,
-  Cell,
   LabelList,
   XAxis,
   YAxis,
@@ -28,16 +27,11 @@ import {
 import type { ClientMonthlyOperatingKpi } from '../lib/supabase';
 import { formatCop, formatNumber, formatRoas, sumOperatingKpis } from '../lib/utils';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
+import { CHART, CHART_PALETTE, TOOLTIP_STYLE } from '../lib/chartColors';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
-const CHART_COLORS = [
-  'hsl(180,100%,50%)',
-  'hsl(280,80%,60%)',
-  'hsl(40,90%,55%)',
-  'hsl(140,60%,50%)',
-  'hsl(200,80%,55%)',
-];
+const CHART_COLORS = CHART_PALETTE;
 
 function shortMonthLabel(monthKey: string): string {
   const [year, month] = monthKey.split('-');
@@ -102,29 +96,29 @@ const SpendBarChart = memo(function SpendBarChart({
   data: Array<{ month: string; spend: number }>;
 }) {
   return (
-    <div style={{ background: 'rgba(6,10,18,0.8)', border: '1px solid hsl(180 100% 50% / 0.1)', borderRadius: 8, padding: '18px 16px 10px' }}>
-      <span className="number-label" style={{ fontSize: '0.58rem', color: 'hsl(215,15%,42%)', marginBottom: 14, display: 'block' }}>
+    <div className="card-glass" style={{ padding: '18px 16px 10px' }}>
+      <span className="number-label" style={{ marginBottom: 14, display: 'block' }}>
         INVERSIÓN POR MES
       </span>
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={data} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="barSpendGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="hsl(180,100%,50%)" stopOpacity={0.9} />
-              <stop offset="100%" stopColor="hsl(280,80%,60%)" stopOpacity={0.75} />
+              <stop offset="0%" stopColor={CHART.cyan} stopOpacity={0.9} />
+              <stop offset="100%" stopColor={CHART.cyan} stopOpacity={0.3} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.05)" vertical={false} />
+          <CartesianGrid strokeDasharray="2 6" stroke={CHART.grid} vertical={false} />
           <XAxis
             dataKey="month"
             tickFormatter={shortMonthLabel}
-            tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+            tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             tickFormatter={formatCopCompact}
-            tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+            tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
             axisLine={false}
             tickLine={false}
             width={56}
@@ -132,15 +126,15 @@ const SpendBarChart = memo(function SpendBarChart({
           <Tooltip
             formatter={(v: unknown) => [formatCop(v as number), 'Inversión']}
             labelFormatter={(l: unknown) => shortMonthLabel(String(l))}
-            contentStyle={{ background: 'rgba(0,0,0,0.88)', border: '1px solid hsl(180 100% 50% / 0.2)', borderRadius: 6, fontFamily: 'JetBrains Mono', fontSize: 11 }}
+            contentStyle={TOOLTIP_STYLE}
             cursor={{ fill: 'rgba(255,255,255,0.04)' }}
           />
-          <Bar dataKey="spend" fill="url(#barSpendGrad)" radius={[8, 8, 0, 0]} animationDuration={700} animationEasing="ease-out">
+          <Bar dataKey="spend" fill="url(#barSpendGrad)" radius={[4, 4, 0, 0]} animationDuration={700} animationEasing="ease-out">
             <LabelList
               dataKey="spend"
               position="top"
               formatter={(v: unknown) => formatCopCompact(v as number)}
-              style={{ fontSize: 9, fontFamily: 'JetBrains Mono', fill: 'hsl(215,15%,52%)' }}
+              style={{ fontSize: 9, fontFamily: 'JetBrains Mono', fill: CHART.axis }}
             />
           </Bar>
         </BarChart>
@@ -155,29 +149,29 @@ const ConvCpmChart = memo(function ConvCpmChart({
   data: Array<{ month: string; messages: number; cpm: number }>;
 }) {
   return (
-    <div style={{ background: 'rgba(6,10,18,0.8)', border: '1px solid hsl(180 100% 50% / 0.1)', borderRadius: 8, padding: '18px 16px 10px' }}>
-      <span className="number-label" style={{ fontSize: '0.58rem', color: 'hsl(215,15%,42%)', marginBottom: 14, display: 'block' }}>
-        CONVERSACIONES <span style={{ color: 'hsl(280,60%,55%)' }}>▌</span> vs CPM <span style={{ color: 'hsl(180,100%,50%)' }}>━</span>
+    <div className="card-glass" style={{ padding: '18px 16px 10px' }}>
+      <span className="number-label" style={{ marginBottom: 14, display: 'block' }}>
+        CONVERSACIONES <span style={{ color: CHART.violet }}>▌</span> vs CPM <span style={{ color: CHART.cyan }}>━</span>
       </span>
       <ResponsiveContainer width="100%" height={200}>
         <ComposedChart data={data} margin={{ top: 6, right: 52, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="cpmAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(180,100%,50%)" stopOpacity={0.18} />
-              <stop offset="95%" stopColor="hsl(180,100%,50%)" stopOpacity={0} />
+              <stop offset="5%" stopColor={CHART.cyan} stopOpacity={0.18} />
+              <stop offset="95%" stopColor={CHART.cyan} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.05)" vertical={false} />
+          <CartesianGrid strokeDasharray="2 6" stroke={CHART.grid} vertical={false} />
           <XAxis
             dataKey="month"
             tickFormatter={shortMonthLabel}
-            tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+            tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             yAxisId="msgs"
-            tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+            tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
             axisLine={false}
             tickLine={false}
             width={36}
@@ -186,13 +180,13 @@ const ConvCpmChart = memo(function ConvCpmChart({
             yAxisId="cpm"
             orientation="right"
             tickFormatter={formatCopCompact}
-            tick={{ fontSize: 10, fill: 'hsl(180,80%,50%)', fontFamily: 'JetBrains Mono', opacity: 0.65 }}
+            tick={{ fontSize: 10, fill: CHART.cyan, fontFamily: 'JetBrains Mono', opacity: 0.65 }}
             axisLine={false}
             tickLine={false}
             width={50}
           />
           <Tooltip
-            contentStyle={{ background: 'rgba(0,0,0,0.88)', border: '1px solid hsl(180 100% 50% / 0.2)', borderRadius: 6, fontFamily: 'JetBrains Mono', fontSize: 11 }}
+            contentStyle={TOOLTIP_STYLE}
             formatter={(v: unknown, name: unknown) => [
               name === 'CPM' ? formatCop(v as number) : formatNumber(v as number),
               String(name),
@@ -200,17 +194,17 @@ const ConvCpmChart = memo(function ConvCpmChart({
             labelFormatter={(l: unknown) => shortMonthLabel(String(l))}
             cursor={{ fill: 'rgba(255,255,255,0.04)' }}
           />
-          <Bar yAxisId="msgs" dataKey="messages" name="Mensajes" fill="hsl(280,80%,60%)" fillOpacity={0.5} radius={[4, 4, 0, 0]} animationDuration={700} />
+          <Bar yAxisId="msgs" dataKey="messages" name="Mensajes" fill={CHART.violet} fillOpacity={0.6} radius={[4, 4, 0, 0]} animationDuration={700} />
           <Area
             yAxisId="cpm"
             type="monotone"
             dataKey="cpm"
             name="CPM"
-            stroke="hsl(180,100%,50%)"
+            stroke={CHART.cyan}
             strokeWidth={2.5}
             fill="url(#cpmAreaGrad)"
-            dot={{ r: 5, fill: 'hsl(180,100%,50%)', strokeWidth: 0 }}
-            activeDot={{ r: 7, fill: 'hsl(180,100%,50%)', stroke: 'hsl(180,100%,80%)', strokeWidth: 2 }}
+            dot={{ r: 4, fill: CHART.cyan, strokeWidth: 0 }}
+            activeDot={{ r: 6, fill: CHART.cyan, stroke: 'rgba(0,229,255,0.4)', strokeWidth: 2 }}
             animationDuration={800}
           />
         </ComposedChart>
@@ -227,12 +221,12 @@ const Top5ClientChart = memo(function Top5ClientChart({
   activePeriod: string;
 }) {
   return (
-    <div style={{ background: 'rgba(6,10,18,0.8)', border: '1px solid hsl(180 100% 50% / 0.1)', borderRadius: 8, padding: '18px 20px 12px' }}>
+    <div className="card-glass" style={{ padding: '18px 20px 12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <span className="number-label" style={{ fontSize: '0.58rem', color: 'hsl(215,15%,42%)' }}>
+        <span className="number-label">
           INVERSIÓN POR CLIENTE — TOP {data.length}
         </span>
-        <span className="number-label" style={{ fontSize: '0.55rem', color: 'hsl(215,15%,32%)' }}>
+        <span className="number-label" style={{ opacity: 0.6 }}>
           {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
         </span>
       </div>
@@ -242,11 +236,17 @@ const Top5ClientChart = memo(function Top5ClientChart({
           data={data}
           margin={{ top: 4, right: 88, left: 4, bottom: 4 }}
         >
-          <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.05)" horizontal={false} />
+          <defs>
+            <linearGradient id="top5ClientGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={CHART.cyan} stopOpacity={0.4} />
+              <stop offset="100%" stopColor={CHART.cyan} stopOpacity={0.85} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="2 6" stroke={CHART.grid} horizontal={false} />
           <XAxis
             type="number"
             tickFormatter={formatCopCompact}
-            tick={{ fontSize: 10, fill: 'hsl(215,15%,42%)', fontFamily: 'JetBrains Mono' }}
+            tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
             axisLine={false}
             tickLine={false}
           />
@@ -254,24 +254,21 @@ const Top5ClientChart = memo(function Top5ClientChart({
             type="category"
             dataKey="name"
             width={110}
-            tick={{ fontSize: 11, fill: 'hsl(215,15%,65%)', fontFamily: 'Outfit, sans-serif' }}
+            tick={{ fontSize: 11, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
             axisLine={false}
             tickLine={false}
           />
           <Tooltip
-            contentStyle={{ background: 'rgba(0,0,0,0.88)', border: '1px solid hsl(180 100% 50% / 0.2)', borderRadius: 6, fontFamily: 'JetBrains Mono', fontSize: 11 }}
+            contentStyle={TOOLTIP_STYLE}
             formatter={(v: unknown) => [formatCop(v as number), 'Inversión']}
             cursor={{ fill: 'rgba(255,255,255,0.04)' }}
           />
-          <Bar dataKey="spend" radius={[0, 6, 6, 0]} animationDuration={900} animationBegin={100} animationEasing="ease-out">
-            {data.map((_, index) => (
-              <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.82} />
-            ))}
+          <Bar dataKey="spend" fill="url(#top5ClientGrad)" radius={[0, 4, 4, 0]} animationDuration={900} animationBegin={100} animationEasing="ease-out">
             <LabelList
               dataKey="spend"
               position="right"
               formatter={(v: unknown) => formatCopCompact(v as number)}
-              style={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: 'hsl(215,15%,58%)' }}
+              style={{ fontSize: 10, fontFamily: 'JetBrains Mono', fill: CHART.axis }}
             />
           </Bar>
         </BarChart>
@@ -551,25 +548,25 @@ export function MetricsPage() {
               <AreaChart data={chartData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(180,100%,50%)" stopOpacity={0.28} />
-                    <stop offset="95%" stopColor="hsl(180,100%,50%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART.cyan} stopOpacity={0.28} />
+                    <stop offset="95%" stopColor={CHART.cyan} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="hsl(220,15%,11%)"
+                  stroke={CHART.grid}
                   vertical={false}
                 />
                 <XAxis
                   dataKey="month"
                   tickFormatter={shortMonthLabel}
-                  tick={{ fontSize: 11, fill: 'hsl(215,15%,48%)' }}
+                  tick={{ fontSize: 11, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   tickFormatter={formatCopCompact}
-                  tick={{ fontSize: 11, fill: 'hsl(215,15%,48%)' }}
+                  tick={{ fontSize: 11, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
                   axisLine={false}
                   tickLine={false}
                   width={68}
@@ -577,21 +574,17 @@ export function MetricsPage() {
                 <Tooltip
                   formatter={(v) => [formatCop(v as number), 'Inversión']}
                   labelFormatter={(label: unknown) => shortMonthLabel(String(label))}
-                  contentStyle={{
-                    background: 'hsl(220,20%,8%)',
-                    border: '1px solid hsl(220,15%,15%)',
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
+                  contentStyle={TOOLTIP_STYLE}
+                  cursor={{ stroke: CHART.axis, strokeWidth: 1 }}
                 />
                 <Area
                   type="monotone"
                   dataKey="spend"
-                  stroke="hsl(180,100%,50%)"
+                  stroke={CHART.cyan}
                   strokeWidth={2}
                   fill="url(#spendGrad)"
                   dot={false}
-                  activeDot={{ r: 4, fill: 'hsl(180,100%,50%)' }}
+                  activeDot={{ r: 4, fill: CHART.cyan, strokeWidth: 0 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
