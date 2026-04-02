@@ -542,7 +542,7 @@ export function MetricsPage() {
               Sin histórico disponible para este cliente.
             </p>
           ) : (
-            <ResponsiveContainer width="100%" height={210}>
+            <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={chartData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">

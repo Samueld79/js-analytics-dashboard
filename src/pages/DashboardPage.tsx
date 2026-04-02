@@ -638,7 +638,7 @@ export function DashboardPage() {
         {/* Bar Chart — Inversión & Mensajes por mes (fuente: ad_campaign_metrics) */}
         <motion.div
           className="card-glass"
-          style={{ padding: '24px' }}
+          style={{ padding: '16px 20px' }}
           {...fadeUp(0.25)}
         >
           <div
@@ -646,7 +646,7 @@ export function DashboardPage() {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'flex-start',
-              marginBottom: '24px',
+              marginBottom: '12px',
             }}
           >
             <div>
@@ -677,7 +677,7 @@ export function DashboardPage() {
               </div>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={monthlyChartData} barGap={4}>
               <defs>
                 <linearGradient id="dashSpendGrad" x1="0" y1="0" x2="0" y2="1">
@@ -711,10 +711,10 @@ export function DashboardPage() {
         {/* Bar Chart — Inversión por cliente */}
         <motion.div
           className="card-glass"
-          style={{ padding: '24px' }}
+          style={{ padding: '16px 20px' }}
           {...fadeUp(0.3)}
         >
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
               Top clientes
             </span>
@@ -731,7 +731,7 @@ export function DashboardPage() {
               Inversión por cliente
             </h3>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart data={clientSpendData} layout="vertical">
               <defs>
                 <linearGradient id="dashClientGrad" x1="0" y1="0" x2="1" y2="0">
@@ -775,7 +775,7 @@ export function DashboardPage() {
         {/* Card header */}
         <div
           style={{
-            padding: '24px',
+            padding: '16px 20px',
             borderBottom: '1px solid hsl(0 0% 100% / 0.08)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -823,12 +823,12 @@ export function DashboardPage() {
           style={{
             display: 'grid',
             gridTemplateColumns: '60% 40%',
-            gap: '24px',
-            padding: '24px',
+            gap: '16px',
+            padding: '16px 20px',
           }}
         >
           {/* Left: monthly bar chart */}
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={yearSalesData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="ventasGradient" x1="0" y1="0" x2="0" y2="1">
@@ -972,7 +972,7 @@ export function DashboardPage() {
       >
         <div
           style={{
-            padding: '24px',
+            padding: '16px 20px',
             borderBottom: '1px solid hsl(0 0% 100% / 0.08)',
           }}
         >

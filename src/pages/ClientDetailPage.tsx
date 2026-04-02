@@ -322,12 +322,12 @@ export function ClientDetailPage() {
       {/* ── Charts Row ── */}
       <div className="portal-charts-grid">
         {/* Area chart: spend + messages over all historical months */}
-        <div className="card-glass" style={{ padding: '20px 24px' }}>
+        <div className="card-glass" style={{ padding: '16px 20px' }}>
           <div className="number-label" style={{ marginBottom: 16 }}>
             Inversión mensual {new Date().getFullYear()}
           </div>
           {areaChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={areaChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="cdpGradSpend" x1="0" y1="0" x2="0" y2="1">
@@ -391,7 +391,7 @@ export function ClientDetailPage() {
         </div>
 
         {/* BUG 3 FIX: Pie chart uses objectiveInfo for labels + colors */}
-        <div className="card-glass" style={{ padding: '20px 24px' }}>
+        <div className="card-glass" style={{ padding: '16px 20px' }}>
           <div className="number-label" style={{ marginBottom: 16 }}>
             Mix de campañas — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
           </div>
@@ -463,7 +463,7 @@ export function ClientDetailPage() {
 
       {/* ── Campaign Table (collapsible) ── */}
       {campaignsByCampaign.length > 0 && (
-        <div className="card-glass" style={{ padding: '20px 24px' }}>
+        <div className="card-glass" style={{ padding: '16px 20px' }}>
           <div
             className="number-label"
             onClick={() => setTableOpen((o) => !o)}
@@ -574,11 +574,11 @@ export function ClientDetailPage() {
 
       {/* ── Year Line Chart: Inversión vs Ventas ── */}
       {yearBarData.length > 0 && (
-        <div className="card-glass" style={{ padding: '20px 24px' }}>
+        <div className="card-glass" style={{ padding: '16px 20px' }}>
           <div className="number-label" style={{ marginBottom: 16 }}>
             Inversión vs Ventas — {new Date().getFullYear()}
           </div>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={200}>
             <LineChart data={yearBarData} margin={{ top: 8, right: 48, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
               <XAxis
