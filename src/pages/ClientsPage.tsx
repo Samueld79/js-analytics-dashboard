@@ -259,7 +259,7 @@ export function ClientsPage() {
       {/* ── Table ── */}
       <div
         className="card-glass"
-        style={{ margin: '16px 24px 24px', borderRadius: '4px', overflow: 'hidden' }}
+        style={{ margin: '16px 24px 24px', overflow: 'hidden' }}
       >
         {loading ? (
           <div

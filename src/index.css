@@ -5678,7 +5678,11 @@ body {
 }
 
 .page-bg {
-  background: hsl(220, 20%, 3%) !important;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(0, 229, 255, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 10%, rgba(168, 85, 247, 0.07) 0%, transparent 35%),
+    radial-gradient(circle at 50% 85%, rgba(0, 230, 118, 0.05) 0%, transparent 40%),
+    linear-gradient(145deg, hsl(222, 25%, 5%) 0%, hsl(220, 20%, 3%) 50%, hsl(218, 22%, 4%) 100%) !important;
   min-height: 100vh;
 }
 
@@ -6196,16 +6200,17 @@ table tbody td {
 }
 
 .card-glass {
-  background: rgba(255,255,255,0.04) !important;
+  background: rgba(255,255,255,0.05) !important;
   border: 1px solid rgba(255,255,255,0.08) !important;
   border-radius: 16px !important;
   backdrop-filter: blur(12px) !important;
-  box-shadow: 0 2px 20px rgba(0,0,0,0.2) !important;
-  transition: all 300ms ease !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.25) !important;
+  transition: border-color 200ms ease !important;
 }
 
 .card-glass:hover {
-  border-color: rgba(0,229,255,0.25) !important;
+  border-color: rgba(0,229,255,0.3) !important;
 }
 
 /* Dashboard v3 layout grids */
@@ -6228,24 +6233,18 @@ table tbody td {
 
 .dashboard-kpi-grid {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+  grid-template-columns: repeat(3, 1fr) !important;
   gap: 16px !important;
   padding: 24px 24px 0 !important;
 }
 
 @media (max-width: 900px) {
   .dashboard-kpi-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-}
-
-@media (max-width: 600px) {
-  .dashboard-kpi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 500px) {
   .dashboard-kpi-grid {
     grid-template-columns: 1fr !important;
   }
@@ -6420,12 +6419,12 @@ table tbody td {
 
 .metrics-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 16px;
 }
-@media (max-width: 700px) { .metrics-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 400px) { .metrics-kpi-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .metrics-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .metrics-kpi-grid { grid-template-columns: 1fr; } }
 
 .metrics-kpi-card {
   padding: 20px 24px 16px;
@@ -6568,7 +6567,7 @@ table tbody td {
 
 .portal-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 28px;
 }
@@ -6599,6 +6598,10 @@ table tbody td {
   .portal-kpi-grid    { grid-template-columns: repeat(2, 1fr); }
   .portal-charts-grid { grid-template-columns: 1fr; }
   .portal-header-actions { margin-left: 0; }
+}
+
+@media (max-width: 500px) {
+  .portal-kpi-grid { grid-template-columns: 1fr; }
 }
 
 /* ══════════════════════════════════════════════════════

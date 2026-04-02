@@ -639,7 +639,7 @@ export function DashboardPage() {
         {/* Bar Chart — Inversión & Mensajes por mes (fuente: ad_campaign_metrics) */}
         <motion.div
           className="card-glass"
-          style={{ padding: '24px', borderRadius: '4px' }}
+          style={{ padding: '24px' }}
           {...fadeUp(0.25)}
         >
           <div
@@ -718,7 +718,7 @@ export function DashboardPage() {
         {/* Bar Chart — Inversión por cliente */}
         <motion.div
           className="card-glass"
-          style={{ padding: '24px', borderRadius: '4px' }}
+          style={{ padding: '24px' }}
           {...fadeUp(0.3)}
         >
           <div style={{ marginBottom: '24px' }}>
@@ -771,7 +771,7 @@ export function DashboardPage() {
       {/* ── Year Sales ── */}
       <motion.div
         className="card-glass"
-        style={{ borderRadius: '4px', overflow: 'hidden' }}
+        style={{ overflow: 'hidden' }}
         {...fadeUp(0.35)}
       >
         {/* Card header */}
@@ -966,7 +966,7 @@ export function DashboardPage() {
       {/* ── Client Table ── */}
       <motion.div
         className="card-glass"
-        style={{ borderRadius: '4px', overflow: 'hidden' }}
+        style={{ overflow: 'hidden' }}
         {...fadeUp(0.4)}
       >
         <div

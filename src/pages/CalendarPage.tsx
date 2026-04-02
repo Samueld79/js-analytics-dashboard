@@ -325,7 +325,7 @@ export function CalendarPage() {
         {/* ── Left: Monthly grid ── */}
         <motion.div
           className="card-glass"
-          style={{ padding: '24px', borderRadius: '4px' }}
+          style={{ padding: '24px' }}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: 'easeOut' } as Transition}
@@ -479,7 +479,7 @@ export function CalendarPage() {
           transition={{ duration: 0.4, ease: 'easeOut', delay: 0.1 } as Transition}
         >
           {/* Section A: Countdown */}
-          <div className="card-glass" style={{ padding: '20px', borderRadius: '4px' }}>
+          <div className="card-glass" style={{ padding: '20px' }}>
             {nextEvent && countdown ? (
               <>
                 <span className="number-label" style={{ display: 'block', marginBottom: '12px' }}>
@@ -557,7 +557,7 @@ export function CalendarPage() {
           </div>
 
           {/* Section B: PRÓXIMAS FECHAS CLAVE */}
-          <div className="card-glass" style={{ borderRadius: '4px', overflow: 'hidden' }}>
+          <div className="card-glass" style={{ overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: '1px solid hsl(0 0% 100% / 0.06)' }}>
               <span className="number-label">PRÓXIMAS FECHAS CLAVE</span>
             </div>
@@ -627,7 +627,7 @@ export function CalendarPage() {
           </div>
 
           {/* Section C: Event list */}
-          <div className="card-glass" style={{ borderRadius: '4px', overflow: 'hidden' }}>
+          <div className="card-glass" style={{ overflow: 'hidden' }}>
             <div style={{
               padding: '14px 20px', borderBottom: '1px solid hsl(0 0% 100% / 0.06)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
