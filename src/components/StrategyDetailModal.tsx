@@ -371,6 +371,8 @@ export function StrategyDetailModal({
                     Tráfico: { bg: 'hsl(215 80% 55% / 0.15)', color: 'hsl(215,80%,70%)' },
                     Interacción: { bg: 'hsl(280 80% 60% / 0.15)', color: 'hsl(280,80%,70%)' },
                     Ventas: { bg: 'hsl(145 100% 45% / 0.12)', color: 'hsl(145,100%,55%)' },
+                    'Generación de leads': { bg: 'hsl(38 100% 55% / 0.12)', color: 'hsl(38,100%,60%)' },
+                    Mensajes: { bg: 'hsl(320 80% 60% / 0.12)', color: 'hsl(320,80%,65%)' },
                     General: { bg: 'rgba(255,255,255,0.07)', color: 'hsl(215,15%,55%)' },
                   };
                   const objStyle = objColors[camp.objective ?? 'General'] ?? objColors.General;

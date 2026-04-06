@@ -471,21 +471,58 @@ export type CreativeFormEntry = {
   imageBase64?: string;
 };
 
-export type AdSetEntry = {
+export type MetaAdEntry = {
   adType?: string;
+  description?: string;
+  publicationType?: 'nueva' | 'existente';
+  existingUrl?: string;
+  notes?: string;
+  imageBase64?: string;
+  welcomeMessage?: string;
+  suggestedQuestions?: string;
+};
+
+export type AdSetEntry = {
+  // Identification
+  name?: string;
+  // ABO budget (used when campaign budgetType is ABO)
+  aboBudgetType?: 'diario' | 'total';
+  aboBudgetAmount?: number;
+  // Scheduling
+  startDate?: string;
+  endDate?: string;
+  hasEndDate?: boolean;
+  // Optimization
+  optimizationGoal?: string;
+  // Conditional fields by campaign objective
+  trafficDestination?: string;
+  interactionType?: string;
+  messageDestinations?: string[];
+  conversionDestination?: string;
+  leadsType?: string;
+  // Audience
   ageMin?: number;
   ageMax?: number;
   gender?: 'all' | 'male' | 'female';
   locations?: string[];
+  detailedTargeting?: string;
+  interests?: string;
+  behaviors?: string;
+  hasCustomAudience?: boolean;
+  customAudienceName?: string;
+  lookalikeAudiences?: string;
+  exclusions?: string;
+  // Placements
+  placementsOption?: 'auto' | 'manual';
   placements?: string[];
+  // Ads (Level 3)
+  ads?: MetaAdEntry[];
+  // Legacy fields (backward compat)
+  adType?: string;
   creatives?: CreativeFormEntry[];
   chatRecommended?: boolean;
   welcomeMessage?: string;
-  interests?: string;
-  behaviors?: string;
   customAudiences?: string;
-  lookalikeAudiences?: string;
-  exclusions?: string;
 };
 
 export type StrategyCampaign = {

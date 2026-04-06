@@ -1,9 +1,9 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AdSetEntry,
   Client,
-  CreativeFormEntry,
+  MetaAdEntry,
   ServiceMutationResult,
   Strategy,
   StrategyCampaign,
@@ -25,29 +25,45 @@ interface Props {
 
 // ─── Local form state types ────────────────────────────────────────────────
 
-interface CreativeFormState {
+interface AdFormState {
+  adType: string;
   description: string;
   publicationType: 'nueva' | 'existente';
   existingUrl: string;
   notes: string;
   imageBase64: string;
   imageFilename: string;
+  welcomeMessage: string;
+  suggestedQuestions: string;
 }
 
 interface AdSetFormState {
-  adType: string;
+  name: string;
+  aboBudgetType: 'diario' | 'total';
+  aboBudgetAmount: string;
+  startDate: string;
+  endDate: string;
+  hasEndDate: boolean;
+  optimizationGoal: string;
+  trafficDestination: string;
+  interactionType: string;
+  messageDestinations: string[];
+  conversionDestination: string;
+  leadsType: string;
   ageMin: number;
   ageMax: number;
   gender: 'all' | 'male' | 'female';
   locationsText: string;
-  placements: string[];
-  creatives: CreativeFormState[];
-  welcomeMessage: string;
+  detailedTargeting: string;
   interests: string;
   behaviors: string;
-  customAudiences: string;
+  hasCustomAudience: boolean;
+  customAudienceName: string;
   lookalikeAudiences: string;
   exclusions: string;
+  placementsOption: 'auto' | 'manual';
+  placements: string[];
+  ads: AdFormState[];
 }
 
 interface CampaignFormState {
@@ -62,45 +78,84 @@ interface CampaignFormState {
 
 const PLACEMENTS = ['Feed', 'Reels', 'Stories', 'Explore', 'Messenger', 'Audience Network'];
 const AD_TYPES = ['Video', 'Imagen', 'Carrusel', 'Reel', 'Colección'];
-const OBJECTIVES = ['General', 'Reconocimiento', 'Tráfico', 'Interacción', 'Ventas'];
-const AGE_OPTIONS_MIN = Array.from({ length: 48 }, (_, i) => 18 + i); // 18–65
-const AGE_OPTIONS_MAX = Array.from({ length: 46 }, (_, i) => 20 + i); // 20–65
+const OBJECTIVES = ['Reconocimiento', 'Tráfico', 'Interacción', 'Ventas', 'Generación de leads', 'Mensajes'];
+const AGE_OPTIONS_MIN = Array.from({ length: 48 }, (_, i) => 18 + i);
+const AGE_OPTIONS_MAX = Array.from({ length: 46 }, (_, i) => 20 + i);
+
+const OPTIMIZATION_GOALS: Record<string, string[]> = {
+  Reconocimiento: ['Alcance', 'Impresiones', 'Reproducciones de video', 'Reconocimiento de marca'],
+  Tráfico: ['Clics en enlace', 'Visitas a página de destino', 'Clics en publicación'],
+  Interacción: ['Interacciones con publicación', 'Reproducciones de video', 'Mensajes', 'Visitas al perfil'],
+  Ventas: ['Conversiones', 'Valor de conversión', 'Ventas del catálogo'],
+  'Generación de leads': ['Clientes potenciales', 'Conversiones de clientes potenciales'],
+  Mensajes: ['Conversaciones iniciadas', 'Respuestas a mensajes'],
+};
+const TRAFFIC_DESTINATIONS = ['Sitio web', 'App', 'Messenger', 'Instagram', 'WhatsApp'];
+const MESSAGE_DESTINATIONS = ['WhatsApp', 'Messenger', 'Instagram DM'];
+const INTERACTION_TYPES = ['Mensajes', 'Reacciones y comentarios', 'Reproducciones de video', 'Visitas al perfil', 'Seguimiento'];
+const CONVERSION_DESTINATIONS = ['Sitio web', 'App', 'WhatsApp', 'Messenger', 'Instagram DM', 'Catálogo'];
+const LEADS_TYPES = ['Formulario nativo', 'Sitio web', 'WhatsApp', 'Messenger'];
+
+const CAMPAIGN_OBJ_COLORS: Record<string, string> = {
+  Reconocimiento: 'hsl(180,100%,50%)',
+  Tráfico: 'hsl(215,80%,65%)',
+  Interacción: 'hsl(280,80%,70%)',
+  Ventas: 'hsl(145,100%,55%)',
+  'Generación de leads': 'hsl(38,100%,60%)',
+  Mensajes: 'hsl(320,80%,65%)',
+};
 
 const DRAFT_KEY = 'strategy_draft';
 
 // ─── Empty factories ───────────────────────────────────────────────────────
 
-function emptyCreative(): CreativeFormState {
+function emptyAd(): AdFormState {
   return {
+    adType: '',
     description: '',
     publicationType: 'nueva',
     existingUrl: '',
     notes: '',
     imageBase64: '',
     imageFilename: '',
+    welcomeMessage: '',
+    suggestedQuestions: '',
   };
 }
 
 function emptyAdSet(): AdSetFormState {
   return {
-    adType: '',
+    name: '',
+    aboBudgetType: 'diario',
+    aboBudgetAmount: '',
+    startDate: '',
+    endDate: '',
+    hasEndDate: false,
+    optimizationGoal: '',
+    trafficDestination: '',
+    interactionType: '',
+    messageDestinations: [],
+    conversionDestination: '',
+    leadsType: '',
     ageMin: 18,
     ageMax: 65,
     gender: 'all',
     locationsText: '',
-    placements: [],
-    creatives: [emptyCreative()],
-    welcomeMessage: '',
+    detailedTargeting: '',
     interests: '',
     behaviors: '',
-    customAudiences: '',
+    hasCustomAudience: false,
+    customAudienceName: '',
     lookalikeAudiences: '',
     exclusions: '',
+    placementsOption: 'auto',
+    placements: [],
+    ads: [emptyAd()],
   };
 }
 
 function emptyCampaign(): CampaignFormState {
-  return { name: '', budget: '', budgetType: 'CBO', objective: 'General', adsets: [emptyAdSet()] };
+  return { name: '', budget: '', budgetType: 'CBO', objective: 'Reconocimiento', adsets: [emptyAdSet()] };
 }
 
 // ─── Converters ───────────────────────────────────────────────────────────
@@ -111,30 +166,66 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
     name: c.name,
     budget: c.budget?.toString() ?? '',
     budgetType: c.budgetType ?? 'CBO',
-    objective: c.objective ?? 'General',
-    adsets: (c.adsets ?? []).map((a) => ({
-      adType: a.adType ?? '',
-      ageMin: a.ageMin ?? 18,
-      ageMax: a.ageMax ?? 65,
-      gender: a.gender ?? 'all',
-      locationsText: (a.locations ?? []).join(', '),
-      placements: a.placements ?? [],
-      creatives:
-        a.creatives?.map((cr) => ({
+    objective: c.objective ?? 'Reconocimiento',
+    adsets: (c.adsets ?? []).map((a): AdSetFormState => {
+      let ads: AdFormState[];
+      if (a.ads?.length) {
+        ads = a.ads.map((ad) => ({
+          adType: ad.adType ?? '',
+          description: ad.description ?? '',
+          publicationType: (ad.publicationType ?? 'nueva') as 'nueva' | 'existente',
+          existingUrl: ad.existingUrl ?? '',
+          notes: ad.notes ?? '',
+          imageBase64: ad.imageBase64 ?? '',
+          imageFilename: ad.imageBase64 ? 'imagen_guardada' : '',
+          welcomeMessage: ad.welcomeMessage ?? '',
+          suggestedQuestions: ad.suggestedQuestions ?? '',
+        }));
+      } else if (a.creatives?.length) {
+        // Migrate legacy creatives → ads
+        ads = a.creatives.map((cr) => ({
+          adType: a.adType ?? '',
           description: cr.description ?? '',
           publicationType: (cr.publicationType ?? 'nueva') as 'nueva' | 'existente',
           existingUrl: cr.existingUrl ?? '',
           notes: cr.notes ?? '',
           imageBase64: cr.imageBase64 ?? '',
           imageFilename: cr.imageBase64 ? 'imagen_guardada' : '',
-        })) ?? [emptyCreative()],
-      welcomeMessage: a.welcomeMessage ?? '',
-      interests: a.interests ?? '',
-      behaviors: a.behaviors ?? '',
-      customAudiences: a.customAudiences ?? '',
-      lookalikeAudiences: a.lookalikeAudiences ?? '',
-      exclusions: a.exclusions ?? '',
-    })),
+          welcomeMessage: a.welcomeMessage ?? '',
+          suggestedQuestions: '',
+        }));
+      } else {
+        ads = [emptyAd()];
+      }
+      return {
+        name: a.name ?? '',
+        aboBudgetType: (a.aboBudgetType ?? 'diario') as 'diario' | 'total',
+        aboBudgetAmount: a.aboBudgetAmount?.toString() ?? '',
+        startDate: a.startDate ?? '',
+        endDate: a.endDate ?? '',
+        hasEndDate: a.hasEndDate ?? false,
+        optimizationGoal: a.optimizationGoal ?? '',
+        trafficDestination: a.trafficDestination ?? '',
+        interactionType: a.interactionType ?? '',
+        messageDestinations: a.messageDestinations ?? [],
+        conversionDestination: a.conversionDestination ?? '',
+        leadsType: a.leadsType ?? '',
+        ageMin: a.ageMin ?? 18,
+        ageMax: a.ageMax ?? 65,
+        gender: a.gender ?? 'all',
+        locationsText: (a.locations ?? []).join(', '),
+        detailedTargeting: a.detailedTargeting ?? '',
+        interests: a.interests ?? '',
+        behaviors: a.behaviors ?? '',
+        hasCustomAudience: a.hasCustomAudience ?? Boolean(a.customAudiences),
+        customAudienceName: a.customAudienceName ?? a.customAudiences ?? '',
+        lookalikeAudiences: a.lookalikeAudiences ?? '',
+        exclusions: a.exclusions ?? '',
+        placementsOption: (a.placementsOption ?? 'auto') as 'auto' | 'manual',
+        placements: a.placements ?? [],
+        ads,
+      };
+    }),
   }));
 }
 
@@ -146,37 +237,61 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
       budget: c.budget ? Number(c.budget) || undefined : undefined,
       budgetType: c.budgetType,
       objective: c.objective,
-      adsets: c.adsets.map(
-        (a): AdSetEntry => ({
-          adType: a.adType || undefined,
-          ageMin: a.ageMin,
-          ageMax: a.ageMax,
-          gender: a.gender,
-          locations: a.locationsText
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
-          placements: a.placements,
-          creatives: a.creatives
-            .filter((cr) => cr.description || cr.existingUrl || cr.notes || cr.imageBase64)
-            .map(
-              (cr): CreativeFormEntry => ({
-                description: cr.description || undefined,
-                publicationType: cr.publicationType,
-                existingUrl:
-                  cr.publicationType === 'existente' ? cr.existingUrl || undefined : undefined,
-                notes: cr.notes || undefined,
-                imageBase64: cr.imageBase64 || undefined,
-              }),
-            ),
-          welcomeMessage: a.welcomeMessage || undefined,
-          interests: a.interests || undefined,
-          behaviors: a.behaviors || undefined,
-          customAudiences: a.customAudiences || undefined,
-          lookalikeAudiences: a.lookalikeAudiences || undefined,
-          exclusions: a.exclusions || undefined,
-        }),
-      ),
+      adsets: c.adsets.map((a): AdSetEntry => ({
+        name: a.name || undefined,
+        aboBudgetType: c.budgetType === 'ABO' ? a.aboBudgetType : undefined,
+        aboBudgetAmount:
+          c.budgetType === 'ABO' && a.aboBudgetAmount
+            ? Number(a.aboBudgetAmount) || undefined
+            : undefined,
+        startDate: a.startDate || undefined,
+        endDate: a.hasEndDate && a.endDate ? a.endDate : undefined,
+        hasEndDate: a.hasEndDate || undefined,
+        optimizationGoal: a.optimizationGoal || undefined,
+        trafficDestination:
+          c.objective === 'Tráfico' ? a.trafficDestination || undefined : undefined,
+        interactionType:
+          c.objective === 'Interacción' ? a.interactionType || undefined : undefined,
+        messageDestinations:
+          c.objective === 'Mensajes' && a.messageDestinations.length
+            ? a.messageDestinations
+            : undefined,
+        conversionDestination:
+          c.objective === 'Ventas' ? a.conversionDestination || undefined : undefined,
+        leadsType:
+          c.objective === 'Generación de leads' ? a.leadsType || undefined : undefined,
+        ageMin: a.ageMin,
+        ageMax: a.ageMax,
+        gender: a.gender,
+        locations: a.locationsText
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        detailedTargeting: a.detailedTargeting || undefined,
+        interests: a.interests || undefined,
+        behaviors: a.behaviors || undefined,
+        hasCustomAudience: a.hasCustomAudience || undefined,
+        customAudienceName: a.hasCustomAudience ? a.customAudienceName || undefined : undefined,
+        lookalikeAudiences: a.lookalikeAudiences || undefined,
+        exclusions: a.exclusions || undefined,
+        placementsOption: a.placementsOption,
+        placements: a.placementsOption === 'manual' ? a.placements : undefined,
+        ads: a.ads
+          .filter((ad) => ad.description || ad.existingUrl || ad.notes || ad.imageBase64)
+          .map(
+            (ad): MetaAdEntry => ({
+              adType: ad.adType || undefined,
+              description: ad.description || undefined,
+              publicationType: ad.publicationType,
+              existingUrl:
+                ad.publicationType === 'existente' ? ad.existingUrl || undefined : undefined,
+              notes: ad.notes || undefined,
+              imageBase64: ad.imageBase64 || undefined,
+              welcomeMessage: ad.welcomeMessage || undefined,
+              suggestedQuestions: ad.suggestedQuestions || undefined,
+            }),
+          ),
+      })),
     }));
 }
 
@@ -347,23 +462,25 @@ function PillToggle({
   );
 }
 
-// ─── Creative card ────────────────────────────────────────────────────────
+// ─── Ad block (Level 3) ───────────────────────────────────────────────────
 
-function CreativeCard({
-  creative,
-  index,
+function AdBlock({
+  ad,
+  adIdx,
+  showMessaging,
   onChange,
   onRemove,
 }: {
-  creative: CreativeFormState;
-  index: number;
-  onChange: (updated: CreativeFormState) => void;
+  ad: AdFormState;
+  adIdx: number;
+  showMessaging: boolean;
+  onChange: (updated: AdFormState) => void;
   onRemove: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function set<K extends keyof CreativeFormState>(field: K, value: CreativeFormState[K]) {
-    onChange({ ...creative, [field]: value });
+  function set<K extends keyof AdFormState>(field: K, value: AdFormState[K]) {
+    onChange({ ...ad, [field]: value });
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -376,7 +493,7 @@ function CreativeCard({
     }
     const reader = new FileReader();
     reader.onload = () => {
-      onChange({ ...creative, imageBase64: reader.result as string, imageFilename: file.name });
+      onChange({ ...ad, imageBase64: reader.result as string, imageFilename: file.name });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -402,7 +519,7 @@ function CreativeCard({
             fontFamily: 'JetBrains Mono, monospace',
           }}
         >
-          CREATIVO {index + 1}
+          ANUNCIO {adIdx + 1}
         </span>
         <button
           type="button"
@@ -420,19 +537,20 @@ function CreativeCard({
         </button>
       </div>
 
-      {/* Description */}
-      <textarea
-        rows={2}
-        value={creative.description}
-        onChange={(e) => set('description', e.target.value)}
-        placeholder="Describe el creativo: qué se muestra, mensaje principal, formato..."
-        style={{ ...TEXTAREA_STYLE, fontSize: '0.8rem' }}
-      />
+      {/* Ad type */}
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Tipo de anuncio</label>
+        <PillToggle
+          options={AD_TYPES}
+          active={ad.adType}
+          onToggle={(v) => set('adType', ad.adType === v ? '' : v)}
+        />
+      </div>
 
-      {/* Publication type pills */}
+      {/* Publication type */}
       <div style={{ display: 'flex', gap: 6 }}>
         {(['nueva', 'existente'] as const).map((t) => {
-          const isActive = creative.publicationType === t;
+          const isActive = ad.publicationType === t;
           return (
             <button
               key={t}
@@ -457,21 +575,30 @@ function CreativeCard({
         })}
       </div>
 
-      {/* URL — only when existente */}
-      {creative.publicationType === 'existente' && (
+      {/* URL — only for existente */}
+      {ad.publicationType === 'existente' && (
         <input
-          value={creative.existingUrl}
+          value={ad.existingUrl}
           onChange={(e) => set('existingUrl', e.target.value)}
           placeholder="https://www.facebook.com/permalink/..."
           style={{ ...INPUT_STYLE, fontSize: '0.78rem' }}
         />
       )}
 
+      {/* Description */}
+      <textarea
+        rows={2}
+        value={ad.description}
+        onChange={(e) => set('description', e.target.value)}
+        placeholder="Brief del creativo: qué se muestra, mensaje principal, formato..."
+        style={{ ...TEXTAREA_STYLE, fontSize: '0.8rem' }}
+      />
+
       {/* Notes */}
       <input
-        value={creative.notes}
+        value={ad.notes}
         onChange={(e) => set('notes', e.target.value)}
-        placeholder="Indicaciones adicionales para este creativo..."
+        placeholder="Indicaciones adicionales..."
         style={{ ...INPUT_STYLE, fontSize: '0.78rem' }}
       />
 
@@ -484,10 +611,10 @@ function CreativeCard({
           style={{ display: 'none' }}
           onChange={handleImageSelect}
         />
-        {creative.imageBase64 ? (
+        {ad.imageBase64 ? (
           <>
             <img
-              src={creative.imageBase64}
+              src={ad.imageBase64}
               alt="preview"
               style={{
                 width: 80,
@@ -508,11 +635,11 @@ function CreativeCard({
                   whiteSpace: 'nowrap',
                 }}
               >
-                {creative.imageFilename}
+                {ad.imageFilename}
               </span>
               <button
                 type="button"
-                onClick={() => onChange({ ...creative, imageBase64: '', imageFilename: '' })}
+                onClick={() => onChange({ ...ad, imageBase64: '', imageFilename: '' })}
                 style={{
                   alignSelf: 'flex-start',
                   background: 'transparent',
@@ -549,25 +676,81 @@ function CreativeCard({
           </button>
         )}
       </div>
+
+      {/* Welcome message + suggested questions — only for Mensajes objective */}
+      {showMessaging && (
+        <>
+          <div style={FIELD_STYLE}>
+            <label style={LABEL_STYLE}>💬 Mensaje de bienvenida</label>
+            <textarea
+              rows={2}
+              value={ad.welcomeMessage}
+              onChange={(e) => set('welcomeMessage', e.target.value)}
+              placeholder="Mensaje que recibirá el prospecto al iniciar la conversación..."
+              style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem' }}
+            />
+          </div>
+          <div style={FIELD_STYLE}>
+            <label style={LABEL_STYLE}>❓ Preguntas sugeridas (una por línea)</label>
+            <textarea
+              rows={3}
+              value={ad.suggestedQuestions}
+              onChange={(e) => set('suggestedQuestions', e.target.value)}
+              placeholder={'¿Cuánto cuesta?\n¿Cómo puedo pedir?\nQuiero más información'}
+              style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-// ─── Adset block ──────────────────────────────────────────────────────────
+// ─── Adset block (Level 2) ────────────────────────────────────────────────
+
+function adSetTabStyle(isActive: boolean, position: 'first' | 'last'): React.CSSProperties {
+  return {
+    padding: '2px 9px',
+    fontSize: '0.6rem',
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    border: isActive ? '1px solid hsl(180,100%,50%)' : '1px solid rgba(255,255,255,0.1)',
+    borderRadius: position === 'first' ? '4px 0 0 4px' : '0 4px 4px 0',
+    borderLeft: position === 'last' ? 'none' : undefined,
+    background: isActive ? 'hsl(180 100% 50% / 0.15)' : 'transparent',
+    color: isActive ? 'hsl(180,100%,65%)' : 'hsl(215,15%,45%)',
+    cursor: 'pointer',
+    fontFamily: 'JetBrains Mono, monospace',
+  };
+}
 
 function AdSetBlock({
   adset,
   adsetIdx,
+  campaignObjective,
+  campaignBudgetType,
   onChange,
   onRemove,
 }: {
   adset: AdSetFormState;
   adsetIdx: number;
+  campaignObjective: string;
+  campaignBudgetType: 'ABO' | 'CBO';
   onChange: (updated: AdSetFormState) => void;
   onRemove: () => void;
 }) {
+  const [isOpen, setIsOpen] = useState(adsetIdx === 0);
+  const [activeTab, setActiveTab] = useState<'conjunto' | 'anuncios'>('conjunto');
+
   function set<K extends keyof AdSetFormState>(field: K, value: AdSetFormState[K]) {
     onChange({ ...adset, [field]: value });
+  }
+
+  function toggleMessageDest(dest: string) {
+    const next = adset.messageDestinations.includes(dest)
+      ? adset.messageDestinations.filter((x) => x !== dest)
+      : [...adset.messageDestinations, dest];
+    set('messageDestinations', next);
   }
 
   function togglePlacement(p: string) {
@@ -577,225 +760,539 @@ function AdSetBlock({
     set('placements', next);
   }
 
-  function updateCreative(crIdx: number, updated: CreativeFormState) {
-    set(
-      'creatives',
-      adset.creatives.map((cr, i) => (i === crIdx ? updated : cr)),
-    );
+  function updateAd(adIdx: number, updated: AdFormState) {
+    set('ads', adset.ads.map((a, i) => (i === adIdx ? updated : a)));
   }
 
-  function removeCreative(crIdx: number) {
-    set(
-      'creatives',
-      adset.creatives.filter((_, i) => i !== crIdx),
-    );
+  function removeAd(adIdx: number) {
+    set('ads', adset.ads.filter((_, i) => i !== adIdx));
   }
+
+  const goalsForObjective = OPTIMIZATION_GOALS[campaignObjective] ?? [];
+  const showMessaging = campaignObjective === 'Mensajes';
+  const displayName = adset.name.trim() || `CONJUNTO ${adsetIdx + 1}`;
 
   return (
     <div
       style={{
-        padding: '10px 12px',
         borderRadius: 8,
         border: '1px solid rgba(255,255,255,0.07)',
         background: 'rgba(255,255,255,0.02)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
+        overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span
-          style={{
-            fontSize: '0.65rem',
-            fontWeight: 700,
-            color: 'hsl(215,15%,45%)',
-            fontFamily: 'JetBrains Mono, monospace',
-            letterSpacing: '0.08em',
-          }}
-        >
-          CONJUNTO {adsetIdx + 1}
-        </span>
-        <button
-          type="button"
-          onClick={onRemove}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'hsl(0,80%,55%)',
-            cursor: 'pointer',
-            padding: 2,
-            lineHeight: 1,
-          }}
-        >
-          <Trash2 size={12} />
-        </button>
-      </div>
-
-      {/* Ad type */}
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Tipo de anuncio</label>
-        <PillToggle
-          options={AD_TYPES}
-          active={adset.adType}
-          onToggle={(v) => set('adType', adset.adType === v ? '' : v)}
-        />
-      </div>
-
-      {/* Age range */}
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Rango de edad</label>
-        <AgeDropdowns
-          ageMin={adset.ageMin}
-          ageMax={adset.ageMax}
-          onChange={(min, max) => onChange({ ...adset, ageMin: min, ageMax: max })}
-        />
-      </div>
-
-      {/* Gender */}
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Género</label>
-        <PillToggle
-          options={['Todos', 'Hombres', 'Mujeres']}
-          active={
-            adset.gender === 'all' ? 'Todos' : adset.gender === 'male' ? 'Hombres' : 'Mujeres'
-          }
-          onToggle={(v) =>
-            set('gender', v === 'Todos' ? 'all' : v === 'Hombres' ? 'male' : 'female')
-          }
-        />
-      </div>
-
-      {/* Locations */}
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Ciudades / ubicaciones</label>
-        <input
-          value={adset.locationsText}
-          onChange={(e) => set('locationsText', e.target.value)}
-          placeholder="Bogotá, Medellín, Cali"
-          style={{ ...INPUT_STYLE, fontSize: '0.8rem' }}
-        />
-      </div>
-
-      {/* Placements */}
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>Ubicaciones de pauta</label>
-        <PillToggle options={PLACEMENTS} active={adset.placements} onToggle={togglePlacement} />
-      </div>
-
-      {/* Segmentation grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div style={FIELD_STYLE}>
-          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Intereses</label>
-          <textarea
-            rows={2}
-            value={adset.interests}
-            onChange={(e) => set('interests', e.target.value)}
-            placeholder="Moda, Fitness, Tecnología..."
-            style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
-          />
-        </div>
-        <div style={FIELD_STYLE}>
-          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Comportamientos</label>
-          <textarea
-            rows={2}
-            value={adset.behaviors}
-            onChange={(e) => set('behaviors', e.target.value)}
-            placeholder="Compradores activos, Viajeros frecuentes..."
-            style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
-          />
-        </div>
-        <div style={FIELD_STYLE}>
-          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Audiencias personalizadas</label>
-          <textarea
-            rows={2}
-            value={adset.customAudiences}
-            onChange={(e) => set('customAudiences', e.target.value)}
-            placeholder="Clientes actuales, Lista de emails..."
-            style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
-          />
-        </div>
-        <div style={FIELD_STYLE}>
-          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Audiencias similares</label>
-          <textarea
-            rows={2}
-            value={adset.lookalikeAudiences}
-            onChange={(e) => set('lookalikeAudiences', e.target.value)}
-            placeholder="Lookalike 1% compradores..."
-            style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
-          />
-        </div>
-      </div>
-
-      {/* Creatives */}
-      <div style={FIELD_STYLE}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <label style={LABEL_STYLE}>Creativos</label>
-          <button
-            type="button"
-            onClick={() => set('creatives', [...adset.creatives, emptyCreative()])}
-            style={{
-              background: 'transparent',
-              border: '1px solid hsl(180 100% 50% / 0.25)',
-              borderRadius: 5,
-              color: 'hsl(180,100%,55%)',
-              cursor: 'pointer',
-              padding: '2px 7px',
-              fontSize: '0.68rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-          >
-            <Plus size={10} /> Creativo
-          </button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {adset.creatives.map((cr, crIdx) => (
-            <CreativeCard
-              key={crIdx}
-              creative={cr}
-              index={crIdx}
-              onChange={(updated) => updateCreative(crIdx, updated)}
-              onRemove={() => removeCreative(crIdx)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Welcome message */}
-      <div style={FIELD_STYLE}>
-        <label style={LABEL_STYLE}>💬 Ejemplo de mensaje de bienvenida</label>
-        <textarea
-          rows={2}
-          value={adset.welcomeMessage}
-          onChange={(e) => set('welcomeMessage', e.target.value)}
-          placeholder="Escribe aquí el mensaje que se enviará al prospecto cuando inicie la conversación..."
-          style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem' }}
-        />
-      </div>
-
-      {/* Exclusions */}
+      {/* Header */}
       <div
         style={{
-          ...FIELD_STYLE,
-          borderLeft: '3px solid hsl(38,100%,50%)',
-          paddingLeft: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '7px 12px',
+          gap: 8,
         }}
       >
-        <label style={{ ...LABEL_STYLE, color: 'hsl(38,100%,65%)' }}>🚫 Exclusiones</label>
-        <textarea
-          rows={2}
-          value={adset.exclusions}
-          onChange={(e) => set('exclusions', e.target.value)}
-          placeholder="Clientes recientes, audiencias a excluir..."
-          style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', borderColor: 'hsl(38 100% 50% / 0.2)' }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              color: 'hsl(215,15%,45%)',
+              fontFamily: 'JetBrains Mono, monospace',
+              letterSpacing: '0.08em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {displayName}
+          </span>
+          {isOpen && (
+            <div style={{ display: 'flex', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('conjunto')}
+                style={adSetTabStyle(activeTab === 'conjunto', 'first')}
+              >
+                CONJUNTO
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('anuncios')}
+                style={adSetTabStyle(activeTab === 'anuncios', 'last')}
+              >
+                ANUNCIOS ({adset.ads.length})
+              </button>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'hsl(215,15%,50%)',
+              cursor: 'pointer',
+              padding: 4,
+              lineHeight: 1,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'hsl(0,80%,55%)',
+              cursor: 'pointer',
+              padding: 4,
+              lineHeight: 1,
+            }}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
       </div>
+
+      {/* Content */}
+      {isOpen && (
+        <div
+          style={{
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+            padding: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          {/* ── CONJUNTO TAB ── */}
+          {activeTab === 'conjunto' && (
+            <>
+              {/* Name */}
+              <div style={FIELD_STYLE}>
+                <label style={LABEL_STYLE}>Nombre del conjunto</label>
+                <input
+                  value={adset.name}
+                  onChange={(e) => set('name', e.target.value)}
+                  placeholder="Ej. Conjunto Bogotá 25-40"
+                  style={{ ...INPUT_STYLE, fontSize: '0.82rem' }}
+                />
+              </div>
+
+              {/* ABO budget — only when campaign is ABO */}
+              {campaignBudgetType === 'ABO' && (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                  <div style={FIELD_STYLE}>
+                    <label style={LABEL_STYLE}>Tipo presupuesto ABO</label>
+                    <PillToggle
+                      options={['Diario', 'Total']}
+                      active={adset.aboBudgetType === 'diario' ? 'Diario' : 'Total'}
+                      onToggle={(v) => set('aboBudgetType', v === 'Diario' ? 'diario' : 'total')}
+                    />
+                  </div>
+                  <div style={{ ...FIELD_STYLE, flex: 1 }}>
+                    <label style={LABEL_STYLE}>Presupuesto COP</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={adset.aboBudgetAmount}
+                      onChange={(e) => set('aboBudgetAmount', e.target.value)}
+                      placeholder="500000"
+                      style={INPUT_STYLE}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Scheduling */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={FIELD_STYLE}>
+                  <label style={LABEL_STYLE}>Fecha de inicio</label>
+                  <input
+                    type="date"
+                    value={adset.startDate}
+                    onChange={(e) => set('startDate', e.target.value)}
+                    style={INPUT_STYLE}
+                  />
+                </div>
+                <div style={FIELD_STYLE}>
+                  <label style={{ ...LABEL_STYLE, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    Fecha de fin
+                    <button
+                      type="button"
+                      onClick={() => set('hasEndDate', !adset.hasEndDate)}
+                      style={{
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        fontSize: '0.6rem',
+                        border: adset.hasEndDate
+                          ? '1px solid hsl(180,100%,50%)'
+                          : '1px solid rgba(255,255,255,0.15)',
+                        background: adset.hasEndDate ? 'hsl(180 100% 50% / 0.15)' : 'transparent',
+                        color: adset.hasEndDate ? 'hsl(180,100%,65%)' : 'hsl(215,15%,45%)',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {adset.hasEndDate ? 'con fin' : 'sin fin'}
+                    </button>
+                  </label>
+                  {adset.hasEndDate && (
+                    <input
+                      type="date"
+                      value={adset.endDate}
+                      onChange={(e) => set('endDate', e.target.value)}
+                      style={INPUT_STYLE}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Optimization goal */}
+              {goalsForObjective.length > 0 && (
+                <div style={FIELD_STYLE}>
+                  <label style={LABEL_STYLE}>Objetivo de optimización</label>
+                  <select
+                    value={adset.optimizationGoal}
+                    onChange={(e) => set('optimizationGoal', e.target.value)}
+                    style={INPUT_STYLE as React.CSSProperties}
+                  >
+                    <option value="">Selecciona un objetivo de optimización...</option>
+                    {goalsForObjective.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Conditional: Tráfico */}
+              {campaignObjective === 'Tráfico' && (
+                <div style={FIELD_STYLE}>
+                  <label style={LABEL_STYLE}>Destino del tráfico</label>
+                  <PillToggle
+                    options={TRAFFIC_DESTINATIONS}
+                    active={adset.trafficDestination}
+                    onToggle={(v) =>
+                      set('trafficDestination', adset.trafficDestination === v ? '' : v)
+                    }
+                  />
+                </div>
+              )}
+
+              {/* Conditional: Interacción */}
+              {campaignObjective === 'Interacción' && (
+                <div style={FIELD_STYLE}>
+                  <label style={LABEL_STYLE}>Tipo de interacción</label>
+                  <PillToggle
+                    options={INTERACTION_TYPES}
+                    active={adset.interactionType}
+                    onToggle={(v) =>
+                      set('interactionType', adset.interactionType === v ? '' : v)
+                    }
+                  />
+                </div>
+              )}
+
+              {/* Conditional: Mensajes */}
+              {campaignObjective === 'Mensajes' && (
+                <div style={FIELD_STYLE}>
+                  <label style={LABEL_STYLE}>Destinos de mensajes</label>
+                  <PillToggle
+                    options={MESSAGE_DESTINATIONS}
+                    active={adset.messageDestinations}
+                    onToggle={toggleMessageDest}
+                  />
+                </div>
+              )}
+
+              {/* Conditional: Ventas */}
+              {campaignObjective === 'Ventas' && (
+                <div style={FIELD_STYLE}>
+                  <label style={LABEL_STYLE}>Destino de conversión</label>
+                  <PillToggle
+                    options={CONVERSION_DESTINATIONS}
+                    active={adset.conversionDestination}
+                    onToggle={(v) =>
+                      set('conversionDestination', adset.conversionDestination === v ? '' : v)
+                    }
+                  />
+                </div>
+              )}
+
+              {/* Conditional: Generación de leads */}
+              {campaignObjective === 'Generación de leads' && (
+                <div style={FIELD_STYLE}>
+                  <label style={LABEL_STYLE}>Tipo de captación</label>
+                  <PillToggle
+                    options={LEADS_TYPES}
+                    active={adset.leadsType}
+                    onToggle={(v) => set('leadsType', adset.leadsType === v ? '' : v)}
+                  />
+                </div>
+              )}
+
+              {/* Audience */}
+              <div
+                style={{
+                  borderTop: '1px solid rgba(255,255,255,0.05)',
+                  paddingTop: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    color: 'hsl(180,100%,50%)',
+                    letterSpacing: '0.1em',
+                    fontFamily: 'JetBrains Mono, monospace',
+                  }}
+                >
+                  AUDIENCIA
+                </span>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={FIELD_STYLE}>
+                    <label style={LABEL_STYLE}>Rango de edad</label>
+                    <AgeDropdowns
+                      ageMin={adset.ageMin}
+                      ageMax={adset.ageMax}
+                      onChange={(min, max) => onChange({ ...adset, ageMin: min, ageMax: max })}
+                    />
+                  </div>
+                  <div style={FIELD_STYLE}>
+                    <label style={LABEL_STYLE}>Género</label>
+                    <PillToggle
+                      options={['Todos', 'Hombres', 'Mujeres']}
+                      active={
+                        adset.gender === 'all'
+                          ? 'Todos'
+                          : adset.gender === 'male'
+                            ? 'Hombres'
+                            : 'Mujeres'
+                      }
+                      onToggle={(v) =>
+                        set('gender', v === 'Todos' ? 'all' : v === 'Hombres' ? 'male' : 'female')
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div style={FIELD_STYLE}>
+                  <label style={LABEL_STYLE}>Ciudades / ubicaciones</label>
+                  <input
+                    value={adset.locationsText}
+                    onChange={(e) => set('locationsText', e.target.value)}
+                    placeholder="Bogotá, Medellín, Cali"
+                    style={{ ...INPUT_STYLE, fontSize: '0.8rem' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={FIELD_STYLE}>
+                    <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>Intereses</label>
+                    <textarea
+                      rows={2}
+                      value={adset.interests}
+                      onChange={(e) => set('interests', e.target.value)}
+                      placeholder="Moda, Fitness, Tecnología..."
+                      style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
+                    />
+                  </div>
+                  <div style={FIELD_STYLE}>
+                    <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>
+                      Comportamientos
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={adset.behaviors}
+                      onChange={(e) => set('behaviors', e.target.value)}
+                      placeholder="Compradores activos, Viajeros frecuentes..."
+                      style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={FIELD_STYLE}>
+                  <label
+                    style={{ ...LABEL_STYLE, display: 'flex', alignItems: 'center', gap: 8 }}
+                  >
+                    Audiencias personalizadas
+                    <button
+                      type="button"
+                      onClick={() => set('hasCustomAudience', !adset.hasCustomAudience)}
+                      style={{
+                        padding: '1px 8px',
+                        borderRadius: 4,
+                        fontSize: '0.62rem',
+                        border: adset.hasCustomAudience
+                          ? '1px solid hsl(180,100%,50%)'
+                          : '1px solid rgba(255,255,255,0.15)',
+                        background: adset.hasCustomAudience
+                          ? 'hsl(180 100% 50% / 0.15)'
+                          : 'transparent',
+                        color: adset.hasCustomAudience
+                          ? 'hsl(180,100%,65%)'
+                          : 'hsl(215,15%,45%)',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {adset.hasCustomAudience ? 'sí' : 'no'}
+                    </button>
+                  </label>
+                  {adset.hasCustomAudience && (
+                    <input
+                      value={adset.customAudienceName}
+                      onChange={(e) => set('customAudienceName', e.target.value)}
+                      placeholder="Nombre de la audiencia personalizada..."
+                      style={{ ...INPUT_STYLE, fontSize: '0.8rem' }}
+                    />
+                  )}
+                </div>
+
+                <div style={FIELD_STYLE}>
+                  <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>
+                    Audiencias similares
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={adset.lookalikeAudiences}
+                    onChange={(e) => set('lookalikeAudiences', e.target.value)}
+                    placeholder="Lookalike 1% compradores..."
+                    style={{ ...TEXTAREA_STYLE, fontSize: '0.75rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* Placements */}
+              <div
+                style={{
+                  borderTop: '1px solid rgba(255,255,255,0.05)',
+                  paddingTop: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    color: 'hsl(180,100%,50%)',
+                    letterSpacing: '0.1em',
+                    fontFamily: 'JetBrains Mono, monospace',
+                  }}
+                >
+                  UBICACIONES DE PAUTA
+                </span>
+                <PillToggle
+                  options={['Automáticas', 'Manuales']}
+                  active={adset.placementsOption === 'auto' ? 'Automáticas' : 'Manuales'}
+                  onToggle={(v) => set('placementsOption', v === 'Automáticas' ? 'auto' : 'manual')}
+                />
+                {adset.placementsOption === 'manual' && (
+                  <PillToggle
+                    options={PLACEMENTS}
+                    active={adset.placements}
+                    onToggle={togglePlacement}
+                  />
+                )}
+              </div>
+
+              {/* Exclusions */}
+              <div
+                style={{
+                  ...FIELD_STYLE,
+                  borderLeft: '3px solid hsl(38,100%,50%)',
+                  paddingLeft: 10,
+                }}
+              >
+                <label style={{ ...LABEL_STYLE, color: 'hsl(38,100%,65%)' }}>🚫 Exclusiones</label>
+                <textarea
+                  rows={2}
+                  value={adset.exclusions}
+                  onChange={(e) => set('exclusions', e.target.value)}
+                  placeholder="Clientes recientes, audiencias a excluir..."
+                  style={{
+                    ...TEXTAREA_STYLE,
+                    fontSize: '0.78rem',
+                    borderColor: 'hsl(38 100% 50% / 0.2)',
+                  }}
+                />
+              </div>
+            </>
+          )}
+
+          {/* ── ANUNCIOS TAB ── */}
+          {activeTab === 'anuncios' && (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {adset.ads.map((ad, adIdx) => (
+                  <AdBlock
+                    key={adIdx}
+                    ad={ad}
+                    adIdx={adIdx}
+                    showMessaging={showMessaging}
+                    onChange={(updated) => updateAd(adIdx, updated)}
+                    onRemove={() => removeAd(adIdx)}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => set('ads', [...adset.ads, emptyAd()])}
+                style={{
+                  alignSelf: 'flex-start',
+                  background: 'transparent',
+                  border: '1px solid hsl(180 100% 50% / 0.25)',
+                  borderRadius: 5,
+                  color: 'hsl(180,100%,55%)',
+                  cursor: 'pointer',
+                  padding: '2px 7px',
+                  fontSize: '0.68rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+              >
+                <Plus size={10} /> Anuncio
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Campaign block ───────────────────────────────────────────────────────
+// ─── Campaign block (Level 1) ─────────────────────────────────────────────
+
+function campTabStyle(isActive: boolean): React.CSSProperties {
+  return {
+    padding: '4px 12px',
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    border: isActive
+      ? '1px solid hsl(180,100%,50%)'
+      : '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 5,
+    background: isActive ? 'hsl(180 100% 50% / 0.15)' : 'transparent',
+    color: isActive ? 'hsl(180,100%,65%)' : 'hsl(215,15%,40%)',
+    cursor: 'pointer',
+    fontFamily: 'JetBrains Mono, monospace',
+  };
+}
 
 function CampaignBlock({
   campaign,
@@ -808,6 +1305,8 @@ function CampaignBlock({
   onChange: (updated: CampaignFormState) => void;
   onRemove: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'campaign' | 'adsets'>('campaign');
+
   function set<K extends keyof CampaignFormState>(field: K, value: CampaignFormState[K]) {
     onChange({ ...campaign, [field]: value });
   }
@@ -823,6 +1322,9 @@ function CampaignBlock({
     onChange({ ...campaign, adsets: campaign.adsets.filter((_, i) => i !== adsetIdx) });
   }
 
+  const totalAds = campaign.adsets.reduce((sum, a) => sum + a.ads.length, 0);
+  const objColor = CAMPAIGN_OBJ_COLORS[campaign.objective] ?? 'hsl(215,15%,55%)';
+
   return (
     <div
       style={{
@@ -835,18 +1337,35 @@ function CampaignBlock({
         gap: 12,
       }}
     >
+      {/* Campaign header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span
-          style={{
-            fontSize: '0.62rem',
-            fontWeight: 700,
-            color: 'hsl(180,100%,50%)',
-            fontFamily: 'JetBrains Mono, monospace',
-            letterSpacing: '0.1em',
-          }}
-        >
-          CAMPAÑA {campIdx + 1}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: objColor,
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontSize: '0.62rem',
+              fontWeight: 700,
+              color: 'hsl(180,100%,50%)',
+              fontFamily: 'JetBrains Mono, monospace',
+              letterSpacing: '0.1em',
+            }}
+          >
+            {campaign.name.trim() || `CAMPAÑA ${campIdx + 1}`}
+          </span>
+          {campaign.objective && (
+            <span style={{ fontSize: '0.6rem', color: objColor, fontFamily: 'JetBrains Mono' }}>
+              · {campaign.objective}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={onRemove}
@@ -863,87 +1382,129 @@ function CampaignBlock({
         </button>
       </div>
 
-      {/* Name + objective */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>Nombre *</label>
-          <input
-            value={campaign.name}
-            onChange={(e) => set('name', e.target.value)}
-            placeholder="Campaña reconocimiento abril"
-            style={INPUT_STYLE}
-          />
-        </div>
-        <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>Objetivo</label>
-          <select
-            value={campaign.objective}
-            onChange={(e) => set('objective', e.target.value)}
-            style={INPUT_STYLE as React.CSSProperties}
-          >
-            {OBJECTIVES.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Budget + budgetType */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-        <div style={{ ...FIELD_STYLE, flex: 1 }}>
-          <label style={LABEL_STYLE}>Presupuesto COP</label>
-          <input
-            type="number"
-            min="0"
-            value={campaign.budget}
-            onChange={(e) => set('budget', e.target.value)}
-            placeholder="5000000"
-            style={INPUT_STYLE}
-          />
-        </div>
-        <div style={FIELD_STYLE}>
-          <label style={LABEL_STYLE}>Tipo presupuesto</label>
-          <PillToggle
-            options={['ABO', 'CBO']}
-            active={campaign.budgetType}
-            onToggle={(v) => set('budgetType', v as 'ABO' | 'CBO')}
-          />
-        </div>
-      </div>
-
-      {/* Adsets */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {campaign.adsets.map((adset, adsetIdx) => (
-          <AdSetBlock
-            key={adsetIdx}
-            adset={adset}
-            adsetIdx={adsetIdx}
-            onChange={(updated) => updateAdSet(adsetIdx, updated)}
-            onRemove={() => removeAdSet(adsetIdx)}
-          />
-        ))}
+      {/* Wizard step tabs */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <button
           type="button"
-          onClick={() => onChange({ ...campaign, adsets: [...campaign.adsets, emptyAdSet()] })}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'transparent',
-            border: '1px dashed hsl(215 15% 30%)',
-            borderRadius: 7,
-            color: 'hsl(215,15%,50%)',
-            cursor: 'pointer',
-            padding: '5px 12px',
-            fontSize: '0.72rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 5,
-          }}
+          onClick={() => setActiveTab('campaign')}
+          style={campTabStyle(activeTab === 'campaign')}
         >
-          <Plus size={11} /> Agregar conjunto de anuncios
+          ① CAMPAÑA
+        </button>
+        <span style={{ color: 'hsl(215,15%,30%)', fontSize: '0.7rem' }}>→</span>
+        <button
+          type="button"
+          onClick={() => setActiveTab('adsets')}
+          style={campTabStyle(activeTab === 'adsets')}
+        >
+          ② CONJUNTOS ({campaign.adsets.length}) · ANUNCIOS ({totalAds})
         </button>
       </div>
+
+      {/* ── CAMPAÑA TAB ── */}
+      {activeTab === 'campaign' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={FIELD_STYLE}>
+              <label style={LABEL_STYLE}>Nombre *</label>
+              <input
+                value={campaign.name}
+                onChange={(e) => set('name', e.target.value)}
+                placeholder="Campaña reconocimiento abril"
+                style={INPUT_STYLE}
+              />
+            </div>
+            <div style={FIELD_STYLE}>
+              <label style={LABEL_STYLE}>Objetivo de campaña</label>
+              <select
+                value={campaign.objective}
+                onChange={(e) => set('objective', e.target.value)}
+                style={INPUT_STYLE as React.CSSProperties}
+              >
+                {OBJECTIVES.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+            <div style={{ ...FIELD_STYLE, flex: 1 }}>
+              <label style={LABEL_STYLE}>Presupuesto COP</label>
+              <input
+                type="number"
+                min="0"
+                value={campaign.budget}
+                onChange={(e) => set('budget', e.target.value)}
+                placeholder="5000000"
+                style={INPUT_STYLE}
+              />
+            </div>
+            <div style={FIELD_STYLE}>
+              <label style={LABEL_STYLE}>Tipo de presupuesto</label>
+              <PillToggle
+                options={['CBO', 'ABO']}
+                active={campaign.budgetType}
+                onToggle={(v) => set('budgetType', v as 'ABO' | 'CBO')}
+              />
+            </div>
+          </div>
+
+          <p
+            style={{
+              fontSize: '0.72rem',
+              color:
+                campaign.budgetType === 'ABO'
+                  ? 'hsl(38,100%,50%)'
+                  : 'hsl(215,15%,40%)',
+              margin: 0,
+              fontStyle: 'italic',
+            }}
+          >
+            {campaign.budgetType === 'CBO'
+              ? 'CBO: Meta optimiza el presupuesto entre todos los conjuntos automáticamente.'
+              : 'ABO: Define el presupuesto individualmente en cada conjunto de anuncios.'}
+          </p>
+        </div>
+      )}
+
+      {/* ── CONJUNTOS TAB ── */}
+      {activeTab === 'adsets' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {campaign.adsets.map((adset, adsetIdx) => (
+            <AdSetBlock
+              key={adsetIdx}
+              adset={adset}
+              adsetIdx={adsetIdx}
+              campaignObjective={campaign.objective}
+              campaignBudgetType={campaign.budgetType}
+              onChange={(updated) => updateAdSet(adsetIdx, updated)}
+              onRemove={() => removeAdSet(adsetIdx)}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => onChange({ ...campaign, adsets: [...campaign.adsets, emptyAdSet()] })}
+            style={{
+              alignSelf: 'flex-start',
+              background: 'transparent',
+              border: '1px dashed hsl(215 15% 30%)',
+              borderRadius: 7,
+              color: 'hsl(215,15%,50%)',
+              cursor: 'pointer',
+              padding: '5px 12px',
+              fontSize: '0.72rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            <Plus size={11} /> Agregar conjunto de anuncios
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -989,7 +1550,7 @@ export function StrategyFormModal({
   const hasMountedRef = useRef(false);
   const isDirtyRef = useRef(false);
 
-  // Auto-save draft on every form/campaign change (new strategies only); mark dirty always
+  // Auto-save draft on every form/campaign change (new strategies only)
   useEffect(() => {
     if (!hasMountedRef.current) {
       hasMountedRef.current = true;
@@ -1033,7 +1594,10 @@ export function StrategyFormModal({
 
   function recoverDraft() {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) { setHasDraft(false); return; }
+    if (!raw) {
+      setHasDraft(false);
+      return;
+    }
     try {
       const saved = JSON.parse(raw) as { form: typeof form; campaigns: CampaignFormState[] };
       setForm(saved.form);
@@ -1088,7 +1652,8 @@ export function StrategyFormModal({
         ai_diff: strategy?.ai_diff ?? draft?.ai_diff ?? null,
         raw_input: strategy?.raw_input ?? draft?.raw_input ?? null,
         campaigns: builtCampaigns,
-        latest_version: strategy?.latest_version ?? strategy?.version ?? draft?.latest_version ?? 1,
+        latest_version:
+          strategy?.latest_version ?? strategy?.version ?? draft?.latest_version ?? 1,
       },
       {
         changeSummary: form.change_summary.trim() || null,
