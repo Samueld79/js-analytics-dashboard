@@ -120,6 +120,18 @@ export function ClientDetailPage() {
     [campaignByMonth],
   );
 
+  // ROAS for selected period (ventas / spend)
+  const periodSales = useMemo(() => {
+    if (activePeriod === 'all') return sales.reduce((s, r) => s + r.total_sales, 0);
+    return sales.filter((r) => r.date.startsWith(activePeriod)).reduce((s, r) => s + r.total_sales, 0);
+  }, [sales, activePeriod]);
+
+  const periodRoas = useMemo(() => {
+    const spend = periodKpi?.spend ?? 0;
+    if (spend <= 0 || periodSales <= 0) return null;
+    return periodSales / spend;
+  }, [periodKpi, periodSales]);
+
   // Bar chart: year view combining campaign spend + manual sales
   const salesByMonth = useMemo(() => {
     const map = new Map<string, number>();
@@ -298,7 +310,7 @@ export function ClientDetailPage() {
           { label: 'Mensajes', value: formatNumber(periodKpi?.messages ?? 0), sub: 'conversaciones iniciadas' },
           { label: 'Alcance', value: formatNumber(periodKpi?.reach ?? 0), sub: 'personas únicas' },
           { label: 'Impresiones', value: formatNumber(periodKpi?.impressions ?? 0), sub: 'veces mostrado' },
-          { label: 'CPM', value: periodKpi && periodKpi.cpm > 0 ? formatCop(periodKpi.cpm) : '—', sub: 'costo por 1000 imp.' },
+          { label: 'ROAS', value: periodRoas != null ? `${periodRoas.toFixed(1)}x` : 'N/D', sub: 'RETORNO SOBRE INVERSIÓN' },
           { label: 'Frecuencia', value: periodKpi && periodKpi.frequency > 0 ? periodKpi.frequency.toFixed(2) : '—', sub: 'imp. por persona' },
         ].map((card, i) => (
           <motion.div
@@ -449,7 +461,7 @@ export function ClientDetailPage() {
                           flexShrink: 0,
                         }}
                       />
-                      {info.label} ({o.shareOfSpend.toFixed(0)}%)
+                      {info.label} ({(o.shareOfSpend * 100).toFixed(0)}%)
                     </span>
                   );
                 })}

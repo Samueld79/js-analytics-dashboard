@@ -6,11 +6,14 @@ import {
   BarChart,
   Bar,
   ComposedChart,
+  LineChart,
+  Line,
   LabelList,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import { motion, type Transition } from 'framer-motion';
@@ -22,10 +25,12 @@ import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import {
   aggregateCampaignKpisByClient,
+  aggregateCampaignMetricsByCampaign,
+  inferObjectiveFromName,
   sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
 import type { ClientMonthlyOperatingKpi } from '../lib/supabase';
-import { formatCop, formatNumber, formatRoas, sumOperatingKpis } from '../lib/utils';
+import { formatCop, formatNumber, toFiniteNumber } from '../lib/utils';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
 
@@ -362,29 +367,66 @@ export function MetricsPage() {
         const campaign = campaignByMonth.find((m) => m.month === monthKey);
         const spend = campaign?.spend ?? 0;
         const messages = campaign?.messages ?? 0;
-        const roas = getMonthRoas({ monthKey, monthlyKpis: scopedMonthlyKpis });
+        const roas = getMonthRoas({ monthKey, monthlyKpis: scopedMonthlyKpis, campaignSpend: spend });
         return { monthKey, spend, messages, roas };
       })
       .filter((r) => r.spend > 0 || r.messages > 0);
   }, [campaignByMonth, scopedMonthlyKpis, scopedSales]);
 
   const chartData = historyRows.map((row) => ({ month: row.monthKey, spend: row.spend }));
+  const trendData = historyRows.map((row) => ({ month: row.monthKey, Inversión: row.spend, Mensajes: row.messages }));
+
+  // Rows filtered to active period (reused in multiple memos)
+  const periodRows = useMemo(
+    () =>
+      activePeriod === 'all' || activePeriod === ''
+        ? campaignRows
+        : campaignRows.filter((r) => r.date.startsWith(activePeriod)),
+    [campaignRows, activePeriod],
+  );
+
+  // Per-client KPIs for selected period (used for top5 + auto-alerts)
+  const campaignByClient = useMemo(
+    () => aggregateCampaignKpisByClient(periodRows),
+    [periodRows],
+  );
 
   // Top-5 clients by spend for the selected period
   const top5ClientData = useMemo(() => {
-    const periodRows =
-      activePeriod === 'all' || activePeriod === ''
-        ? campaignRows
-        : campaignRows.filter((r) => r.date.startsWith(activePeriod));
-    const byClient = aggregateCampaignKpisByClient(periodRows);
-    return [...byClient.entries()]
+    return [...campaignByClient.entries()]
       .map(([clientId, kpi]) => {
         const client = clients.find((c) => c.id === clientId);
         return { name: client?.name ?? clientId.slice(0, 8), spend: kpi.spend };
       })
       .sort((a, b) => b.spend - a.spend)
       .slice(0, 5);
-  }, [campaignRows, activePeriod, clients]);
+  }, [campaignByClient, clients]);
+
+  // Campaign-level breakdown for campaign table
+  const campaignsByCampaign = useMemo(
+    () => aggregateCampaignMetricsByCampaign(periodRows).slice(0, 25),
+    [periodRows],
+  );
+
+  // Auto-metric alerts
+  const autoAlerts = useMemo(() => {
+    const result: { emoji: string; color: string; msg: string }[] = [];
+    if (campaignByClient.size === 0) return result;
+    for (const [clientId, kpi] of campaignByClient.entries()) {
+      const name = clients.find((c) => c.id === clientId)?.name ?? clientId.slice(0, 8);
+      if (kpi.spend === 0) {
+        result.push({ emoji: '⚪', color: 'hsl(215,15%,48%)', msg: `Sin datos este mes para ${name}` });
+        continue;
+      }
+      if (kpi.frequency > 3.0)
+        result.push({ emoji: '🔴', color: 'hsl(0,84%,60%)', msg: `Frecuencia alta en ${name} — riesgo de fatiga (${kpi.frequency.toFixed(1)}x)` });
+      if (kpi.cpm > 15_000)
+        result.push({ emoji: '🟠', color: 'hsl(30,100%,55%)', msg: `CPM elevado en ${name} — ${formatCop(kpi.cpm)}` });
+      if (kpi.messages < 50)
+        result.push({ emoji: '🟡', color: 'hsl(50,100%,55%)', msg: `Bajo volumen de conversaciones en ${name} (${kpi.messages} msgs)` });
+    }
+    return result;
+  }, [campaignByClient, clients]);
 
   const cStatus: HealthStatus = costPerConv != null ? costStatus(costPerConv) : 'neutral';
 
@@ -528,6 +570,29 @@ export function MetricsPage() {
       </div>
 
 
+      {/* ── Auto-metric alerts ── */}
+      {campaignByMonth.length > 0 && (
+        <div style={{ padding: '0 24px 12px' }}>
+          {autoAlerts.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: 'hsl(145 100% 45% / 0.07)', border: '1px solid hsl(145 100% 45% / 0.2)', fontSize: '0.76rem', color: 'hsl(145,100%,55%)' }}>
+              🟢 Todas las métricas en rango normal
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {autoAlerts.map((a, i) => (
+                <div
+                  key={i}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 8, background: `${a.color}10`, border: `1px solid ${a.color}35`, fontSize: '0.76rem' }}
+                >
+                  <span>{a.emoji}</span>
+                  <span style={{ color: 'hsl(215,15%,75%)' }}>{a.msg}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="metrics-main-grid">
         <motion.div
           className="card-glass metrics-chart-card"
@@ -595,50 +660,66 @@ export function MetricsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.44 } as Transition}
         >
-          <span className="number-label">ÚLTIMOS 6 MESES</span>
-          <div className="table-wrap" style={{ marginTop: 14 }}>
-            <table className="metrics-history-table">
-              <thead>
-                <tr>
-                  <th>Mes</th>
-                  <th className="num-col">Inversión</th>
-                  <th className="num-col">Mensajes</th>
-                  <th className="num-col">ROAS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historyRows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      style={{
-                        textAlign: 'center',
-                        padding: '28px 0',
-                        color: 'hsl(215,15%,45%)',
-                        fontSize: '0.82rem',
-                      }}
-                    >
-                      Sin histórico disponible
-                    </td>
-                  </tr>
-                ) : (
-                  historyRows.map((row) => (
-                    <tr
-                      key={row.monthKey}
-                      className={row.monthKey === activePeriod ? 'is-current-month' : ''}
-                    >
-                      <td>{shortMonthLabel(row.monthKey)}</td>
-                      <td className="num-col">{formatCop(row.spend)}</td>
-                      <td className="num-col">{formatNumber(row.messages)}</td>
-                      <td className="num-col">
-                        <span className={roasClass(row.roas)}>{formatRoas(row.roas)}</span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <span className="number-label">TENDENCIA — ÚLTIMOS 6 MESES</span>
+          {trendData.length === 0 ? (
+            <p className="empty-note" style={{ marginTop: 32 }}>Sin histórico disponible.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={trendData} margin={{ top: 8, right: 52, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={shortMonthLabel}
+                  tick={{ fontSize: 10, fill: CHART.axis, fontFamily: 'JetBrains Mono' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  yAxisId="spend"
+                  tickFormatter={formatCopCompact}
+                  tick={{ fontSize: 10, fill: CHART.cyan, fontFamily: 'JetBrains Mono' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={56}
+                />
+                <YAxis
+                  yAxisId="msgs"
+                  orientation="right"
+                  tick={{ fontSize: 10, fill: CHART.violet, fontFamily: 'JetBrains Mono' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                />
+                <Tooltip
+                  formatter={(v: unknown, name: unknown) => [
+                    name === 'Inversión' ? formatCop(v as number) : formatNumber(v as number),
+                    String(name),
+                  ]}
+                  labelFormatter={(l: unknown) => shortMonthLabel(String(l))}
+                  contentStyle={TOOLTIP_STYLE}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'JetBrains Mono', color: CHART.axis }} />
+                <Line
+                  yAxisId="spend"
+                  type="monotone"
+                  dataKey="Inversión"
+                  stroke={CHART.cyan}
+                  strokeWidth={2}
+                  dot={{ fill: CHART.cyan, r: 3, strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: CHART.cyan }}
+                />
+                <Line
+                  yAxisId="msgs"
+                  type="monotone"
+                  dataKey="Mensajes"
+                  stroke={CHART.violet}
+                  strokeWidth={2}
+                  dot={{ fill: CHART.violet, r: 3, strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: CHART.violet }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </motion.div>
       </div>
 
@@ -661,24 +742,93 @@ export function MetricsPage() {
           )}
         </div>
       )}
+
+      {/* ── Campaign table ── */}
+      {campaignsByCampaign.length > 0 && (
+        <div style={{ padding: '0 24px 32px' }}>
+          <p className="number-label" style={{ marginBottom: 10, color: 'hsl(215,15%,36%)' }}>
+            CAMPAÑAS — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
+            <span style={{ marginLeft: 8, color: 'hsl(180,100%,50%)' }}>({campaignsByCampaign.length})</span>
+          </p>
+          <div className="card-glass" style={{ overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    {['Campaña', 'Tipo', 'Estado', 'Inversión', 'Mensajes', 'Costo/Msg'].map((h, i) => (
+                      <th key={h} style={{ padding: '9px 12px', color: 'hsl(215,15%,42%)', fontWeight: 500, textAlign: i >= 3 ? 'right' : 'left', whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono', fontSize: '0.6rem', letterSpacing: '0.06em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const avgCostPerMsg = (() => {
+                      const rows = campaignsByCampaign.filter((c) => c.messages > 0);
+                      if (!rows.length) return null;
+                      const s = rows.reduce((a, c) => a + c.spend, 0);
+                      const m = rows.reduce((a, c) => a + c.messages, 0);
+                      return m > 0 ? s / m : null;
+                    })();
+                    return campaignsByCampaign.map((c) => {
+                      const tipo = inferObjectiveFromName(c.campaignName);
+                      const tipoColors: Record<string, string> = { Interacción: CHART.violet, Tráfico: CHART.cyan, Ventas: CHART.green, Reconocimiento: CHART.amber, Presentación: '#38bdf8', Evaluación: CHART.orange };
+                      const tipoColor = tipoColors[tipo] ?? 'rgba(255,255,255,0.3)';
+                      const isActive = c.effectiveStatus === 'ACTIVE';
+                      const costPerMsg = c.messages > 0 ? c.spend / c.messages : null;
+                      const isHighCost = avgCostPerMsg != null && costPerMsg != null && costPerMsg > avgCostPerMsg * 1.5;
+                      return (
+                        <tr key={c.campaignId} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: isHighCost ? 'hsl(0 84% 60% / 0.05)' : 'transparent' }}>
+                          <td style={{ padding: '8px 12px', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
+                            {c.campaignName}
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: 4, background: `${tipoColor}18`, color: tipoColor, border: `1px solid ${tipoColor}30` }}>{tipo}</span>
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: 4, background: isActive ? 'hsl(145 100% 45% / 0.1)' : 'rgba(255,255,255,0.05)', color: isActive ? 'hsl(145,100%,50%)' : 'hsl(215,15%,45%)' }}>
+                              {isActive ? '🟢 Activa' : (c.effectiveStatus ?? '⚫ —')}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'JetBrains Mono', fontSize: '0.76rem', color: 'hsl(180,100%,50%)' }}>{formatCop(c.spend)}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'JetBrains Mono', fontSize: '0.76rem', color: 'hsl(215,15%,60%)' }}>{c.messages > 0 ? formatNumber(c.messages) : '—'}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'JetBrains Mono', fontSize: '0.72rem', color: isHighCost ? 'hsl(0,84%,65%)' : 'hsl(215,15%,55%)' }}>
+                            {costPerMsg != null ? formatCop(costPerMsg) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/** Returns real_roas for a given month from consolidated KPI rows; 0 if unavailable. */
+/**
+ * Returns real_roas for a given month.
+ * Uses campaignSpend (from ad_campaign_metrics) as denominator if provided and > 0,
+ * because the legacy client_monthly_operating_kpis.spend may be in a different scale.
+ */
 function getMonthRoas(params: {
   monthKey: string;
   monthlyKpis: ClientMonthlyOperatingKpi[];
+  campaignSpend?: number;
 }): number {
   const monthRows = params.monthlyKpis.filter(
     (row) => getMonthKey(row.month) === params.monthKey,
   );
-  if (monthRows.length > 0) return sumOperatingKpis(monthRows).real_roas;
-  return 0;
+  if (monthRows.length === 0) return 0;
+  const totalSales = monthRows.reduce((sum, row) => sum + toFiniteNumber(row.total_sales), 0);
+  if (totalSales <= 0) return 0;
+  const spend =
+    params.campaignSpend != null && params.campaignSpend > 0
+      ? params.campaignSpend
+      : monthRows.reduce((sum, row) => sum + toFiniteNumber(row.spend), 0);
+  if (spend <= 0) return 0;
+  return Math.round((totalSales / spend) * 100) / 100;
 }
 
-function roasClass(roas: number): string {
-  if (roas >= 3) return 'roas-pill roas-good';
-  if (roas >= 2) return 'roas-pill roas-ok';
-  return 'roas-pill roas-low';
-}

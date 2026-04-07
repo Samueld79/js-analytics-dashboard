@@ -274,8 +274,16 @@ export function ClientsPage() {
             Cargando clientes...
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: 190 }} />
+                <col style={{ width: 100 }} />
+                <col style={{ width: 140 }} />
+                <col style={{ width: 76 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 72 }} />
+              </colgroup>
               <thead>
                 <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.06)' }}>
                   {['Cliente', 'Inversión', 'Alcance', 'CPM', 'Actualizado', 'Acciones'].map(
@@ -339,7 +347,7 @@ export function ClientsPage() {
                               {client.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div style={{ minWidth: 0 }}>
+                          <div style={{ minWidth: 0, overflow: 'hidden' }}>
                             <Link
                               to={`/clients/${client.id}`}
                               style={{
@@ -350,6 +358,9 @@ export function ClientsPage() {
                                 textDecoration: 'none',
                                 display: 'block',
                                 lineHeight: 1.2,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
                               }}
                             >
                               {client.name}

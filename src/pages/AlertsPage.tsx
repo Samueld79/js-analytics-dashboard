@@ -674,8 +674,18 @@ export function AlertsPage() {
           </div>
         </div>
 
-        {/* ── Right: Tasks ── */}
-        <div className={`tasks-col${mobileTab !== 'tasks' ? ' mobile-hidden' : ''}`} style={COLUMN_STYLE}>
+        {/* ── Right: Rendimiento Diario + Tareas de Campañas ── */}
+        <div
+          className={`tasks-col${mobileTab !== 'tasks' ? ' mobile-hidden' : ''}`}
+          style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', paddingBottom: 16 }}
+        >
+          {/* Section 1: Rendimiento Diario */}
+          <WeeklyPerformance />
+
+          {/* Divider */}
+          <div style={{ height: 1, background: 'hsl(215 15% 15% / 0.9)', flexShrink: 0 }} />
+
+          {/* Section 2: Tareas de Campañas */}
           <TasksPanel clients={clients} isInternal={isInternal} fabTrigger={fabTrigger} />
         </div>
       </div>
@@ -810,18 +820,18 @@ function TasksPanel({
   }
 
   return (
-    <div style={COLUMN_STYLE}>
+    <>
       <div
         style={{
           background: 'hsl(220,18%,7%)',
           border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 10, padding: '14px 16px',
-          display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1,
+          display: 'flex', flexDirection: 'column', flexShrink: 0,
         }}
       >
         {/* Panel header */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexShrink: 0, flexWrap: 'wrap' }}>
-          <span className="number-label" style={{ fontSize: '0.62rem', letterSpacing: '0.1em' }}>TAREAS</span>
+          <span className="number-label" style={{ fontSize: '0.62rem', letterSpacing: '0.1em' }}>TAREAS DE CAMPAÑAS</span>
           {overdueCount > 0 && (
             <span style={{ fontSize: '0.64rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'hsl(0 84% 60% / 0.15)', color: 'hsl(0,84%,65%)', border: '1px solid hsl(0 84% 60% / 0.3)' }}>
               ⚠ {overdueCount} vencida{overdueCount !== 1 ? 's' : ''}
@@ -876,8 +886,7 @@ function TasksPanel({
         {taskNotice && <p className="empty-note" style={{ marginBottom: 8, flexShrink: 0 }}>{taskNotice}</p>}
 
         {/* Task list */}
-        <div style={{ ...SCROLL_AREA, paddingRight: 2 }}>
-          <WeeklyPerformance />
+        <div style={{ maxHeight: 440, overflowY: 'auto', overflowX: 'hidden', paddingRight: 2 }}>
           {displayedTasks.length === 0 ? (
             <p style={{ fontSize: '0.8rem', color: 'hsl(215,15%,42%)', textAlign: 'center', padding: '24px 0' }}>
               {taskTab === 'pending' ? 'Sin tareas pendientes' : 'Sin tareas realizadas'}
@@ -1100,6 +1109,6 @@ function TasksPanel({
           }}
         />
       )}
-    </div>
+    </>
   );
 }
