@@ -4,6 +4,7 @@ import { useClients } from '../hooks/useClients';
 import { useTasks } from '../hooks/useData';
 import { useAuth } from '../hooks/useAuth';
 import { createTasks } from '../services/tasks';
+import { WeeklyPerformance } from '../components/WeeklyPerformance';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   AlertTriangle,
@@ -876,6 +877,7 @@ function TasksPanel({
 
         {/* Task list */}
         <div style={{ ...SCROLL_AREA, paddingRight: 2 }}>
+          <WeeklyPerformance />
           {displayedTasks.length === 0 ? (
             <p style={{ fontSize: '0.8rem', color: 'hsl(215,15%,42%)', textAlign: 'center', padding: '24px 0' }}>
               {taskTab === 'pending' ? 'Sin tareas pendientes' : 'Sin tareas realizadas'}
