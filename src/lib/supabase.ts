@@ -806,3 +806,16 @@ export type ServiceMutationResult<T> = {
   data: T | null;
   error: string | null;
 };
+
+export type DailyChecklistEntry = {
+  id: string;
+  user_name: 'juanca' | 'samuel';
+  task_id: string;
+  task_name: string;
+  task_points: number;
+  completed: boolean;
+  date: string; // YYYY-MM-DD
+  week_number: number;
+  year: number;
+  created_at: string;
+};
