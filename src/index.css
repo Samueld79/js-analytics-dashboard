@@ -6611,6 +6611,17 @@ table tbody td {
 /* ══════════════════════════════════════════════════════
    RESPONSIVE MOBILE — < 768px
    ══════════════════════════════════════════════════════ */
+/* ── Alerts: tablet — 2 columns, alerts spans 2 rows, rendimiento+tasks stack ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .alerts-grid {
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-rows: auto auto;
+  }
+  .alerts-col  { grid-row: 1 / 3; overflow-y: auto; }
+  .rendimiento-col { grid-column: 2; grid-row: 1; overflow-y: auto; }
+  .tasks-col   { grid-column: 2; grid-row: 2; overflow-y: auto; }
+}
+
 @media (max-width: 768px) {
 
   /* ── General ── */
@@ -6768,9 +6779,10 @@ table tbody td {
   /* ── Alerts: mobile tabs ── */
   .alerts-grid {
     grid-template-columns: 1fr !important;
-    paddingBottom: 80px;
+    padding-bottom: 80px;
   }
   .alerts-col.mobile-hidden,
+  .rendimiento-col.mobile-hidden,
   .tasks-col.mobile-hidden { display: none !important; }
 
   /* Tab bar */

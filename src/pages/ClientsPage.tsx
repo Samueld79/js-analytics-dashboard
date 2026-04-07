@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
 import { useCampaignSummary, useAlerts } from '../hooks/useData';
@@ -8,13 +8,12 @@ import {
   sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
 import { getMonthLabel } from '../utils/monthLabel';
-import { ExternalLink, Eye, Plus, Search, Users } from 'lucide-react';
+import { ExternalLink, Plus, Search, Users } from 'lucide-react';
 import { formatCop, formatNumber } from '../lib/utils';
 
 type StatusFilter = 'all' | 'active' | 'paused';
 
 export function ClientsPage() {
-  const navigate = useNavigate();
   const { clients, loading, saving, error, createClient } = useClients();
   // Unified campaign source — same hook as DashboardPage
   const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary();
@@ -274,19 +273,19 @@ export function ClientsPage() {
             Cargando clientes...
           </div>
         ) : (
-          <div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: 190 }} />
+                <col style={{ width: 200 }} />
+                <col style={{ width: 110 }} />
+                <col style={{ width: 160 }} />
+                <col style={{ width: 70 }} />
                 <col style={{ width: 100 }} />
-                <col style={{ width: 140 }} />
-                <col style={{ width: 76 }} />
                 <col style={{ width: 80 }} />
-                <col style={{ width: 72 }} />
               </colgroup>
               <thead>
                 <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.06)' }}>
-                  {['Cliente', 'Inversión', 'Alcance', 'CPM', 'Actualizado', 'Acciones'].map(
+                  {['Cliente', 'Inversión', 'Alcance', 'CPM', 'Actualizado', 'Portal'].map(
                     (h) => (
                       <th
                         key={h}
@@ -414,27 +413,17 @@ export function ClientsPage() {
                         </div>
                       </td>
 
-                      {/* Acciones — icon only con title tooltip */}
+                      {/* Portal — dedicated column, always visible */}
                       <td style={{ padding: '9px 14px' }}>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button
-                            title="Ver cliente"
-                            className="btn-ghost"
-                            style={{ padding: '4px 6px', cursor: 'pointer', border: '1px solid hsl(0 0% 100% / 0.08)', display: 'flex', alignItems: 'center', color: 'hsl(215,15%,55%)' }}
-                            onClick={() => void navigate(`/clients/${client.id}`)}
-                          >
-                            <Eye size={12} />
-                          </button>
-                          <a
-                            href={`/portal/${client.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="Abrir portal"
-                            style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid hsl(180 100% 50% / 0.2)', color: 'hsl(180,100%,50%)', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
-                          >
-                            <ExternalLink size={12} />
-                          </a>
-                        </div>
+                        <a
+                          href={`/portal/${client.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Abrir portal del cliente"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: '4px', border: '1px solid hsl(180 100% 50% / 0.3)', color: 'hsl(180,100%,60%)', textDecoration: 'none', fontFamily: 'JetBrains Mono', fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', background: 'hsl(180 100% 50% / 0.06)', whiteSpace: 'nowrap' }}
+                        >
+                          <ExternalLink size={11} /> Ver
+                        </a>
                       </td>
                     </tr>
                   );

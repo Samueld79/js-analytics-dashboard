@@ -335,7 +335,7 @@ export function AlertsPage() {
   const [customDates, setCustomDates] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [mobileTab, setMobileTab] = useState<'alerts' | 'tasks'>('alerts');
+  const [mobileTab, setMobileTab] = useState<'alerts' | 'rendimiento' | 'tasks'>('alerts');
   const [fabTrigger, setFabTrigger] = useState(0);
 
   // Monday weekly-report alert (once per mount per week)
@@ -473,6 +473,12 @@ export function AlertsPage() {
           Alertas {unread > 0 && <span className="alerts-tab-badge">{unread}</span>}
         </button>
         <button
+          className={`alerts-tab-btn${mobileTab === 'rendimiento' ? ' active' : ''}`}
+          onClick={() => setMobileTab('rendimiento')}
+        >
+          Rendimiento
+        </button>
+        <button
           className={`alerts-tab-btn${mobileTab === 'tasks' ? ' active' : ''}`}
           onClick={() => setMobileTab('tasks')}
         >
@@ -480,19 +486,19 @@ export function AlertsPage() {
         </button>
       </div>
 
-      {/* Two-column fixed-height grid */}
+      {/* Three-column layout: Alertas | Rendimiento | Tareas */}
       <div
         className="alerts-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 20,
+          gridTemplateColumns: '40% 1fr 1fr',
+          gap: 16,
           flex: 1,
           minHeight: 0,
           paddingBottom: 20,
         }}
       >
-        {/* ── Left: Alerts ── */}
+        {/* ── Col 1: Alerts ── */}
         <div className={`alerts-col${mobileTab !== 'alerts' ? ' mobile-hidden' : ''}`} style={COLUMN_STYLE}>
           <div className="filter-row" style={{ marginBottom: 10, flexWrap: 'wrap', flexShrink: 0 }}>
             {(['open', 'snoozed', 'resolved', 'dismissed'] as const).map((v) => (
@@ -674,18 +680,25 @@ export function AlertsPage() {
           </div>
         </div>
 
-        {/* ── Right: Rendimiento Diario + Tareas de Campañas ── */}
+        {/* ── Col 2: Rendimiento Diario ── */}
+        <div
+          className={`rendimiento-col${mobileTab !== 'rendimiento' ? ' mobile-hidden' : ''}`}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', paddingBottom: 4 }}
+        >
+          {/* Card header */}
+          <div style={{ marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+            <span style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', color: 'hsl(180,100%,50%)', fontFamily: 'JetBrains Mono' }}>
+              RENDIMIENTO DIARIO
+            </span>
+          </div>
+          <WeeklyPerformance />
+        </div>
+
+        {/* ── Col 3: Tareas de Campañas ── */}
         <div
           className={`tasks-col${mobileTab !== 'tasks' ? ' mobile-hidden' : ''}`}
-          style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', paddingBottom: 16 }}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', paddingBottom: 4 }}
         >
-          {/* Section 1: Rendimiento Diario */}
-          <WeeklyPerformance />
-
-          {/* Divider */}
-          <div style={{ height: 1, background: 'hsl(215 15% 15% / 0.9)', flexShrink: 0 }} />
-
-          {/* Section 2: Tareas de Campañas */}
           <TasksPanel clients={clients} isInternal={isInternal} fabTrigger={fabTrigger} />
         </div>
       </div>

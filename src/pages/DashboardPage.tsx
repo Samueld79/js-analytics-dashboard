@@ -313,9 +313,16 @@ export function DashboardPage() {
           executiveAdMetrics.filter((r) => r.client_id === client.id),
           executiveSales.filter((r) => r.client_id === client.id),
         );
-      // Campaign spend is the canonical source; operating KPIs used for ROAS/Ventas
+      // Campaign spend is the canonical source — also recompute real_roas with correct spend
       const monthTotals = campaignRow
-        ? { ...baseTotals, spend: campaignRow.spend }
+        ? {
+            ...baseTotals,
+            spend: campaignRow.spend,
+            real_roas:
+              campaignRow.spend > 0 && baseTotals.total_sales > 0
+                ? baseTotals.total_sales / campaignRow.spend
+                : 0,
+          }
         : baseTotals;
       const meta = metaByClient[client.id] ?? null;
       const socialMetric =

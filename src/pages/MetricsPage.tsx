@@ -20,7 +20,7 @@ import { motion, type Transition } from 'framer-motion';
 import { BarChart3, DollarSign, MessageCircle, Percent, TrendingDown, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useMonthlyOperatingKpis, useCampaignSummary } from '../hooks/useData';
+import { useCampaignSummary } from '../hooks/useData';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import {
@@ -29,8 +29,7 @@ import {
   inferObjectiveFromName,
   sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
-import type { ClientMonthlyOperatingKpi } from '../lib/supabase';
-import { formatCop, formatNumber, toFiniteNumber } from '../lib/utils';
+import { formatCop, formatNumber } from '../lib/utils';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
 
@@ -312,17 +311,8 @@ export function MetricsPage() {
   // Primary data source: ad_campaign_metrics
   const { rows: campaignRows, byMonth: campaignByMonth, loading: campaignLoading } = useCampaignSummary(queryClientId, 730);
 
-  // Historical ROAS: monthly KPI rows + manual sales
-  const { monthlyKpis } = useMonthlyOperatingKpis(queryClientId, 12);
   const { sales } = useDailySales({ clientId: queryClientId, days: 730 });
 
-  const scopedMonthlyKpis = useMemo(
-    () =>
-      isInternal
-        ? monthlyKpis
-        : monthlyKpis.filter((row) => visibleClientIds.has(row.client_id)),
-    [isInternal, monthlyKpis, visibleClientIds],
-  );
   const scopedSales = useMemo(
     () => (isInternal ? sales : sales.filter((row) => visibleClientIds.has(row.client_id))),
     [isInternal, sales, visibleClientIds],
@@ -353,11 +343,17 @@ export function MetricsPage() {
   const costPerConv =
     periodKpi && periodKpi.messages > 0 ? periodKpi.spend / periodKpi.messages : null;
 
-  // Historical section — last 6 months, spend + messages from campaigns, ROAS from KPI rows
+  // Historical section — last 6 months, spend + messages from campaigns, ROAS from daily_sales
   const historyRows = useMemo(() => {
+    // Build sales totals from daily_sales (canonical, full-COP values)
+    const salesByMonth = new Map<string, number>();
+    scopedSales.forEach((s) => {
+      const key = getMonthKey(s.date);
+      salesByMonth.set(key, (salesByMonth.get(key) ?? 0) + s.total_sales);
+    });
+
     const allMonths = new Set<string>([
       ...campaignByMonth.map((m) => m.month),
-      ...scopedMonthlyKpis.map((r) => getMonthKey(r.month)),
       ...scopedSales.map((r) => getMonthKey(r.date)),
     ]);
     return [...allMonths]
@@ -367,11 +363,15 @@ export function MetricsPage() {
         const campaign = campaignByMonth.find((m) => m.month === monthKey);
         const spend = campaign?.spend ?? 0;
         const messages = campaign?.messages ?? 0;
-        const roas = getMonthRoas({ monthKey, monthlyKpis: scopedMonthlyKpis, campaignSpend: spend });
+        const monthlySales = salesByMonth.get(monthKey) ?? 0;
+        const roas =
+          spend > 0 && monthlySales > 0
+            ? Math.round((monthlySales / spend) * 100) / 100
+            : 0;
         return { monthKey, spend, messages, roas };
       })
       .filter((r) => r.spend > 0 || r.messages > 0);
-  }, [campaignByMonth, scopedMonthlyKpis, scopedSales]);
+  }, [campaignByMonth, scopedSales]);
 
   const chartData = historyRows.map((row) => ({ month: row.monthKey, spend: row.spend }));
   const trendData = historyRows.map((row) => ({ month: row.monthKey, Inversión: row.spend, Mensajes: row.messages }));
@@ -808,27 +808,4 @@ export function MetricsPage() {
   );
 }
 
-/**
- * Returns real_roas for a given month.
- * Uses campaignSpend (from ad_campaign_metrics) as denominator if provided and > 0,
- * because the legacy client_monthly_operating_kpis.spend may be in a different scale.
- */
-function getMonthRoas(params: {
-  monthKey: string;
-  monthlyKpis: ClientMonthlyOperatingKpi[];
-  campaignSpend?: number;
-}): number {
-  const monthRows = params.monthlyKpis.filter(
-    (row) => getMonthKey(row.month) === params.monthKey,
-  );
-  if (monthRows.length === 0) return 0;
-  const totalSales = monthRows.reduce((sum, row) => sum + toFiniteNumber(row.total_sales), 0);
-  if (totalSales <= 0) return 0;
-  const spend =
-    params.campaignSpend != null && params.campaignSpend > 0
-      ? params.campaignSpend
-      : monthRows.reduce((sum, row) => sum + toFiniteNumber(row.spend), 0);
-  if (spend <= 0) return 0;
-  return Math.round((totalSales / spend) * 100) / 100;
-}
 
