@@ -80,7 +80,7 @@ export function ClientDetailPage() {
   } = useClientWorkspace(id, 400);
 
   // Single source: ad_campaign_metrics (1 year of history; wait until client UUID is available)
-  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(client?.id, 365, !!client?.id);
+  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(client?.id, 365);
 
   // Period selector — null = auto-select most recent
   const [selectedPeriod, setSelectedPeriod] = useState<string | 'all' | null>(null);
@@ -698,3 +698,4 @@ export function ClientDetailPage() {
     </div>
   );
 }
+src/pages/ClientDetailPage.tsx
