@@ -29,7 +29,16 @@ import {
   inferObjectiveFromName,
   sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
-import { formatCop, formatNumber } from '../lib/utils';
+import { formatCop, formatNumber, toFiniteNumber } from '../lib/utils';
+
+// Portal-only formatter: always shows 2 decimal places (punto miles, coma decimales).
+// Does NOT replace the global formatCop — this is only for the public client portal.
+function formatCopFull(value: unknown): string {
+  const amount = toFiniteNumber(value);
+  if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(2).replace('.', ',')} MM`;
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(2).replace('.', ',')}M`;
+  return `$${amount.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
 
@@ -70,8 +79,8 @@ export function ClientDetailPage() {
     strategies,
   } = useClientWorkspace(id, 400);
 
-  // Single source: ad_campaign_metrics (2 years of history)
-  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(client?.id, 730);
+  // Single source: ad_campaign_metrics (1 year of history; wait until client UUID is available)
+  const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(client?.id, 365, !!client?.id);
 
   // Period selector — null = auto-select most recent
   const [selectedPeriod, setSelectedPeriod] = useState<string | 'all' | null>(null);
@@ -306,11 +315,12 @@ export function ClientDetailPage() {
       {/* ── KPI Grid ── */}
       <div className="portal-kpi-grid">
         {[
-          { label: 'Inversión', value: formatCop(periodKpi?.spend ?? 0), sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
+          { label: 'Ventas Totales', value: periodSales > 0 ? formatCopFull(periodSales) : 'N/D', sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
+          { label: 'Inversión', value: formatCopFull(periodKpi?.spend ?? 0), sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
           { label: 'Mensajes', value: formatNumber(periodKpi?.messages ?? 0), sub: 'conversaciones iniciadas' },
           { label: 'Alcance', value: formatNumber(periodKpi?.reach ?? 0), sub: 'personas únicas' },
           { label: 'Impresiones', value: formatNumber(periodKpi?.impressions ?? 0), sub: 'veces mostrado' },
-          { label: 'ROAS', value: periodRoas != null ? `${periodRoas.toFixed(1)}x` : 'N/D', sub: 'RETORNO SOBRE INVERSIÓN' },
+          { label: 'ROAS', value: periodRoas != null ? `${periodRoas.toFixed(1)}x` : 'N/D', sub: 'retorno sobre inversión' },
           { label: 'Frecuencia', value: periodKpi && periodKpi.frequency > 0 ? periodKpi.frequency.toFixed(2) : '—', sub: 'imp. por persona' },
         ].map((card, i) => (
           <motion.div
