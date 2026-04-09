@@ -139,42 +139,34 @@ export function useTasks(clientId?: string) {
   return { tasks, loading, updateTask, deleteTask, reload: load };
 }
 
-// Module-level caches — survive navigation within the app session.
-// Key: clientId or '__all__'
-const _monthlyHistoryCache = new Map<string, CampaignAggregateByMonth[]>();
-const _campaignSummaryCache = new Map<string, AdCampaignMetric[]>();
-
-// Fetches 1 year of ad_campaign_metrics and aggregates them by month.
+// Fetches 2 years of ad_campaign_metrics and aggregates them by month.
 // clientId=undefined → all clients (MetricsPage "Todos los clientes" mode).
 // clientId=UUID      → filtered to that client.
-// Results are cached in memory — use reload(true) to force a fresh fetch.
 export function useCampaignMonthlyHistory(clientId?: string) {
-  const cacheKey = clientId ?? '__all__';
-  const [byMonth, setByMonth] = useState<CampaignAggregateByMonth[]>(
-    () => _monthlyHistoryCache.get(cacheKey) ?? [],
-  );
-  const [loading, setLoading] = useState(!_monthlyHistoryCache.has(cacheKey));
+  const [byMonth, setByMonth] = useState<CampaignAggregateByMonth[]>([]);
+  const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<CampaignAggregateByMonth[] | null>(null);
 
-  const load = useCallback(async (force = false) => {
-    if (!force && _monthlyHistoryCache.has(cacheKey)) return;
-    setLoading(true);
+  const load = useCallback(async () => {
+    if (!prevDataRef.current) setLoading(true);
     try {
-      const rows = await listAdCampaignMetrics({ clientId, days: 365 });
+      const rows = await listAdCampaignMetrics({ clientId, days: 730 });
+      console.log('[useCampaignMonthlyHistory] clientId:', clientId, 'rows:', rows.length, 'months:', [...new Set(rows.map((r) => r.date.slice(0, 7)))]);
       const agg = aggregateCampaignMetricsByMonth(rows);
-      _monthlyHistoryCache.set(cacheKey, agg);
+      prevDataRef.current = agg;
       setByMonth(agg);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [clientId, cacheKey]);
+  }, [clientId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  return { byMonth, loading, reload: () => load(true) };
+  return { byMonth, loading, reload: load };
 }
 
 /**
@@ -189,28 +181,23 @@ export function useCampaignMonthlyHistory(clientId?: string) {
  * Pass clientId to scope to a single client; omit for all clients.
  * days=90 covers the three available periods (2026-01-31, 2026-02-28, 2026-03-17).
  */
-// enabled=false → skip fetch (use when clientId may be temporarily undefined before data loads)
-export function useCampaignSummary(clientId?: string, days = 90, enabled = true) {
-  const cacheKey = `${clientId ?? '__all__'}:${days}`;
-  const [rows, setRows] = useState<AdCampaignMetric[]>(
-    () => _campaignSummaryCache.get(cacheKey) ?? [],
-  );
-  const [loading, setLoading] = useState(enabled && !_campaignSummaryCache.has(cacheKey));
+export function useCampaignSummary(clientId?: string, days = 90) {
+  const [rows, setRows] = useState<AdCampaignMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+  const prevDataRef = useRef<AdCampaignMetric[] | null>(null);
 
-  const load = useCallback(async (force = false) => {
-    if (!enabled) return;
-    if (!force && _campaignSummaryCache.has(cacheKey)) return;
-    setLoading(true);
+  const load = useCallback(async () => {
+    if (!prevDataRef.current) setLoading(true);
     try {
       const data = await listAdCampaignMetrics({ clientId, days });
-      _campaignSummaryCache.set(cacheKey, data);
+      prevDataRef.current = data;
       setRows(data);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [clientId, days, cacheKey, enabled]);
+  }, [clientId, days]);
 
   useEffect(() => {
     void load();
@@ -219,7 +206,7 @@ export function useCampaignSummary(clientId?: string, days = 90, enabled = true)
   const byMonth = useMemo(() => aggregateCampaignMetricsByMonth(rows), [rows]);
 
   // rows exposed so callers can filter by period and call aggregateCampaignKpisByClient
-  return { rows, byMonth, loading, reload: () => load(true) };
+  return { rows, byMonth, loading, reload: load };
 }
 
 export function useAdCampaignMetrics(clientId?: string, days = 90) {

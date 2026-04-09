@@ -20,11 +20,7 @@ type ListAlertsParams = {
 export async function listAlerts({ clientId }: ListAlertsParams = {}): Promise<Alert[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
-  let query = supabase
-    .from('alerts')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(200);
+  let query = supabase.from('alerts').select('*').order('created_at', { ascending: false });
   if (clientId) query = query.eq('client_id', clientId);
 
   const { data, error } = await query;

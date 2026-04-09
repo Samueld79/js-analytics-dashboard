@@ -309,9 +309,9 @@ export function MetricsPage() {
       : selectedClientId;
 
   // Primary data source: ad_campaign_metrics
-  const { rows: campaignRows, byMonth: campaignByMonth, loading: campaignLoading } = useCampaignSummary(queryClientId, 365);
+  const { rows: campaignRows, byMonth: campaignByMonth, loading: campaignLoading } = useCampaignSummary(queryClientId, 730);
 
-  const { sales } = useDailySales({ clientId: queryClientId, days: 365 });
+  const { sales } = useDailySales({ clientId: queryClientId, days: 730 });
 
   const scopedSales = useMemo(
     () => (isInternal ? sales : sales.filter((row) => visibleClientIds.has(row.client_id))),

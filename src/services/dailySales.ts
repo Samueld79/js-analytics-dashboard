@@ -74,10 +74,7 @@ export async function listDailySales({
 }: ListDailySalesParams = {}): Promise<DailySale[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
-  let query = supabase
-    .from('daily_sales')
-    .select('id,client_id,date,total_sales,new_client_sales,repeat_sales,physical_store_sales,online_sales,observations,status,registered_by')
-    .order('date', { ascending: false });
+  let query = supabase.from('daily_sales').select('*').order('date', { ascending: false });
 
   if (startDate) {
     query = query.gte('date', startDate);
