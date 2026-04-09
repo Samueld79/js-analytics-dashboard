@@ -136,9 +136,9 @@ export function SalesPage() {
       : undefined;
 
   const { sales, addSale, removeSale, loading: salesLoading } = useDailySales(
-    { clientId: accessQueryId, days: 730 },
+    { clientId: accessQueryId, days: 365 },
   );
-  const { rows: allCampaignRows } = useCampaignSummary(accessQueryId, 730);
+  const { rows: allCampaignRows } = useCampaignSummary(accessQueryId, 365);
 
   // ── in-memory filter by UI-selected client ────────────────────────────────
   const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;

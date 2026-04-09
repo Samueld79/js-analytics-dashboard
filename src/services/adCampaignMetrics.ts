@@ -426,7 +426,9 @@ export async function listAdCampaignMetrics({
 
   let query = supabase
     .from('ad_campaign_metrics')
-    .select('*')
+    .select(
+      'client_id,campaign_id,campaign_name,objective,effective_status,date,spend,reach,impressions,clicks,messages,messaging_started,messaging_connections,messaging_first_reply,leads,purchases,purchase_value,link_clicks,page_engagement,post_engagement,video_views,thruplays,profile_visits',
+    )
     .order('date', { ascending: false })
     .order('spend', { ascending: false });
 

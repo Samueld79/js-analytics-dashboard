@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   isSupabaseConfigured,
   type DailySale,
@@ -14,14 +14,16 @@ type UseDailySalesParams = {
   endDate?: string;
 };
 
-export function useDailySales(clientIdOrParams?: string | UseDailySalesParams, days = 30) {
-  const params = useMemo(
-    () =>
-      typeof clientIdOrParams === 'string'
-        ? { clientId: clientIdOrParams, days }
-        : { days, ...(clientIdOrParams ?? {}) },
-    [clientIdOrParams, days],
-  );
+export function useDailySales(clientIdOrParams?: string | UseDailySalesParams, defaultDays = 30) {
+  // Extract primitives immediately so inline-object callers don't cause re-fetch loops.
+  const clientId =
+    typeof clientIdOrParams === 'string' ? clientIdOrParams : clientIdOrParams?.clientId;
+  const days =
+    typeof clientIdOrParams === 'object' ? (clientIdOrParams?.days ?? defaultDays) : defaultDays;
+  const startDate =
+    typeof clientIdOrParams === 'object' ? clientIdOrParams?.startDate : undefined;
+  const endDate = typeof clientIdOrParams === 'object' ? clientIdOrParams?.endDate : undefined;
+
   const [sales, setSales] = useState<DailySale[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function useDailySales(clientIdOrParams?: string | UseDailySalesParams, d
     }
 
     try {
-      const data = await listDailySales(params);
+      const data = await listDailySales({ clientId, days, startDate, endDate });
       prevDataRef.current = data;
       setSales(data);
       setError(null);
@@ -50,7 +52,7 @@ export function useDailySales(clientIdOrParams?: string | UseDailySalesParams, d
         setLoading(false);
       }
     }
-  }, [params]);
+  }, [clientId, days, startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void load();
