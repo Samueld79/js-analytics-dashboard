@@ -476,6 +476,7 @@ export type MetaAdEntry = {
   description?: string;
   publicationType?: 'nueva' | 'existente';
   existingUrl?: string;
+  referenceUrl?: string | null;  // URL de referencia creativa para publicación nueva
   notes?: string;
   imageBase64?: string;
   welcomeMessage?: string;
@@ -512,9 +513,13 @@ export type AdSetEntry = {
   customAudienceName?: string;
   lookalikeAudiences?: string;
   exclusions?: string;
-  // Placements
+  // Placements (legacy — values: Feed, Reels, Stories, Explore, Messenger, Audience Network)
   placementsOption?: 'auto' | 'manual';
   placements?: string[];
+  // Platforms — Meta social channels (replaces placements in new data)
+  platforms?: string[];
+  // Adset-level strategic notes
+  notes?: string | null;
   // Ads (Level 3)
   ads?: MetaAdEntry[];
   // Legacy fields (backward compat)

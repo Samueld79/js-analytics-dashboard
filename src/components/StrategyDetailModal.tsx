@@ -40,6 +40,7 @@ import type {
   ChecklistItem,
   Client,
   DriveLink,
+  MetaAdEntry,
   SegmentationData,
   Strategy,
   StrategyCampaign,
@@ -80,7 +81,9 @@ export function StrategyDetailModal({
   const seg = strategy.segmentation as SegmentationData;
   const richCampaigns = (strategy.campaigns ?? []) as StrategyCampaign[];
 
-  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<number>>(new Set());
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<number>>(
+    () => new Set(richCampaigns.map((_, i) => i)),
+  );
   function toggleCampaign(idx: number) {
     setExpandedCampaigns((prev) => {
       const next = new Set(prev);
@@ -92,7 +95,7 @@ export function StrategyDetailModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box modal-large" onClick={(event) => event.stopPropagation()}>
+      <div className="modal-box modal-large" style={{ maxWidth: 'min(980px, 95vw)' }} onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
             <h2 className="modal-title">{strategy.title}</h2>
@@ -362,8 +365,8 @@ export function StrategyDetailModal({
 
           {richCampaigns.length > 0 && (
             <section className="strategy-section">
-              <h3 className="strategy-section-title">Campañas</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <h3 className="strategy-section-title">Campañas ({richCampaigns.length})</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {richCampaigns.map((camp, idx) => {
                   const isOpen = expandedCampaigns.has(idx);
                   const objColors: Record<string, { bg: string; color: string }> = {
@@ -379,35 +382,23 @@ export function StrategyDetailModal({
                   return (
                     <div
                       key={idx}
-                      style={{
-                        borderRadius: 9,
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        background: 'rgba(255,255,255,0.02)',
-                        overflow: 'hidden',
-                      }}
+                      style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}
                     >
                       {/* Campaign header (clickable) */}
                       <button
                         type="button"
                         onClick={() => toggleCampaign(idx)}
-                        style={{
-                          width: '100%', display: 'flex', alignItems: 'center',
-                          justifyContent: 'space-between', gap: 10,
-                          padding: '10px 14px', background: 'none',
-                          border: 'none', cursor: 'pointer', textAlign: 'left',
-                        }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 16px', background: 'rgba(255,255,255,0.03)', border: 'none', cursor: 'pointer', textAlign: 'left' }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#d8e7ff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {camp.name}
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#d8e7ff' }}>{camp.name}</span>
                           {camp.objective && (
                             <span style={{ padding: '2px 9px', borderRadius: 10, fontSize: '0.64rem', fontWeight: 700, background: objStyle.bg, color: objStyle.color, flexShrink: 0 }}>
                               {camp.objective}
                             </span>
                           )}
                           {camp.budgetType && (
-                            <span style={{ padding: '2px 7px', borderRadius: 6, fontSize: '0.62rem', fontWeight: 700, background: 'hsl(180 100% 50% / 0.1)', color: 'hsl(180,100%,55%)', border: '1px solid hsl(180 100% 50% / 0.2)', flexShrink: 0, fontFamily: 'JetBrains Mono, monospace' }}>
+                            <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: '0.62rem', fontWeight: 700, background: 'hsl(180 100% 50% / 0.1)', color: 'hsl(180,100%,55%)', border: '1px solid hsl(180 100% 50% / 0.2)', flexShrink: 0, fontFamily: 'JetBrains Mono, monospace' }}>
                               {camp.budgetType}
                             </span>
                           )}
@@ -417,115 +408,230 @@ export function StrategyDetailModal({
                             </span>
                           )}
                         </div>
-                        {isOpen ? <ChevronUp size={14} style={{ color: 'hsl(180,100%,50%)', flexShrink: 0 }} /> : <ChevronDown size={14} style={{ color: 'hsl(215,15%,50%)', flexShrink: 0 }} />}
+                        {isOpen
+                          ? <ChevronUp size={14} style={{ color: 'hsl(180,100%,50%)', flexShrink: 0 }} />
+                          : <ChevronDown size={14} style={{ color: 'hsl(215,15%,50%)', flexShrink: 0 }} />}
                       </button>
 
-                      {/* Ad sets detail (expanded) */}
-                      {isOpen && (camp.adsets ?? []).length > 0 && (
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                          {(camp.adsets ?? []).map((adset, adsetIdx) => (
-                            <div
-                              key={adsetIdx}
-                              style={{ padding: '10px 12px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 7 }}
-                            >
-                              {/* Ad type + age + gender row */}
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                {adset.adType && (
-                                  <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,255,255,0.07)', color: '#c0d0f0' }}>
-                                    {adset.adType}
+                      {/* AdSets (expanded) */}
+                      {isOpen && (
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                          {(camp.adsets ?? []).length === 0 && (
+                            <span style={{ fontSize: '0.76rem', color: 'hsl(215,15%,40%)' }}>Sin conjuntos de anuncios</span>
+                          )}
+                          {(camp.adsets ?? []).map((adset, adsetIdx) => {
+                            const effectivePlatforms = adset.platforms?.length
+                              ? adset.platforms
+                              : (adset.placements ?? []);
+                            const adsToShow: MetaAdEntry[] = adset.ads?.length
+                              ? adset.ads
+                              : (adset.creatives ?? []).map((cr) => ({
+                                  adType: adset.adType ?? undefined,
+                                  description: cr.description,
+                                  publicationType: cr.publicationType,
+                                  existingUrl: cr.existingUrl,
+                                }));
+                            const sLabel: React.CSSProperties = { fontSize: '0.6rem', fontWeight: 700, color: 'hsl(180,100%,50%)', letterSpacing: '0.08em', display: 'block', marginBottom: 4 };
+                            const fLabel: React.CSSProperties = { fontSize: '0.65rem', color: 'hsl(215,15%,45%)', marginRight: 5 };
+                            const fValue: React.CSSProperties = { fontSize: '0.76rem', color: '#8094b8' };
+                            return (
+                              <div
+                                key={adsetIdx}
+                                style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 10 }}
+                              >
+                                {/* AdSet header: name + age + gender + ABO */}
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, alignItems: 'center' }}>
+                                  {adset.name && (
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#c8d8f0' }}>{adset.name}</span>
+                                  )}
+                                  <span style={{ fontSize: '0.7rem', color: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono, monospace', background: 'rgba(255,255,255,0.07)', padding: '2px 8px', borderRadius: 4 }}>
+                                    {adset.ageMin ?? 18}–{adset.ageMax === 65 ? '65+' : (adset.ageMax ?? 65)} años
                                   </span>
+                                  {adset.gender && adset.gender !== 'all' && (
+                                    <span style={{ fontSize: '0.7rem', color: 'hsl(215,15%,55%)', background: 'rgba(255,255,255,0.07)', padding: '2px 8px', borderRadius: 4 }}>
+                                      {adset.gender === 'male' ? '♂ Hombres' : '♀ Mujeres'}
+                                    </span>
+                                  )}
+                                  {adset.aboBudgetType != null && adset.aboBudgetAmount != null && (
+                                    <span style={{ fontSize: '0.7rem', color: 'hsl(145,100%,55%)', background: 'hsl(145 100% 45% / 0.12)', padding: '2px 8px', borderRadius: 4, fontFamily: 'JetBrains Mono, monospace' }}>
+                                      ABO ${adset.aboBudgetAmount.toLocaleString('es-CO')}/{adset.aboBudgetType === 'diario' ? 'día' : 'total'}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Dates + Optimization goal */}
+                                {(adset.startDate || adset.optimizationGoal) && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                                    {adset.startDate && (
+                                      <span style={fValue}>
+                                        <span style={fLabel}>FECHAS</span>
+                                        {adset.startDate} → {adset.endDate ?? 'sin fecha fin'}
+                                      </span>
+                                    )}
+                                    {adset.optimizationGoal && (
+                                      <span style={fValue}>
+                                        <span style={fLabel}>OPTIMIZACIÓN</span>
+                                        {adset.optimizationGoal}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
-                                <span style={{ fontSize: '0.72rem', color: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono, monospace' }}>
-                                  {adset.ageMin ?? 18} – {adset.ageMax === 65 ? '65+' : (adset.ageMax ?? 65)} años
-                                </span>
-                                {adset.gender && adset.gender !== 'all' && (
-                                  <span style={{ fontSize: '0.7rem', color: 'hsl(215,15%,55%)' }}>
-                                    · {adset.gender === 'male' ? 'Hombres' : 'Mujeres'}
-                                  </span>
+
+                                {/* Objective-based destination fields */}
+                                {adset.trafficDestination && (
+                                  <span style={fValue}><span style={fLabel}>DESTINO TRÁFICO</span>{adset.trafficDestination}</span>
+                                )}
+                                {adset.interactionType && (
+                                  <span style={fValue}><span style={fLabel}>TIPO INTERACCIÓN</span>{adset.interactionType}</span>
+                                )}
+                                {adset.conversionDestination && (
+                                  <span style={fValue}><span style={fLabel}>DESTINO CONVERSIÓN</span>{adset.conversionDestination}</span>
+                                )}
+                                {adset.leadsType && (
+                                  <span style={fValue}><span style={fLabel}>TIPO LEADS</span>{adset.leadsType}</span>
+                                )}
+                                {(adset.messageDestinations ?? []).length > 0 && (
+                                  <span style={fValue}><span style={fLabel}>DESTINOS MENSAJES</span>{adset.messageDestinations!.join(' · ')}</span>
+                                )}
+
+                                {/* Audience block */}
+                                {((adset.locations ?? []).length > 0 || adset.detailedTargeting || adset.interests || adset.behaviors || adset.hasCustomAudience || adset.lookalikeAudiences || adset.exclusions) && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '8px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <span style={sLabel}>AUDIENCIA</span>
+                                    {(adset.locations ?? []).length > 0 && (
+                                      <span style={fValue}><span style={fLabel}>Ciudades</span>{adset.locations!.join(' · ')}</span>
+                                    )}
+                                    {adset.detailedTargeting && (
+                                      <span style={fValue}><span style={fLabel}>Segmentación</span>{adset.detailedTargeting}</span>
+                                    )}
+                                    {adset.interests && (
+                                      <span style={fValue}><span style={fLabel}>Intereses</span>{adset.interests}</span>
+                                    )}
+                                    {adset.behaviors && (
+                                      <span style={fValue}><span style={fLabel}>Comportamientos</span>{adset.behaviors}</span>
+                                    )}
+                                    {adset.hasCustomAudience && adset.customAudienceName && (
+                                      <span style={fValue}><span style={fLabel}>Audiencia custom</span>{adset.customAudienceName}</span>
+                                    )}
+                                    {adset.lookalikeAudiences && (
+                                      <span style={fValue}><span style={fLabel}>Lookalike</span>{adset.lookalikeAudiences}</span>
+                                    )}
+                                    {adset.exclusions && (
+                                      <span style={fValue}><span style={fLabel}>Exclusiones</span>{adset.exclusions}</span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Platforms */}
+                                {effectivePlatforms.length > 0 && (
+                                  <div>
+                                    <span style={sLabel}>PLATAFORMAS</span>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                      {effectivePlatforms.map((p) => (
+                                        <span key={p} style={{ padding: '2px 9px', borderRadius: 4, fontSize: '0.67rem', background: 'hsl(180 100% 50% / 0.1)', color: 'hsl(180,100%,55%)', border: '1px solid hsl(180 100% 50% / 0.2)' }}>
+                                          {p}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Adset welcome message (legacy) */}
+                                {adset.welcomeMessage && (
+                                  <div>
+                                    <span style={sLabel}>MSG. BIENVENIDA</span>
+                                    <span style={{ ...fValue, display: 'block' }}>{adset.welcomeMessage}</span>
+                                  </div>
+                                )}
+
+                                {/* Adset notes — cyan left border */}
+                                {adset.notes && (
+                                  <div style={{ padding: '8px 10px', borderRadius: 6, borderLeft: '3px solid hsl(180,100%,50%)', background: 'hsl(180 100% 50% / 0.05)' }}>
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'hsl(180,100%,60%)', letterSpacing: '0.08em', display: 'block', marginBottom: 3 }}>
+                                      📋 NOTAS DEL CONJUNTO
+                                    </span>
+                                    <p style={{ fontSize: '0.76rem', color: '#8094b8', margin: 0, whiteSpace: 'pre-wrap' }}>{adset.notes}</p>
+                                  </div>
+                                )}
+
+                                {/* Ads */}
+                                {adsToShow.length > 0 && (
+                                  <div>
+                                    <span style={sLabel}>ANUNCIOS ({adsToShow.length})</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                      {adsToShow.map((ad, adIdx) => (
+                                        <div key={adIdx} style={{ padding: '8px 11px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                          {/* Badges */}
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+                                            {ad.adType && (
+                                              <span style={{ fontSize: '0.67rem', padding: '2px 8px', borderRadius: 4, fontWeight: 700, background: 'rgba(255,255,255,0.08)', color: '#c0d0f0' }}>
+                                                {ad.adType}
+                                              </span>
+                                            )}
+                                            {ad.publicationType && (
+                                              <span style={{ fontSize: '0.67rem', padding: '2px 8px', borderRadius: 4, fontWeight: 700, background: ad.publicationType === 'existente' ? 'hsl(38 100% 55% / 0.15)' : 'hsl(145 100% 45% / 0.12)', color: ad.publicationType === 'existente' ? 'hsl(38,100%,60%)' : 'hsl(145,100%,55%)' }}>
+                                                {ad.publicationType === 'existente' ? '♻️ Publicación existente' : '📝 Publicación nueva'}
+                                              </span>
+                                            )}
+                                          </div>
+                                          {/* Existing URL */}
+                                          {ad.existingUrl && (
+                                            <a href={ad.existingUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: 'hsl(180,100%,55%)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                                              <ExternalLink size={11} style={{ flexShrink: 0 }} />
+                                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.existingUrl}</span>
+                                            </a>
+                                          )}
+                                          {/* Reference URL (nueva only) */}
+                                          {ad.referenceUrl && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                              <span style={{ fontSize: '0.6rem', color: 'hsl(215,15%,45%)', fontWeight: 700, letterSpacing: '0.06em' }}>🔗 REF. CREATIVA</span>
+                                              <a href={ad.referenceUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: 'hsl(180,100%,55%)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                                                <Link size={11} style={{ flexShrink: 0 }} />
+                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.referenceUrl}</span>
+                                              </a>
+                                            </div>
+                                          )}
+                                          {/* Description / copy */}
+                                          {ad.description && (
+                                            <p style={{ fontSize: '0.76rem', color: '#8094b8', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{ad.description}</p>
+                                          )}
+                                          {/* Welcome message at ad level */}
+                                          {ad.welcomeMessage && (
+                                            <div>
+                                              <span style={{ fontSize: '0.6rem', color: 'hsl(215,15%,45%)', fontWeight: 700, letterSpacing: '0.06em', display: 'block', marginBottom: 2 }}>MSG. BIENVENIDA</span>
+                                              <span style={fValue}>{ad.welcomeMessage}</span>
+                                            </div>
+                                          )}
+                                          {/* Suggested questions */}
+                                          {ad.suggestedQuestions && (
+                                            <div>
+                                              <span style={{ fontSize: '0.6rem', color: 'hsl(215,15%,45%)', fontWeight: 700, letterSpacing: '0.06em', display: 'block', marginBottom: 2 }}>PREGUNTAS SUGERIDAS</span>
+                                              <span style={fValue}>{ad.suggestedQuestions}</span>
+                                            </div>
+                                          )}
+                                          {/* Ad notes — amber left border */}
+                                          {ad.notes && (
+                                            <div style={{ padding: '5px 8px', borderRadius: 4, borderLeft: '3px solid hsl(38,100%,55%)', background: 'hsl(38 100% 55% / 0.05)' }}>
+                                              <p style={{ fontSize: '0.72rem', color: 'hsl(38,100%,65%)', margin: 0, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{ad.notes}</p>
+                                            </div>
+                                          )}
+                                          {/* Image */}
+                                          {ad.imageBase64 && (
+                                            <div style={{ marginTop: 2 }}>
+                                              <a href={ad.imageBase64} target="_blank" rel="noreferrer" style={{ display: 'inline-block' }}>
+                                                <img src={ad.imageBase64} alt="Imagen adjunta" style={{ maxWidth: 180, borderRadius: 7, border: '1px solid rgba(6,182,212,0.2)', display: 'block' }} />
+                                              </a>
+                                              <span style={{ fontSize: '0.64rem', color: 'hsl(180,100%,50%)', marginTop: 3, display: 'block' }}>📎 Imagen adjunta</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
                                 )}
                               </div>
-
-                              {/* Locations */}
-                              {(adset.locations ?? []).length > 0 && (
-                                <div>
-                                  <span style={{ fontSize: '0.62rem', color: 'hsl(180,100%,50%)', fontWeight: 700, letterSpacing: '0.08em', display: 'block', marginBottom: 3 }}>CIUDADES</span>
-                                  <span style={{ fontSize: '0.76rem', color: '#8094b8' }}>{adset.locations!.join(' · ')}</span>
-                                </div>
-                              )}
-
-                              {/* Placements */}
-                              {(adset.placements ?? []).length > 0 && (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                  {adset.placements!.map((p) => (
-                                    <span key={p} style={{ padding: '2px 8px', borderRadius: 4, fontSize: '0.66rem', background: 'rgba(255,255,255,0.05)', color: 'hsl(215,15%,60%)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                      {p}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Creatives */}
-                              {(adset.creatives ?? []).length > 0 && (
-                                <div>
-                                  <span style={{ fontSize: '0.62rem', color: 'hsl(180,100%,50%)', fontWeight: 700, letterSpacing: '0.08em', display: 'block', marginBottom: 5 }}>CREATIVOS</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                    {adset.creatives!.map((cr, crIdx) => (
-                                      <div key={crIdx} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                          {cr.publicationType && (
-                                            <span style={{ fontSize: '0.62rem', padding: '1px 7px', borderRadius: 4, fontWeight: 700, background: cr.publicationType === 'existente' ? 'hsl(38 100% 55% / 0.15)' : 'hsl(145 100% 45% / 0.12)', color: cr.publicationType === 'existente' ? 'hsl(38,100%,60%)' : 'hsl(145,100%,55%)' }}>
-                                              {cr.publicationType === 'existente' ? 'existente' : 'nueva'}
-                                            </span>
-                                          )}
-                                          {cr.description && <span style={{ fontSize: '0.76rem', color: '#8094b8', wordBreak: 'break-word' }}>{cr.description}</span>}
-                                        </div>
-                                        {cr.existingUrl && (
-                                          <a href={cr.existingUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.72rem', color: 'hsl(180,100%,55%)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {cr.existingUrl}
-                                          </a>
-                                        )}
-                                        {cr.notes && <span style={{ fontSize: '0.7rem', color: 'hsl(215,15%,45%)', fontStyle: 'italic' }}>{cr.notes}</span>}
-                                        {cr.imageBase64 && (
-                                          <div style={{ marginTop: 4 }}>
-                                            <a href={cr.imageBase64} target="_blank" rel="noreferrer" style={{ display: 'inline-block' }}>
-                                              <img
-                                                src={cr.imageBase64}
-                                                alt="Imagen adjunta"
-                                                style={{
-                                                  maxWidth: 200,
-                                                  borderRadius: 8,
-                                                  border: '1px solid rgba(6,182,212,0.2)',
-                                                  display: 'block',
-                                                }}
-                                              />
-                                            </a>
-                                            <span style={{ fontSize: '0.65rem', color: 'hsl(180,100%,50%)', marginTop: 3, display: 'block' }}>
-                                              📎 Imagen adjunta
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Welcome message */}
-                              {adset.welcomeMessage && (
-                                <div>
-                                  <span style={{ fontSize: '0.62rem', color: 'hsl(180,100%,50%)', fontWeight: 700, letterSpacing: '0.08em', display: 'block', marginBottom: 3 }}>MSG. BIENVENIDA</span>
-                                  <span style={{ fontSize: '0.76rem', color: '#8094b8' }}>{adset.welcomeMessage}</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Empty adsets indicator */}
-                      {isOpen && (camp.adsets ?? []).length === 0 && (
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '10px 14px' }}>
-                          <span style={{ fontSize: '0.76rem', color: 'hsl(215,15%,40%)' }}>Sin conjuntos de anuncios</span>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

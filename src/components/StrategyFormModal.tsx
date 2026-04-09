@@ -30,6 +30,7 @@ interface AdFormState {
   description: string;
   publicationType: 'nueva' | 'existente';
   existingUrl: string;
+  referenceUrl: string;
   notes: string;
   imageBase64: string;
   imageFilename: string;
@@ -63,6 +64,8 @@ interface AdSetFormState {
   exclusions: string;
   placementsOption: 'auto' | 'manual';
   placements: string[];
+  platforms: string[];
+  notes: string;
   ads: AdFormState[];
 }
 
@@ -76,7 +79,7 @@ interface CampaignFormState {
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
-const PLACEMENTS = ['Feed', 'Reels', 'Stories', 'Explore', 'Messenger', 'Audience Network'];
+const META_PLATFORMS = ['Facebook', 'Instagram', 'Audience Network', 'Messenger', 'WhatsApp', 'Threads'];
 const AD_TYPES = ['Video', 'Imagen', 'Carrusel', 'Reel', 'Colección'];
 const OBJECTIVES = ['Reconocimiento', 'Tráfico', 'Interacción', 'Ventas', 'Generación de leads', 'Mensajes'];
 const AGE_OPTIONS_MIN = Array.from({ length: 48 }, (_, i) => 18 + i);
@@ -115,6 +118,7 @@ function emptyAd(): AdFormState {
     description: '',
     publicationType: 'nueva',
     existingUrl: '',
+    referenceUrl: '',
     notes: '',
     imageBase64: '',
     imageFilename: '',
@@ -150,6 +154,8 @@ function emptyAdSet(): AdSetFormState {
     exclusions: '',
     placementsOption: 'auto',
     placements: [],
+    platforms: [],
+    notes: '',
     ads: [emptyAd()],
   };
 }
@@ -175,6 +181,7 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
           description: ad.description ?? '',
           publicationType: (ad.publicationType ?? 'nueva') as 'nueva' | 'existente',
           existingUrl: ad.existingUrl ?? '',
+          referenceUrl: ad.referenceUrl ?? '',
           notes: ad.notes ?? '',
           imageBase64: ad.imageBase64 ?? '',
           imageFilename: ad.imageBase64 ? 'imagen_guardada' : '',
@@ -188,6 +195,7 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
           description: cr.description ?? '',
           publicationType: (cr.publicationType ?? 'nueva') as 'nueva' | 'existente',
           existingUrl: cr.existingUrl ?? '',
+          referenceUrl: '',
           notes: cr.notes ?? '',
           imageBase64: cr.imageBase64 ?? '',
           imageFilename: cr.imageBase64 ? 'imagen_guardada' : '',
@@ -223,6 +231,9 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
         exclusions: a.exclusions ?? '',
         placementsOption: (a.placementsOption ?? 'auto') as 'auto' | 'manual',
         placements: a.placements ?? [],
+        // platforms: new field, fallback to legacy placements if platforms not yet set
+        platforms: a.platforms ?? [],
+        notes: a.notes ?? '',
         ads,
       };
     }),
@@ -276,8 +287,10 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
         exclusions: a.exclusions || undefined,
         placementsOption: a.placementsOption,
         placements: a.placementsOption === 'manual' ? a.placements : undefined,
+        platforms: a.platforms.length ? a.platforms : undefined,
+        notes: a.notes.trim() || undefined,
         ads: a.ads
-          .filter((ad) => ad.description || ad.existingUrl || ad.notes || ad.imageBase64)
+          .filter((ad) => ad.description || ad.existingUrl || ad.referenceUrl || ad.notes || ad.imageBase64)
           .map(
             (ad): MetaAdEntry => ({
               adType: ad.adType || undefined,
@@ -285,6 +298,8 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
               publicationType: ad.publicationType,
               existingUrl:
                 ad.publicationType === 'existente' ? ad.existingUrl || undefined : undefined,
+              referenceUrl:
+                ad.publicationType === 'nueva' ? ad.referenceUrl || undefined : undefined,
               notes: ad.notes || undefined,
               imageBase64: ad.imageBase64 || undefined,
               welcomeMessage: ad.welcomeMessage || undefined,
@@ -594,6 +609,22 @@ function AdBlock({
         style={{ ...TEXTAREA_STYLE, fontSize: '0.8rem' }}
       />
 
+      {/* Reference URL — only for nueva */}
+      {ad.publicationType === 'nueva' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>
+            🔗 URL de referencia creativa
+            <span style={{ fontWeight: 400, color: 'hsl(215,15%,45%)', marginLeft: 6 }}>(opcional)</span>
+          </label>
+          <input
+            value={ad.referenceUrl}
+            onChange={(e) => set('referenceUrl', e.target.value)}
+            placeholder="https://www.instagram.com/reel/..."
+            style={{ ...INPUT_STYLE, fontSize: '0.78rem' }}
+          />
+        </div>
+      )}
+
       {/* Notes */}
       <input
         value={ad.notes}
@@ -753,11 +784,11 @@ function AdSetBlock({
     set('messageDestinations', next);
   }
 
-  function togglePlacement(p: string) {
-    const next = adset.placements.includes(p)
-      ? adset.placements.filter((x) => x !== p)
-      : [...adset.placements, p];
-    set('placements', next);
+  function togglePlatform(p: string) {
+    const next = adset.platforms.includes(p)
+      ? adset.platforms.filter((x) => x !== p)
+      : [...adset.platforms, p];
+    set('platforms', next);
   }
 
   function updateAd(adIdx: number, updated: AdFormState) {
@@ -1174,14 +1205,14 @@ function AdSetBlock({
                 </div>
               </div>
 
-              {/* Placements */}
+              {/* Plataformas (Meta channels) */}
               <div
                 style={{
                   borderTop: '1px solid rgba(255,255,255,0.05)',
                   paddingTop: 10,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 10,
+                  gap: 8,
                 }}
               >
                 <span
@@ -1193,19 +1224,46 @@ function AdSetBlock({
                     fontFamily: 'JetBrains Mono, monospace',
                   }}
                 >
-                  UBICACIONES DE PAUTA
+                  PLATAFORMAS
                 </span>
-                <PillToggle
-                  options={['Automáticas', 'Manuales']}
-                  active={adset.placementsOption === 'auto' ? 'Automáticas' : 'Manuales'}
-                  onToggle={(v) => set('placementsOption', v === 'Automáticas' ? 'auto' : 'manual')}
-                />
-                {adset.placementsOption === 'manual' && (
-                  <PillToggle
-                    options={PLACEMENTS}
-                    active={adset.placements}
-                    onToggle={togglePlacement}
-                  />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {META_PLATFORMS.map((platform) => {
+                    const isSelected = adset.platforms.includes(platform);
+                    return (
+                      <label
+                        key={platform}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          cursor: 'pointer',
+                          padding: '4px 10px',
+                          borderRadius: 5,
+                          border: isSelected
+                            ? '1px solid hsl(180,100%,50%)'
+                            : '1px solid rgba(255,255,255,0.1)',
+                          background: isSelected ? 'hsl(180 100% 50% / 0.12)' : 'transparent',
+                          fontSize: '0.74rem',
+                          fontWeight: isSelected ? 600 : 400,
+                          color: isSelected ? 'hsl(180,100%,70%)' : 'hsl(215,15%,50%)',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => togglePlatform(platform)}
+                          style={{ width: 12, height: 12, accentColor: 'hsl(180,100%,50%)', cursor: 'pointer' }}
+                        />
+                        {platform}
+                      </label>
+                    );
+                  })}
+                </div>
+                {adset.platforms.length === 0 && (
+                  <span style={{ fontSize: '0.66rem', color: 'hsl(215,15%,40%)', fontStyle: 'italic' }}>
+                    Selecciona al menos una plataforma
+                  </span>
                 )}
               </div>
 
@@ -1228,6 +1286,24 @@ function AdSetBlock({
                     fontSize: '0.78rem',
                     borderColor: 'hsl(38 100% 50% / 0.2)',
                   }}
+                />
+              </div>
+
+              {/* Adset-level notes */}
+              <div
+                style={{
+                  ...FIELD_STYLE,
+                  borderLeft: '3px solid hsl(180,100%,50%)',
+                  paddingLeft: 10,
+                }}
+              >
+                <label style={{ ...LABEL_STYLE, color: 'hsl(180,100%,60%)' }}>📋 Notas del conjunto</label>
+                <textarea
+                  rows={2}
+                  value={adset.notes}
+                  onChange={(e) => set('notes', e.target.value)}
+                  placeholder="Indicaciones estratégicas para este conjunto de anuncios..."
+                  style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem' }}
                 />
               </div>
             </>
