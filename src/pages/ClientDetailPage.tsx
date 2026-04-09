@@ -30,6 +30,8 @@ import {
   sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
 import { formatCop, formatNumber, toFiniteNumber } from '../lib/utils';
+import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
+import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
 
 // Portal-only formatter: always shows 2 decimal places (punto miles, coma decimales).
 // Does NOT replace the global formatCop — this is only for the public client portal.
@@ -39,8 +41,6 @@ function formatCopFull(value: unknown): string {
   if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(2).replace('.', ',')}M`;
   return `$${amount.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
-import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
 
 const FADE = { duration: 0.3, ease: 'easeOut' } as Transition;
 
