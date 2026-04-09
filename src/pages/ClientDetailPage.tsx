@@ -316,7 +316,7 @@ export function ClientDetailPage() {
       <div className="portal-kpi-grid">
         {[
           { label: 'Ventas Totales', value: periodSales > 0 ? formatCopFull(periodSales) : 'N/D', sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
-          { label: 'Inversión', value: formatCopFull(periodKpi?.spend ?? 0), sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
+          { label: 'Inversión', value: formatCop(periodKpi?.spend ?? 0), sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
           { label: 'Mensajes', value: formatNumber(periodKpi?.messages ?? 0), sub: 'conversaciones iniciadas' },
           { label: 'Alcance', value: formatNumber(periodKpi?.reach ?? 0), sub: 'personas únicas' },
           { label: 'Impresiones', value: formatNumber(periodKpi?.impressions ?? 0), sub: 'veces mostrado' },
