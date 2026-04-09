@@ -698,4 +698,3 @@ export function ClientDetailPage() {
     </div>
   );
 }
-src/pages/ClientDetailPage.tsx
