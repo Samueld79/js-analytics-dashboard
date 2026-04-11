@@ -40,6 +40,11 @@ import type {
   ChecklistItem,
   Client,
   DriveLink,
+  LeadsInstantForm,
+  LeadsLandingConfig,
+  LeadsMessagesConfig,
+  LeadsMetrics,
+  LeadsPostLead,
   MetaAdEntry,
   SegmentationData,
   Strategy,
@@ -47,6 +52,134 @@ import type {
   StrategyHistory,
 } from '../lib/supabase';
 import { formatCop, statusLabel } from '../lib/utils';
+
+// ─── Leads summary (read-only) ─────────────────────────────────────────────
+
+function LeadsFieldRow({ label, value }: { label: string; value: string }) {
+  if (!value) return null;
+  return (
+    <div style={{ fontSize: '0.76rem', color: '#8094b8' }}>
+      <span style={{ fontSize: '0.65rem', color: 'rgba(245,158,11,0.7)', marginRight: 5 }}>{label}</span>
+      {value}
+    </div>
+  );
+}
+
+function LeadsSummary({ camp }: { camp: StrategyCampaign }) {
+  const amber = '#f59e0b';
+  const sectionLabel: React.CSSProperties = { fontSize: '0.58rem', fontWeight: 700, color: amber, letterSpacing: '0.1em', display: 'block', marginBottom: 5, fontFamily: 'JetBrains Mono, monospace' };
+  const convLoc = camp.leadsConversionLocation;
+  const iForm = camp.leadsInstantForm as LeadsInstantForm | null | undefined;
+  const msgs = camp.leadsMessages as LeadsMessagesConfig | null | undefined;
+  const land = camp.leadsLanding as LeadsLandingConfig | null | undefined;
+  const post = camp.leadsPostLead as LeadsPostLead | null | undefined;
+  const met = camp.leadsMetrics as LeadsMetrics | null | undefined;
+
+  if (!convLoc && !post && !met) return null;
+
+  return (
+    <div style={{ borderTop: '1px solid rgba(245,158,11,0.1)', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(245,158,11,0.02)' }}>
+      {/* Conversion location badge */}
+      {convLoc && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: '0.6rem', fontWeight: 700, color: amber, letterSpacing: '0.08em' }}>CONVERSIÓN</span>
+          <span style={{ padding: '2px 9px', borderRadius: 10, fontSize: '0.68rem', fontWeight: 700, background: 'rgba(245,158,11,0.15)', color: amber, border: '1px solid rgba(245,158,11,0.25)' }}>
+            {convLoc}
+          </span>
+        </div>
+      )}
+
+      {/* Instant form summary */}
+      {iForm && (
+        <div style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(245,158,11,0.15)', background: 'rgba(255,255,255,0.01)' }}>
+          <span style={sectionLabel}>FORMULARIO INSTANTÁNEO</span>
+          <LeadsFieldRow label="Nombre" value={iForm.formName ?? ''} />
+          <LeadsFieldRow label="Tipo" value={iForm.formType === 'volume' ? 'Más volumen' : iForm.formType === 'intent' ? 'Mayor intención' : ''} />
+          <LeadsFieldRow label="Título" value={iForm.introTitle ?? ''} />
+          {(iForm.questions ?? []).filter(q => q.enabled).length > 0 && (
+            <div style={{ marginTop: 5 }}>
+              <span style={{ fontSize: '0.62rem', color: 'rgba(245,158,11,0.6)', display: 'block', marginBottom: 3 }}>PREGUNTAS ACTIVAS</span>
+              <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {(iForm.questions ?? []).filter(q => q.enabled).map((q, i) => (
+                  <li key={i} style={{ fontSize: '0.74rem', color: '#8094b8' }}>{q.label}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+          <LeadsFieldRow label="Agradecimiento" value={iForm.thankYouTitle ?? ''} />
+        </div>
+      )}
+
+      {/* Messages summary */}
+      {msgs && (
+        <div style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(245,158,11,0.15)', background: 'rgba(255,255,255,0.01)' }}>
+          <span style={sectionLabel}>CONFIGURACIÓN DE MENSAJES</span>
+          {(msgs.platforms ?? []).length > 0 && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+              {msgs.platforms!.map((p) => <span key={p} style={{ padding: '1px 8px', borderRadius: 4, fontSize: '0.66rem', background: 'rgba(245,158,11,0.12)', color: amber }}>{p}</span>)}
+            </div>
+          )}
+          <LeadsFieldRow label="Saludo" value={msgs.greeting ?? ''} />
+        </div>
+      )}
+
+      {/* Landing summary */}
+      {land && (
+        <div style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(245,158,11,0.15)', background: 'rgba(255,255,255,0.01)' }}>
+          <span style={sectionLabel}>LANDING PAGE</span>
+          <LeadsFieldRow label="URL" value={land.landingUrl ?? ''} />
+          <LeadsFieldRow label="Headline" value={land.headline ?? ''} />
+          <LeadsFieldRow label="CTA" value={land.cta ?? ''} />
+        </div>
+      )}
+
+      {/* Post-lead */}
+      {post && (
+        <div style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(245,158,11,0.1)', background: 'rgba(255,255,255,0.01)', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <span style={sectionLabel}>FLUJO POST-LEAD</span>
+          <LeadsFieldRow label="Canal" value={post.contactChannel ?? ''} />
+          <LeadsFieldRow label="Respuesta" value={post.responseTime ?? ''} />
+          <LeadsFieldRow label="Responsable" value={post.responsible ?? ''} />
+          {post.followUpMessage && <div style={{ fontSize: '0.74rem', color: '#8094b8', fontStyle: 'italic', width: '100%' }}>{post.followUpMessage}</div>}
+        </div>
+      )}
+
+      {/* Metrics */}
+      {met && (
+        <div style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(245,158,11,0.1)', background: 'rgba(255,255,255,0.01)' }}>
+          <span style={sectionLabel}>MÉTRICAS OBJETIVO</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 5 }}>
+            {met.expectedCpl != null && (
+              <div style={{ padding: '4px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.58rem', color: 'rgba(245,158,11,0.7)', fontWeight: 700 }}>CPL ESPERADO</div>
+                <div style={{ fontSize: '0.82rem', color: amber, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
+                  ${met.expectedCpl.toLocaleString('es-CO')}
+                </div>
+              </div>
+            )}
+            {met.expectedCtr && (
+              <div style={{ padding: '4px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.58rem', color: 'rgba(245,158,11,0.7)', fontWeight: 700 }}>CTR</div>
+                <div style={{ fontSize: '0.82rem', color: amber, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{met.expectedCtr}</div>
+              </div>
+            )}
+            {met.monthlyLeadsGoal != null && (
+              <div style={{ padding: '4px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.58rem', color: 'rgba(245,158,11,0.7)', fontWeight: 700 }}>META / MES</div>
+                <div style={{ fontSize: '0.82rem', color: amber, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{met.monthlyLeadsGoal} leads</div>
+              </div>
+            )}
+          </div>
+          {(met.kpiChecklist ?? []).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {met.kpiChecklist!.map((k) => <span key={k} style={{ padding: '1px 7px', borderRadius: 4, fontSize: '0.64rem', background: 'rgba(245,158,11,0.1)', color: amber }}>{k}</span>)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   strategy: Strategy;
@@ -407,11 +540,21 @@ export function StrategyDetailModal({
                               ${camp.budget.toLocaleString('es-CO')}
                             </span>
                           )}
+                          {camp.leadsConversionLocation && (
+                            <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: '0.62rem', fontWeight: 700, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)', flexShrink: 0 }}>
+                              {camp.leadsConversionLocation}
+                            </span>
+                          )}
                         </div>
                         {isOpen
                           ? <ChevronUp size={14} style={{ color: 'hsl(180,100%,50%)', flexShrink: 0 }} />
                           : <ChevronDown size={14} style={{ color: 'hsl(215,15%,50%)', flexShrink: 0 }} />}
                       </button>
+
+                      {/* Leads summary (expanded, only for Clientes Potenciales) */}
+                      {isOpen && camp.objective === 'Clientes Potenciales' && (
+                        <LeadsSummary camp={camp} />
+                      )}
 
                       {/* AdSets (expanded) */}
                       {isOpen && (
@@ -594,6 +737,33 @@ export function StrategyDetailModal({
                                           {/* Description / copy */}
                                           {ad.description && (
                                             <p style={{ fontSize: '0.76rem', color: '#8094b8', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{ad.description}</p>
+                                          )}
+                                          {/* Leads copies V1/V2/V3 */}
+                                          {(ad.copyV1 || ad.copyV2 || ad.copyV3) && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                              {([['copyV1', 'V1'], ['copyV2', 'V2'], ['copyV3', 'V3']] as const).map(([field, label]) =>
+                                                ad[field] ? (
+                                                  <div key={field} style={{ padding: '5px 8px', borderRadius: 5, border: '1px solid rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.04)' }}>
+                                                    <span style={{ fontSize: '0.58rem', fontWeight: 700, color: '#f59e0b', display: 'block', marginBottom: 2 }}>COPY {label}</span>
+                                                    <p style={{ fontSize: '0.75rem', color: '#8094b8', margin: 0, whiteSpace: 'pre-wrap' }}>{ad[field]}</p>
+                                                  </div>
+                                                ) : null
+                                              )}
+                                            </div>
+                                          )}
+                                          {/* Headline + CTA */}
+                                          {(ad.headline || ad.ctaButton) && (
+                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                              {ad.headline && <span style={{ fontSize: '0.76rem', color: '#c8d8f0', fontWeight: 600 }}>{ad.headline}</span>}
+                                              {ad.ctaButton && <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: '0.66rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 700 }}>{ad.ctaButton}</span>}
+                                            </div>
+                                          )}
+                                          {/* Creative idea */}
+                                          {ad.creativeIdea && (
+                                            <div>
+                                              <span style={{ fontSize: '0.6rem', color: 'hsl(215,15%,45%)', fontWeight: 700, letterSpacing: '0.06em', display: 'block', marginBottom: 2 }}>💡 IDEA VISUAL</span>
+                                              <span style={{ fontSize: '0.74rem', color: '#8094b8' }}>{ad.creativeIdea}</span>
+                                            </div>
                                           )}
                                           {/* Welcome message at ad level */}
                                           {ad.welcomeMessage && (

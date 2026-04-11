@@ -476,11 +476,79 @@ export type MetaAdEntry = {
   description?: string;
   publicationType?: 'nueva' | 'existente';
   existingUrl?: string;
-  referenceUrl?: string | null;  // URL de referencia creativa para publicación nueva
+  referenceUrl?: string | null;
   notes?: string;
   imageBase64?: string;
   welcomeMessage?: string;
   suggestedQuestions?: string;
+  // Leads (Clientes Potenciales) copy fields
+  copyV1?: string;
+  copyV2?: string;
+  copyV3?: string;
+  headline?: string;
+  ctaButton?: string;
+  creativeType?: string;
+  creativeIdea?: string;
+};
+
+// ─── Clientes Potenciales (Leads) campaign data structures ─────────────────
+
+export type LeadsInstantFormQuestion = {
+  id: string;
+  field: 'nombre' | 'whatsapp' | 'email' | 'ciudad' | 'custom';
+  label?: string;
+  questionType?: 'short' | 'multiple' | 'conditional';
+  options?: string[];
+  enabled: boolean;
+};
+
+export type LeadsInstantForm = {
+  formName?: string;
+  formType?: 'volume' | 'intent';
+  introTitle?: string;
+  introDescription?: string;
+  introCoverImage?: string;
+  questions?: LeadsInstantFormQuestion[];
+  privacyUrl?: string;
+  privacyDisclaimer?: string;
+  thankYouTitle?: string;
+  thankYouDescription?: string;
+  thankYouButton?: 'whatsapp' | 'website' | 'download' | 'none';
+  thankYouButtonUrl?: string;
+};
+
+export type LeadsMessagesConfig = {
+  platforms?: string[];
+  whatsappNumber?: string;
+  greeting?: string;
+  questions?: string[];
+};
+
+export type LeadsLandingConfig = {
+  landingUrl?: string;
+  headline?: string;
+  subheadline?: string;
+  valueProposition?: string;
+  benefits?: string[];
+  socialProof?: string;
+  cta?: string;
+  formFields?: string[];
+};
+
+export type LeadsPostLead = {
+  contactChannel?: string;
+  responseTime?: string;
+  followUpMessage?: string;
+  responsible?: string;
+};
+
+export type LeadsMetrics = {
+  expectedCpl?: number;
+  expectedCtr?: string;
+  monthlyLeadsGoal?: number;
+  kpiChecklist?: string[];
+  scalingCriteria?: string;
+  pauseCriteria?: string;
 };
 
 export type AdSetEntry = {
@@ -520,6 +588,10 @@ export type AdSetEntry = {
   platforms?: string[];
   // Adset-level strategic notes
   notes?: string | null;
+  // Leads (Clientes Potenciales) optimization
+  leadsOptimizationEvent?: string;
+  leadsConversionWindow?: string;
+  leadsBidStrategy?: string;
   // Ads (Level 3)
   ads?: MetaAdEntry[];
   // Legacy fields (backward compat)
@@ -536,6 +608,13 @@ export type StrategyCampaign = {
   budgetType?: 'ABO' | 'CBO';
   objective?: string;
   adsets?: AdSetEntry[];
+  // Clientes Potenciales (Leads) campaign config
+  leadsConversionLocation?: string;
+  leadsInstantForm?: LeadsInstantForm | null;
+  leadsMessages?: LeadsMessagesConfig | null;
+  leadsLanding?: LeadsLandingConfig | null;
+  leadsPostLead?: LeadsPostLead | null;
+  leadsMetrics?: LeadsMetrics | null;
 };
 
 export type SegmentationData = {

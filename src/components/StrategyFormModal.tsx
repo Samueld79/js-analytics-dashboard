@@ -36,6 +36,14 @@ interface AdFormState {
   imageFilename: string;
   welcomeMessage: string;
   suggestedQuestions: string;
+  // Leads copy
+  copyV1: string;
+  copyV2: string;
+  copyV3: string;
+  headline: string;
+  ctaButton: string;
+  creativeType: string;
+  creativeIdea: string;
 }
 
 interface AdSetFormState {
@@ -67,6 +75,70 @@ interface AdSetFormState {
   platforms: string[];
   notes: string;
   ads: AdFormState[];
+  // Leads optimization
+  leadsOptimizationEvent: string;
+  leadsConversionWindow: string;
+  leadsBidStrategy: string;
+}
+
+// ─── Leads form state types ────────────────────────────────────────────────
+
+interface LeadsInstantFormQuestionState {
+  id: string;
+  field: 'nombre' | 'whatsapp' | 'email' | 'ciudad' | 'custom';
+  label: string;
+  questionType: 'short' | 'multiple' | 'conditional';
+  options: string[];
+  enabled: boolean;
+}
+
+interface LeadsInstantFormState {
+  formName: string;
+  formType: 'volume' | 'intent';
+  introTitle: string;
+  introDescription: string;
+  introCoverImage: string;
+  questions: LeadsInstantFormQuestionState[];
+  privacyUrl: string;
+  privacyDisclaimer: string;
+  thankYouTitle: string;
+  thankYouDescription: string;
+  thankYouButton: 'whatsapp' | 'website' | 'download' | 'none';
+  thankYouButtonUrl: string;
+}
+
+interface LeadsMessagesState {
+  platforms: string[];
+  whatsappNumber: string;
+  greeting: string;
+  questions: string[];
+}
+
+interface LeadsLandingState {
+  landingUrl: string;
+  headline: string;
+  subheadline: string;
+  valueProposition: string;
+  benefits: string[];
+  socialProof: string;
+  cta: string;
+  formFields: string[];
+}
+
+interface LeadsPostLeadState {
+  contactChannel: string;
+  responseTime: string;
+  followUpMessage: string;
+  responsible: string;
+}
+
+interface LeadsMetricsState {
+  expectedCpl: string;
+  expectedCtr: string;
+  monthlyLeadsGoal: string;
+  kpiChecklist: string[];
+  scalingCriteria: string;
+  pauseCriteria: string;
 }
 
 interface CampaignFormState {
@@ -75,13 +147,20 @@ interface CampaignFormState {
   budgetType: 'ABO' | 'CBO';
   objective: string;
   adsets: AdSetFormState[];
+  // Clientes Potenciales (Leads)
+  leadsConversionLocation: string;
+  leadsInstantForm: LeadsInstantFormState;
+  leadsMessages: LeadsMessagesState;
+  leadsLanding: LeadsLandingState;
+  leadsPostLead: LeadsPostLeadState;
+  leadsMetrics: LeadsMetricsState;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
 const META_PLATFORMS = ['Facebook', 'Instagram', 'Audience Network', 'Messenger', 'WhatsApp', 'Threads'];
 const AD_TYPES = ['Video', 'Imagen', 'Carrusel', 'Reel', 'Colección'];
-const OBJECTIVES = ['Reconocimiento', 'Tráfico', 'Interacción', 'Ventas', 'Generación de leads', 'Mensajes'];
+const OBJECTIVES = ['Reconocimiento', 'Tráfico', 'Interacción', 'Ventas', 'Clientes Potenciales', 'Generación de leads', 'Mensajes'];
 const AGE_OPTIONS_MIN = Array.from({ length: 48 }, (_, i) => 18 + i);
 const AGE_OPTIONS_MAX = Array.from({ length: 46 }, (_, i) => 20 + i);
 
@@ -90,6 +169,7 @@ const OPTIMIZATION_GOALS: Record<string, string[]> = {
   Tráfico: ['Clics en enlace', 'Visitas a página de destino', 'Clics en publicación'],
   Interacción: ['Interacciones con publicación', 'Reproducciones de video', 'Mensajes', 'Visitas al perfil'],
   Ventas: ['Conversiones', 'Valor de conversión', 'Ventas del catálogo'],
+  'Clientes Potenciales': ['Clientes potenciales (recomendado)', 'Clientes potenciales de calidad', 'Conversión de clientes potenciales'],
   'Generación de leads': ['Clientes potenciales', 'Conversiones de clientes potenciales'],
   Mensajes: ['Conversaciones iniciadas', 'Respuestas a mensajes'],
 };
@@ -99,11 +179,36 @@ const INTERACTION_TYPES = ['Mensajes', 'Reacciones y comentarios', 'Reproduccion
 const CONVERSION_DESTINATIONS = ['Sitio web', 'App', 'WhatsApp', 'Messenger', 'Instagram DM', 'Catálogo'];
 const LEADS_TYPES = ['Formulario nativo', 'Sitio web', 'WhatsApp', 'Messenger'];
 
+// Clientes Potenciales constants
+const LEADS_CONVERSION_LOCATIONS = [
+  '📋 Formulario instantáneo',
+  '💬 Mensajes (WhatsApp / Messenger / Instagram)',
+  '🌐 Sitio web (Landing Page)',
+  '📞 Llamadas',
+];
+const LEADS_CONV_WINDOWS = [
+  '1 día después del clic',
+  '7 días después del clic (recomendado)',
+  '1 día de visualización',
+];
+const LEADS_BID_STRATEGIES = [
+  'Costo por resultado más bajo (recomendado)',
+  'Límite de costo',
+  'ROAS mínimo',
+];
+const AD_CTA_OPTIONS = ['Más información', 'Registrarte', 'Suscribirse', 'Solicitar presupuesto', 'Descargar', 'Obtener oferta', 'Enviar mensaje'];
+const LEADS_KPI_ALL = ['CPL (Costo por Lead)', 'CTR', 'Tasa de conversión del formulario', 'Calidad de leads (% que responde)', 'CPM', 'Frecuencia'];
+const LEADS_KPI_DEFAULT = ['CPL (Costo por Lead)', 'CTR', 'Tasa de conversión del formulario', 'Calidad de leads (% que responde)'];
+const LEADS_FORM_FIELDS = ['Nombre', 'WhatsApp', 'Email', 'Ciudad', 'Empresa'];
+const LEADS_CONTACT_CHANNELS = ['WhatsApp (recomendado)', 'Llamada telefónica', 'Email', 'CRM automático'];
+const LEADS_RESPONSE_TIMES = ['Inmediato (automatizado)', 'Menos de 5 minutos', 'Menos de 1 hora', 'Mismo día'];
+
 const CAMPAIGN_OBJ_COLORS: Record<string, string> = {
   Reconocimiento: 'hsl(180,100%,50%)',
   Tráfico: 'hsl(215,80%,65%)',
   Interacción: 'hsl(280,80%,70%)',
   Ventas: 'hsl(145,100%,55%)',
+  'Clientes Potenciales': '#f59e0b',
   'Generación de leads': 'hsl(38,100%,60%)',
   Mensajes: 'hsl(320,80%,65%)',
 };
@@ -111,6 +216,70 @@ const CAMPAIGN_OBJ_COLORS: Record<string, string> = {
 const DRAFT_KEY = 'strategy_draft';
 
 // ─── Empty factories ───────────────────────────────────────────────────────
+
+function emptyLeadsInstantForm(): LeadsInstantFormState {
+  return {
+    formName: '',
+    formType: 'volume',
+    introTitle: '',
+    introDescription: '',
+    introCoverImage: '',
+    questions: [
+      { id: 'q1', field: 'nombre', label: 'Nombre completo', questionType: 'short', options: [], enabled: true },
+      { id: 'q2', field: 'whatsapp', label: 'Número de WhatsApp', questionType: 'short', options: [], enabled: true },
+      { id: 'q3', field: 'email', label: 'Correo electrónico', questionType: 'short', options: [], enabled: false },
+      { id: 'q4', field: 'ciudad', label: 'Ciudad/Ubicación', questionType: 'short', options: [], enabled: false },
+    ],
+    privacyUrl: '',
+    privacyDisclaimer: 'Al enviar este formulario autorizas el tratamiento de tus datos personales conforme a nuestra política de privacidad.',
+    thankYouTitle: '¡Gracias! Nos pondremos en contacto pronto.',
+    thankYouDescription: '',
+    thankYouButton: 'whatsapp',
+    thankYouButtonUrl: '',
+  };
+}
+
+function emptyLeadsMessages(): LeadsMessagesState {
+  return {
+    platforms: [],
+    whatsappNumber: '',
+    greeting: '¡Hola! Vi tu anuncio y me interesa saber más.',
+    questions: ['', '', ''],
+  };
+}
+
+function emptyLeadsLanding(): LeadsLandingState {
+  return {
+    landingUrl: '',
+    headline: '',
+    subheadline: '',
+    valueProposition: '',
+    benefits: ['', '', '', ''],
+    socialProof: '',
+    cta: 'Quiero mi presupuesto gratis',
+    formFields: ['Nombre', 'WhatsApp'],
+  };
+}
+
+function emptyLeadsPostLead(): LeadsPostLeadState {
+  return {
+    contactChannel: 'WhatsApp (recomendado)',
+    responseTime: 'Menos de 5 minutos',
+    followUpMessage: 'Hola [Nombre], vi que dejaste tus datos en nuestro anuncio...',
+    responsible: '',
+  };
+}
+
+function emptyLeadsMetrics(): LeadsMetricsState {
+  return {
+    expectedCpl: '',
+    expectedCtr: '',
+    monthlyLeadsGoal: '',
+    kpiChecklist: [...LEADS_KPI_DEFAULT],
+    scalingCriteria: '',
+    pauseCriteria: '',
+  };
+}
 
 function emptyAd(): AdFormState {
   return {
@@ -124,6 +293,13 @@ function emptyAd(): AdFormState {
     imageFilename: '',
     welcomeMessage: '',
     suggestedQuestions: '',
+    copyV1: '',
+    copyV2: '',
+    copyV3: '',
+    headline: '',
+    ctaButton: '',
+    creativeType: '',
+    creativeIdea: '',
   };
 }
 
@@ -157,22 +333,87 @@ function emptyAdSet(): AdSetFormState {
     platforms: [],
     notes: '',
     ads: [emptyAd()],
+    leadsOptimizationEvent: '',
+    leadsConversionWindow: '',
+    leadsBidStrategy: '',
   };
 }
 
 function emptyCampaign(): CampaignFormState {
-  return { name: '', budget: '', budgetType: 'CBO', objective: 'Reconocimiento', adsets: [emptyAdSet()] };
+  return {
+    name: '',
+    budget: '',
+    budgetType: 'CBO',
+    objective: 'Reconocimiento',
+    adsets: [emptyAdSet()],
+    leadsConversionLocation: '',
+    leadsInstantForm: emptyLeadsInstantForm(),
+    leadsMessages: emptyLeadsMessages(),
+    leadsLanding: emptyLeadsLanding(),
+    leadsPostLead: emptyLeadsPostLead(),
+    leadsMetrics: emptyLeadsMetrics(),
+  };
 }
 
 // ─── Converters ───────────────────────────────────────────────────────────
 
 function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormState[] {
   if (!campaigns?.length) return [];
-  return campaigns.map((c) => ({
+  return campaigns.map((c) => {
+    // Map leads data from DB → form state
+    const rawIF = c.leadsInstantForm;
+    const leadsInstantForm: LeadsInstantFormState = rawIF
+      ? {
+          formName: rawIF.formName ?? '',
+          formType: rawIF.formType ?? 'volume',
+          introTitle: rawIF.introTitle ?? '',
+          introDescription: rawIF.introDescription ?? '',
+          introCoverImage: rawIF.introCoverImage ?? '',
+          questions: rawIF.questions?.length
+            ? rawIF.questions.map((q, i): LeadsInstantFormQuestionState => ({
+                id: q.id ?? `q${i}`,
+                field: q.field,
+                label: q.label ?? '',
+                questionType: q.questionType ?? 'short',
+                options: q.options ?? [],
+                enabled: q.enabled,
+              }))
+            : emptyLeadsInstantForm().questions,
+          privacyUrl: rawIF.privacyUrl ?? '',
+          privacyDisclaimer: rawIF.privacyDisclaimer ?? emptyLeadsInstantForm().privacyDisclaimer,
+          thankYouTitle: rawIF.thankYouTitle ?? emptyLeadsInstantForm().thankYouTitle,
+          thankYouDescription: rawIF.thankYouDescription ?? '',
+          thankYouButton: rawIF.thankYouButton ?? 'whatsapp',
+          thankYouButtonUrl: rawIF.thankYouButtonUrl ?? '',
+        }
+      : emptyLeadsInstantForm();
+    const rawMsg = c.leadsMessages;
+    const leadsMessages: LeadsMessagesState = rawMsg
+      ? { platforms: rawMsg.platforms ?? [], whatsappNumber: rawMsg.whatsappNumber ?? '', greeting: rawMsg.greeting ?? emptyLeadsMessages().greeting, questions: rawMsg.questions?.length ? rawMsg.questions : ['', '', ''] }
+      : emptyLeadsMessages();
+    const rawLand = c.leadsLanding;
+    const leadsLanding: LeadsLandingState = rawLand
+      ? { landingUrl: rawLand.landingUrl ?? '', headline: rawLand.headline ?? '', subheadline: rawLand.subheadline ?? '', valueProposition: rawLand.valueProposition ?? '', benefits: rawLand.benefits?.length ? rawLand.benefits : ['', '', '', ''], socialProof: rawLand.socialProof ?? '', cta: rawLand.cta ?? emptyLeadsLanding().cta, formFields: rawLand.formFields ?? ['Nombre', 'WhatsApp'] }
+      : emptyLeadsLanding();
+    const rawPL = c.leadsPostLead;
+    const leadsPostLead: LeadsPostLeadState = rawPL
+      ? { contactChannel: rawPL.contactChannel ?? emptyLeadsPostLead().contactChannel, responseTime: rawPL.responseTime ?? emptyLeadsPostLead().responseTime, followUpMessage: rawPL.followUpMessage ?? emptyLeadsPostLead().followUpMessage, responsible: rawPL.responsible ?? '' }
+      : emptyLeadsPostLead();
+    const rawMet = c.leadsMetrics;
+    const leadsMetrics: LeadsMetricsState = rawMet
+      ? { expectedCpl: rawMet.expectedCpl?.toString() ?? '', expectedCtr: rawMet.expectedCtr ?? '', monthlyLeadsGoal: rawMet.monthlyLeadsGoal?.toString() ?? '', kpiChecklist: rawMet.kpiChecklist ?? [...LEADS_KPI_DEFAULT], scalingCriteria: rawMet.scalingCriteria ?? '', pauseCriteria: rawMet.pauseCriteria ?? '' }
+      : emptyLeadsMetrics();
+    return {
     name: c.name,
     budget: c.budget?.toString() ?? '',
     budgetType: c.budgetType ?? 'CBO',
     objective: c.objective ?? 'Reconocimiento',
+    leadsConversionLocation: c.leadsConversionLocation ?? '',
+    leadsInstantForm,
+    leadsMessages,
+    leadsLanding,
+    leadsPostLead,
+    leadsMetrics,
     adsets: (c.adsets ?? []).map((a): AdSetFormState => {
       let ads: AdFormState[];
       if (a.ads?.length) {
@@ -187,6 +428,13 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
           imageFilename: ad.imageBase64 ? 'imagen_guardada' : '',
           welcomeMessage: ad.welcomeMessage ?? '',
           suggestedQuestions: ad.suggestedQuestions ?? '',
+          copyV1: ad.copyV1 ?? '',
+          copyV2: ad.copyV2 ?? '',
+          copyV3: ad.copyV3 ?? '',
+          headline: ad.headline ?? '',
+          ctaButton: ad.ctaButton ?? '',
+          creativeType: ad.creativeType ?? '',
+          creativeIdea: ad.creativeIdea ?? '',
         }));
       } else if (a.creatives?.length) {
         // Migrate legacy creatives → ads
@@ -201,6 +449,7 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
           imageFilename: cr.imageBase64 ? 'imagen_guardada' : '',
           welcomeMessage: a.welcomeMessage ?? '',
           suggestedQuestions: '',
+          copyV1: '', copyV2: '', copyV3: '', headline: '', ctaButton: '', creativeType: '', creativeIdea: '',
         }));
       } else {
         ads = [emptyAd()];
@@ -231,13 +480,16 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
         exclusions: a.exclusions ?? '',
         placementsOption: (a.placementsOption ?? 'auto') as 'auto' | 'manual',
         placements: a.placements ?? [],
-        // platforms: new field, fallback to legacy placements if platforms not yet set
         platforms: a.platforms ?? [],
         notes: a.notes ?? '',
         ads,
+        leadsOptimizationEvent: a.leadsOptimizationEvent ?? '',
+        leadsConversionWindow: a.leadsConversionWindow ?? '',
+        leadsBidStrategy: a.leadsBidStrategy ?? '',
       };
     }),
-  }));
+  };
+  });
 }
 
 function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
@@ -289,8 +541,11 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
         placements: a.placementsOption === 'manual' ? a.placements : undefined,
         platforms: a.platforms.length ? a.platforms : undefined,
         notes: a.notes.trim() || undefined,
+        leadsOptimizationEvent: c.objective === 'Clientes Potenciales' ? a.leadsOptimizationEvent || undefined : undefined,
+        leadsConversionWindow: c.objective === 'Clientes Potenciales' ? a.leadsConversionWindow || undefined : undefined,
+        leadsBidStrategy: c.objective === 'Clientes Potenciales' ? a.leadsBidStrategy || undefined : undefined,
         ads: a.ads
-          .filter((ad) => ad.description || ad.existingUrl || ad.referenceUrl || ad.notes || ad.imageBase64)
+          .filter((ad) => ad.description || ad.existingUrl || ad.referenceUrl || ad.notes || ad.imageBase64 || ad.copyV1 || ad.headline)
           .map(
             (ad): MetaAdEntry => ({
               adType: ad.adType || undefined,
@@ -304,9 +559,46 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
               imageBase64: ad.imageBase64 || undefined,
               welcomeMessage: ad.welcomeMessage || undefined,
               suggestedQuestions: ad.suggestedQuestions || undefined,
+              copyV1: ad.copyV1 || undefined,
+              copyV2: ad.copyV2 || undefined,
+              copyV3: ad.copyV3 || undefined,
+              headline: ad.headline || undefined,
+              ctaButton: ad.ctaButton || undefined,
+              creativeType: ad.creativeType || undefined,
+              creativeIdea: ad.creativeIdea || undefined,
             }),
           ),
       })),
+      // Clientes Potenciales leads data
+      leadsConversionLocation: c.objective === 'Clientes Potenciales' ? c.leadsConversionLocation || undefined : undefined,
+      leadsInstantForm: c.objective === 'Clientes Potenciales' && c.leadsConversionLocation === '📋 Formulario instantáneo'
+        ? {
+            formName: c.leadsInstantForm.formName || undefined,
+            formType: c.leadsInstantForm.formType,
+            introTitle: c.leadsInstantForm.introTitle || undefined,
+            introDescription: c.leadsInstantForm.introDescription || undefined,
+            introCoverImage: c.leadsInstantForm.introCoverImage || undefined,
+            questions: c.leadsInstantForm.questions,
+            privacyUrl: c.leadsInstantForm.privacyUrl || undefined,
+            privacyDisclaimer: c.leadsInstantForm.privacyDisclaimer || undefined,
+            thankYouTitle: c.leadsInstantForm.thankYouTitle || undefined,
+            thankYouDescription: c.leadsInstantForm.thankYouDescription || undefined,
+            thankYouButton: c.leadsInstantForm.thankYouButton,
+            thankYouButtonUrl: c.leadsInstantForm.thankYouButtonUrl || undefined,
+          }
+        : undefined,
+      leadsMessages: c.objective === 'Clientes Potenciales' && c.leadsConversionLocation === '💬 Mensajes (WhatsApp / Messenger / Instagram)'
+        ? { platforms: c.leadsMessages.platforms.length ? c.leadsMessages.platforms : undefined, whatsappNumber: c.leadsMessages.whatsappNumber || undefined, greeting: c.leadsMessages.greeting || undefined, questions: c.leadsMessages.questions.filter(Boolean) }
+        : undefined,
+      leadsLanding: c.objective === 'Clientes Potenciales' && c.leadsConversionLocation === '🌐 Sitio web (Landing Page)'
+        ? { landingUrl: c.leadsLanding.landingUrl || undefined, headline: c.leadsLanding.headline || undefined, subheadline: c.leadsLanding.subheadline || undefined, valueProposition: c.leadsLanding.valueProposition || undefined, benefits: c.leadsLanding.benefits.filter(Boolean), socialProof: c.leadsLanding.socialProof || undefined, cta: c.leadsLanding.cta || undefined, formFields: c.leadsLanding.formFields }
+        : undefined,
+      leadsPostLead: c.objective === 'Clientes Potenciales'
+        ? { contactChannel: c.leadsPostLead.contactChannel || undefined, responseTime: c.leadsPostLead.responseTime || undefined, followUpMessage: c.leadsPostLead.followUpMessage || undefined, responsible: c.leadsPostLead.responsible || undefined }
+        : undefined,
+      leadsMetrics: c.objective === 'Clientes Potenciales'
+        ? { expectedCpl: c.leadsMetrics.expectedCpl ? Number(c.leadsMetrics.expectedCpl) || undefined : undefined, expectedCtr: c.leadsMetrics.expectedCtr || undefined, monthlyLeadsGoal: c.leadsMetrics.monthlyLeadsGoal ? Number(c.leadsMetrics.monthlyLeadsGoal) || undefined : undefined, kpiChecklist: c.leadsMetrics.kpiChecklist.length ? c.leadsMetrics.kpiChecklist : undefined, scalingCriteria: c.leadsMetrics.scalingCriteria || undefined, pauseCriteria: c.leadsMetrics.pauseCriteria || undefined }
+        : undefined,
     }));
 }
 
@@ -483,12 +775,14 @@ function AdBlock({
   ad,
   adIdx,
   showMessaging,
+  campaignObjective,
   onChange,
   onRemove,
 }: {
   ad: AdFormState;
   adIdx: number;
   showMessaging: boolean;
+  campaignObjective: string;
   onChange: (updated: AdFormState) => void;
   onRemove: () => void;
 }) {
@@ -733,6 +1027,88 @@ function AdBlock({
           </div>
         </>
       )}
+
+      {/* Leads copy — only for Clientes Potenciales objective */}
+      {campaignObjective === 'Clientes Potenciales' && (
+        <>
+          <div style={{ borderTop: '1px solid rgba(245,158,11,0.15)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#f59e0b', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace' }}>COPY DEL ANUNCIO</span>
+
+            {/* 3 copy versions */}
+            {(['copyV1', 'copyV2', 'copyV3'] as const).map((field, i) => (
+              <div key={field} style={FIELD_STYLE}>
+                <label style={{ ...LABEL_STYLE, color: '#f59e0b' }}>Texto principal V{i + 1}</label>
+                <textarea
+                  rows={3}
+                  value={ad[field]}
+                  onChange={(e) => set(field, e.target.value)}
+                  placeholder={`Versión ${i + 1} del copy principal...`}
+                  style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', borderColor: 'rgba(245,158,11,0.2)' }}
+                />
+              </div>
+            ))}
+
+            {/* Headline */}
+            <div style={FIELD_STYLE}>
+              <label style={LABEL_STYLE}>Titular / Headline</label>
+              <input
+                value={ad.headline}
+                onChange={(e) => set('headline', e.target.value)}
+                placeholder="Obtén tu presupuesto gratis hoy"
+                style={{ ...INPUT_STYLE, fontSize: '0.82rem' }}
+              />
+            </div>
+
+            {/* CTA */}
+            <div style={FIELD_STYLE}>
+              <label style={LABEL_STYLE}>Botón CTA</label>
+              <select
+                value={ad.ctaButton}
+                onChange={(e) => set('ctaButton', e.target.value)}
+                style={INPUT_STYLE as React.CSSProperties}
+              >
+                <option value="">Selecciona CTA...</option>
+                {AD_CTA_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid rgba(245,158,11,0.15)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#f59e0b', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace' }}>CREATIVO</span>
+
+            {/* Creative type */}
+            <div style={FIELD_STYLE}>
+              <label style={LABEL_STYLE}>Tipo de creativo</label>
+              <PillToggle
+                options={['Imagen', 'Video', 'Carrusel']}
+                active={ad.creativeType}
+                onToggle={(v) => set('creativeType', ad.creativeType === v ? '' : v)}
+              />
+              {ad.creativeType === 'Imagen' && (
+                <span style={{ fontSize: '0.66rem', color: 'hsl(215,15%,40%)', fontStyle: 'italic' }}>1080×1080px o 1080×1920px para Stories/Reels</span>
+              )}
+              {ad.creativeType === 'Video' && (
+                <span style={{ fontSize: '0.66rem', color: 'hsl(215,15%,40%)', fontStyle: 'italic' }}>Máx 15 seg para Reels, subtítulos obligatorios</span>
+              )}
+              {ad.creativeType === 'Carrusel' && (
+                <span style={{ fontSize: '0.66rem', color: 'hsl(215,15%,40%)', fontStyle: 'italic' }}>Mín 2, máx 10 tarjetas, 1080×1080px</span>
+              )}
+            </div>
+
+            {/* Creative idea */}
+            <div style={FIELD_STYLE}>
+              <label style={LABEL_STYLE}>Idea visual</label>
+              <textarea
+                rows={2}
+                value={ad.creativeIdea}
+                onChange={(e) => set('creativeIdea', e.target.value)}
+                placeholder="Descripción del concepto creativo: qué se muestra, qué comunica..."
+                style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', borderColor: 'rgba(245,158,11,0.2)' }}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -801,6 +1177,7 @@ function AdSetBlock({
 
   const goalsForObjective = OPTIMIZATION_GOALS[campaignObjective] ?? [];
   const showMessaging = campaignObjective === 'Mensajes';
+  const isLeads = campaignObjective === 'Clientes Potenciales';
   const displayName = adset.name.trim() || `CONJUNTO ${adsetIdx + 1}`;
 
   return (
@@ -1069,6 +1446,48 @@ function AdSetBlock({
                 </div>
               )}
 
+              {/* Conditional: Clientes Potenciales — optimization */}
+              {isLeads && (
+                <div style={{ borderTop: '1px solid rgba(245,158,11,0.15)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#f59e0b', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace' }}>OPTIMIZACIÓN Y ENTREGA</span>
+                  <div style={FIELD_STYLE}>
+                    <label style={LABEL_STYLE}>Evento de optimización</label>
+                    <select
+                      value={adset.leadsOptimizationEvent}
+                      onChange={(e) => set('leadsOptimizationEvent', e.target.value)}
+                      style={INPUT_STYLE as React.CSSProperties}
+                    >
+                      <option value="">Selecciona evento...</option>
+                      {(OPTIMIZATION_GOALS['Clientes Potenciales'] ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={FIELD_STYLE}>
+                      <label style={LABEL_STYLE}>Ventana de conversión</label>
+                      <select
+                        value={adset.leadsConversionWindow}
+                        onChange={(e) => set('leadsConversionWindow', e.target.value)}
+                        style={INPUT_STYLE as React.CSSProperties}
+                      >
+                        <option value="">Selecciona ventana...</option>
+                        {LEADS_CONV_WINDOWS.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                    <div style={FIELD_STYLE}>
+                      <label style={LABEL_STYLE}>Estrategia de puja</label>
+                      <select
+                        value={adset.leadsBidStrategy}
+                        onChange={(e) => set('leadsBidStrategy', e.target.value)}
+                        style={INPUT_STYLE as React.CSSProperties}
+                      >
+                        <option value="">Selecciona estrategia...</option>
+                        {LEADS_BID_STRATEGIES.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Audience */}
               <div
                 style={{
@@ -1319,6 +1738,7 @@ function AdSetBlock({
                     ad={ad}
                     adIdx={adIdx}
                     showMessaging={showMessaging}
+                    campaignObjective={campaignObjective}
                     onChange={(updated) => updateAd(adIdx, updated)}
                     onRemove={() => removeAd(adIdx)}
                   />
@@ -1347,6 +1767,449 @@ function AdSetBlock({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Leads section sub-components ────────────────────────────────────────
+
+const AMBER: React.CSSProperties = { color: '#f59e0b' };
+const AMBER_BORDER: React.CSSProperties = { borderColor: 'rgba(245,158,11,0.25)' };
+const AMBER_SECTION_LABEL: React.CSSProperties = { fontSize: '0.6rem', fontWeight: 700, color: '#f59e0b', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace' };
+
+function LeadsSectionHeading({ label }: { label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 10px' }}>
+      <span style={AMBER_SECTION_LABEL}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: 'rgba(245,158,11,0.15)' }} />
+    </div>
+  );
+}
+
+// ─── Instant Form Section ─────────────────────────────────────────────────
+
+function LeadsInstantFormSection({
+  data,
+  onChange,
+}: {
+  data: LeadsInstantFormState;
+  onChange: (updated: LeadsInstantFormState) => void;
+}) {
+  function set<K extends keyof LeadsInstantFormState>(field: K, value: LeadsInstantFormState[K]) {
+    onChange({ ...data, [field]: value });
+  }
+
+  function setQuestion(idx: number, updated: LeadsInstantFormQuestionState) {
+    onChange({ ...data, questions: data.questions.map((q, i) => (i === idx ? updated : q)) });
+  }
+
+  function addCustomQuestion() {
+    const newQ: LeadsInstantFormQuestionState = {
+      id: `custom_${Date.now()}`,
+      field: 'custom',
+      label: '',
+      questionType: 'short',
+      options: ['', ''],
+      enabled: true,
+    };
+    onChange({ ...data, questions: [...data.questions, newQ] });
+  }
+
+  function removeQuestion(idx: number) {
+    onChange({ ...data, questions: data.questions.filter((_, i) => i !== idx) });
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <LeadsSectionHeading label="CONFIGURACIÓN DEL FORMULARIO" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Nombre del formulario</label>
+          <input value={data.formName} onChange={(e) => set('formName', e.target.value)} placeholder="Formulario leads abril" style={INPUT_STYLE} />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Tipo de formulario</label>
+          <select value={data.formType} onChange={(e) => set('formType', e.target.value as 'volume' | 'intent')} style={INPUT_STYLE as React.CSSProperties}>
+            <option value="volume">Más volumen — mayor cantidad de leads</option>
+            <option value="intent">Mayor intención — leads más calificados</option>
+          </select>
+        </div>
+      </div>
+
+      <LeadsSectionHeading label="INTRODUCCIÓN" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Título del formulario <span style={{ color: 'hsl(215,15%,40%)' }}>(máx 60)</span></label>
+          <input value={data.introTitle} onChange={(e) => set('introTitle', e.target.value)} maxLength={60} placeholder="¿Te interesa nuestro servicio?" style={INPUT_STYLE} />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Imagen de portada (URL o descripción)</label>
+          <input value={data.introCoverImage} onChange={(e) => set('introCoverImage', e.target.value)} placeholder="https://... o descripción visual" style={INPUT_STYLE} />
+        </div>
+      </div>
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Descripción <span style={{ color: 'hsl(215,15%,40%)' }}>(máx 80)</span></label>
+        <textarea rows={2} value={data.introDescription} onChange={(e) => set('introDescription', e.target.value)} maxLength={80} placeholder="Completa el formulario y nos ponemos en contacto..." style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem' }} />
+      </div>
+
+      <LeadsSectionHeading label="PREGUNTAS" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {data.questions.map((q, idx) => (
+          <div key={q.id} style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flex: 1 }}>
+                <input
+                  type="checkbox"
+                  checked={q.enabled}
+                  onChange={(e) => setQuestion(idx, { ...q, enabled: e.target.checked })}
+                  style={{ width: 13, height: 13, accentColor: '#f59e0b', cursor: 'pointer' }}
+                />
+                {q.field === 'custom' ? (
+                  <input
+                    value={q.label}
+                    onChange={(e) => setQuestion(idx, { ...q, label: e.target.value })}
+                    placeholder="Texto de la pregunta..."
+                    style={{ ...INPUT_STYLE, fontSize: '0.78rem', flex: 1, padding: '3px 8px' }}
+                  />
+                ) : (
+                  <span style={{ fontSize: '0.78rem', color: q.enabled ? '#c8d8f0' : 'hsl(215,15%,40%)' }}>{q.label}</span>
+                )}
+              </label>
+              {q.field === 'custom' && (
+                <>
+                  <select value={q.questionType} onChange={(e) => setQuestion(idx, { ...q, questionType: e.target.value as LeadsInstantFormQuestionState['questionType'] })} style={{ ...SELECT_COMPACT, fontSize: '0.7rem' }}>
+                    <option value="short">Respuesta corta</option>
+                    <option value="multiple">Opción múltiple</option>
+                    <option value="conditional">Condicional</option>
+                  </select>
+                  <button type="button" onClick={() => removeQuestion(idx)} style={{ background: 'transparent', border: 'none', color: 'hsl(0,80%,55%)', cursor: 'pointer', padding: 2, lineHeight: 1 }}>
+                    <Trash2 size={11} />
+                  </button>
+                </>
+              )}
+            </div>
+            {q.field === 'custom' && q.questionType === 'multiple' && (
+              <div style={{ paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {q.options.slice(0, 5).map((opt, oi) => (
+                  <div key={oi} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input
+                      value={opt}
+                      onChange={(e) => {
+                        const opts = [...q.options];
+                        opts[oi] = e.target.value;
+                        setQuestion(idx, { ...q, options: opts });
+                      }}
+                      placeholder={`Opción ${oi + 1}`}
+                      style={{ ...INPUT_STYLE, fontSize: '0.75rem', flex: 1, padding: '3px 8px' }}
+                    />
+                    {q.options.length > 2 && (
+                      <button type="button" onClick={() => setQuestion(idx, { ...q, options: q.options.filter((_, i) => i !== oi) })} style={{ background: 'transparent', border: 'none', color: 'hsl(215,15%,40%)', cursor: 'pointer', padding: 0 }}>
+                        <Trash2 size={10} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {q.options.length < 5 && (
+                  <button type="button" onClick={() => setQuestion(idx, { ...q, options: [...q.options, ''] })} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, color: 'hsl(215,15%,50%)', cursor: 'pointer', padding: '2px 8px', fontSize: '0.66rem', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <Plus size={9} /> opción
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        <button type="button" onClick={addCustomQuestion} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px dashed rgba(245,158,11,0.3)', borderRadius: 5, color: '#f59e0b', cursor: 'pointer', padding: '3px 10px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Plus size={10} /> Agregar pregunta
+        </button>
+      </div>
+
+      <LeadsSectionHeading label="POLÍTICA DE PRIVACIDAD" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>URL política de privacidad</label>
+          <input value={data.privacyUrl} onChange={(e) => set('privacyUrl', e.target.value)} placeholder="https://tusitio.com/privacidad" style={INPUT_STYLE} />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Texto del disclaimer</label>
+          <textarea rows={2} value={data.privacyDisclaimer} onChange={(e) => set('privacyDisclaimer', e.target.value)} style={{ ...TEXTAREA_STYLE, fontSize: '0.74rem' }} />
+        </div>
+      </div>
+
+      <LeadsSectionHeading label="PANTALLA DE AGRADECIMIENTO" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Título</label>
+          <input value={data.thankYouTitle} onChange={(e) => set('thankYouTitle', e.target.value)} placeholder="¡Gracias! Nos pondremos en contacto pronto." style={INPUT_STYLE} />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Botón de acción</label>
+          <select value={data.thankYouButton} onChange={(e) => set('thankYouButton', e.target.value as LeadsInstantFormState['thankYouButton'])} style={INPUT_STYLE as React.CSSProperties}>
+            <option value="whatsapp">Ir a WhatsApp</option>
+            <option value="website">Ver sitio web</option>
+            <option value="download">Descargar</option>
+            <option value="none">Sin botón</option>
+          </select>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Descripción</label>
+          <textarea rows={2} value={data.thankYouDescription} onChange={(e) => set('thankYouDescription', e.target.value)} placeholder="Revisaremos tu solicitud en breve..." style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem' }} />
+        </div>
+        {data.thankYouButton !== 'none' && (
+          <div style={FIELD_STYLE}>
+            <label style={LABEL_STYLE}>URL / Número del botón</label>
+            <input value={data.thankYouButtonUrl} onChange={(e) => set('thankYouButtonUrl', e.target.value)} placeholder={data.thankYouButton === 'whatsapp' ? '+57 300 000 0000' : 'https://...'} style={INPUT_STYLE} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Messages Section ─────────────────────────────────────────────────────
+
+function LeadsMessagesSection({
+  data,
+  onChange,
+}: {
+  data: LeadsMessagesState;
+  onChange: (updated: LeadsMessagesState) => void;
+}) {
+  function set<K extends keyof LeadsMessagesState>(field: K, value: LeadsMessagesState[K]) {
+    onChange({ ...data, [field]: value });
+  }
+
+  function togglePlatform(p: string) {
+    const next = data.platforms.includes(p) ? data.platforms.filter((x) => x !== p) : [...data.platforms, p];
+    set('platforms', next);
+  }
+
+  function setQuestion(idx: number, val: string) {
+    const next = [...data.questions];
+    next[idx] = val;
+    set('questions', next);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <LeadsSectionHeading label="CONFIGURACIÓN DE MENSAJES" />
+
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Plataforma destino</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {['WhatsApp', 'Instagram Direct', 'Messenger'].map((p) => {
+            const isSelected = data.platforms.includes(p);
+            return (
+              <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '4px 10px', borderRadius: 5, border: isSelected ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: isSelected ? 'rgba(245,158,11,0.12)' : 'transparent', fontSize: '0.74rem', fontWeight: isSelected ? 600 : 400, color: isSelected ? '#f59e0b' : 'hsl(215,15%,50%)', userSelect: 'none' }}>
+                <input type="checkbox" checked={isSelected} onChange={() => togglePlatform(p)} style={{ width: 12, height: 12, accentColor: '#f59e0b', cursor: 'pointer' }} />
+                {p}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {data.platforms.includes('WhatsApp') && (
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Número de WhatsApp (+57...)</label>
+          <input value={data.whatsappNumber} onChange={(e) => set('whatsappNumber', e.target.value)} placeholder="+57 300 000 0000" style={INPUT_STYLE} />
+        </div>
+      )}
+
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Saludo inicial automático</label>
+        <textarea rows={2} value={data.greeting} onChange={(e) => set('greeting', e.target.value)} style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', ...AMBER_BORDER }} />
+      </div>
+
+      <LeadsSectionHeading label="PREGUNTAS AUTOMATIZADAS (hasta 5)" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {data.questions.map((q, idx) => (
+          <input key={idx} value={q} onChange={(e) => setQuestion(idx, e.target.value)} placeholder={`Opción ${idx + 1} — ej: ¿Cuál es tu presupuesto?`} style={{ ...INPUT_STYLE, fontSize: '0.78rem' }} />
+        ))}
+        {data.questions.length < 5 && (
+          <button type="button" onClick={() => set('questions', [...data.questions, ''])} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px dashed rgba(245,158,11,0.3)', borderRadius: 5, color: '#f59e0b', cursor: 'pointer', padding: '3px 10px', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Plus size={10} /> Agregar opción
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Landing Section ──────────────────────────────────────────────────────
+
+function LeadsLandingSection({
+  data,
+  onChange,
+}: {
+  data: LeadsLandingState;
+  onChange: (updated: LeadsLandingState) => void;
+}) {
+  function set<K extends keyof LeadsLandingState>(field: K, value: LeadsLandingState[K]) {
+    onChange({ ...data, [field]: value });
+  }
+
+  function toggleFormField(f: string) {
+    const next = data.formFields.includes(f) ? data.formFields.filter((x) => x !== f) : [...data.formFields, f];
+    set('formFields', next);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <LeadsSectionHeading label="ESTRUCTURA DE LA LANDING" />
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>URL de la landing</label>
+        <input value={data.landingUrl} onChange={(e) => set('landingUrl', e.target.value)} placeholder="https://tusitio.com/landing" style={INPUT_STYLE} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Headline principal</label>
+          <input value={data.headline} onChange={(e) => set('headline', e.target.value)} placeholder="Transforma tu negocio hoy" style={INPUT_STYLE} />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Subheadline</label>
+          <input value={data.subheadline} onChange={(e) => set('subheadline', e.target.value)} placeholder="Sin compromisos, consulta gratis" style={INPUT_STYLE} />
+        </div>
+      </div>
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Oferta / Propuesta de valor</label>
+        <textarea rows={2} value={data.valueProposition} onChange={(e) => set('valueProposition', e.target.value)} placeholder="Describe qué ofreces y por qué es único..." style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', ...AMBER_BORDER }} />
+      </div>
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Beneficios clave (hasta 4)</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {data.benefits.slice(0, 4).map((b, i) => (
+            <input key={i} value={b} onChange={(e) => { const next = [...data.benefits]; next[i] = e.target.value; set('benefits', next); }} placeholder={`Beneficio ${i + 1}`} style={{ ...INPUT_STYLE, fontSize: '0.78rem' }} />
+          ))}
+        </div>
+      </div>
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Prueba social (testimonios, número de clientes)</label>
+        <textarea rows={2} value={data.socialProof} onChange={(e) => set('socialProof', e.target.value)} placeholder="Más de 500 clientes satisfechos..." style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem' }} />
+      </div>
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>CTA principal</label>
+        <input value={data.cta} onChange={(e) => set('cta', e.target.value)} placeholder="Quiero mi presupuesto gratis" style={INPUT_STYLE} />
+      </div>
+
+      <LeadsSectionHeading label="FORMULARIO WEB — CAMPOS A PEDIR" />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {LEADS_FORM_FIELDS.map((f) => {
+          const isSelected = data.formFields.includes(f);
+          return (
+            <label key={f} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '4px 10px', borderRadius: 5, border: isSelected ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: isSelected ? 'rgba(245,158,11,0.12)' : 'transparent', fontSize: '0.74rem', fontWeight: isSelected ? 600 : 400, color: isSelected ? '#f59e0b' : 'hsl(215,15%,50%)', userSelect: 'none' }}>
+              <input type="checkbox" checked={isSelected} onChange={() => toggleFormField(f)} style={{ width: 12, height: 12, accentColor: '#f59e0b', cursor: 'pointer' }} />
+              {f}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Post-lead Section ────────────────────────────────────────────────────
+
+function LeadsPostLeadSection({
+  data,
+  onChange,
+}: {
+  data: LeadsPostLeadState;
+  onChange: (updated: LeadsPostLeadState) => void;
+}) {
+  function set<K extends keyof LeadsPostLeadState>(field: K, value: LeadsPostLeadState[K]) {
+    onChange({ ...data, [field]: value });
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <LeadsSectionHeading label="FLUJO POST-LEAD" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Canal de contacto post-lead</label>
+          <select value={data.contactChannel} onChange={(e) => set('contactChannel', e.target.value)} style={INPUT_STYLE as React.CSSProperties}>
+            {LEADS_CONTACT_CHANNELS.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Tiempo ideal de respuesta</label>
+          <select value={data.responseTime} onChange={(e) => set('responseTime', e.target.value)} style={INPUT_STYLE as React.CSSProperties}>
+            {LEADS_RESPONSE_TIMES.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Responsable de seguimiento</label>
+        <input value={data.responsible} onChange={(e) => set('responsible', e.target.value)} placeholder="Nombre del encargado" style={INPUT_STYLE} />
+      </div>
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Mensaje de seguimiento automático</label>
+        <textarea rows={3} value={data.followUpMessage} onChange={(e) => set('followUpMessage', e.target.value)} placeholder="Hola [Nombre], vi que dejaste tus datos en nuestro anuncio..." style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', ...AMBER_BORDER }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Metrics Section ──────────────────────────────────────────────────────
+
+function LeadsMetricsSection({
+  data,
+  onChange,
+}: {
+  data: LeadsMetricsState;
+  onChange: (updated: LeadsMetricsState) => void;
+}) {
+  function set<K extends keyof LeadsMetricsState>(field: K, value: LeadsMetricsState[K]) {
+    onChange({ ...data, [field]: value });
+  }
+
+  function toggleKpi(kpi: string) {
+    const next = data.kpiChecklist.includes(kpi) ? data.kpiChecklist.filter((x) => x !== kpi) : [...data.kpiChecklist, kpi];
+    set('kpiChecklist', next);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <LeadsSectionHeading label="MÉTRICAS OBJETIVO" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>CPL esperado (COP)</label>
+          <input type="number" min="0" value={data.expectedCpl} onChange={(e) => set('expectedCpl', e.target.value)} placeholder="50000" style={INPUT_STYLE} />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>CTR esperado</label>
+          <input value={data.expectedCtr} onChange={(e) => set('expectedCtr', e.target.value)} placeholder="2% - 4%" style={INPUT_STYLE} />
+        </div>
+        <div style={FIELD_STYLE}>
+          <label style={LABEL_STYLE}>Meta de leads / mes</label>
+          <input type="number" min="0" value={data.monthlyLeadsGoal} onChange={(e) => set('monthlyLeadsGoal', e.target.value)} placeholder="100" style={INPUT_STYLE} />
+        </div>
+      </div>
+
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Métricas clave a revisar</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {LEADS_KPI_ALL.map((kpi) => {
+            const isSelected = data.kpiChecklist.includes(kpi);
+            return (
+              <label key={kpi} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '4px 10px', borderRadius: 5, border: isSelected ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: isSelected ? 'rgba(245,158,11,0.12)' : 'transparent', fontSize: '0.72rem', fontWeight: isSelected ? 600 : 400, color: isSelected ? '#f59e0b' : 'hsl(215,15%,50%)', userSelect: 'none' }}>
+                <input type="checkbox" checked={isSelected} onChange={() => toggleKpi(kpi)} style={{ width: 12, height: 12, accentColor: '#f59e0b', cursor: 'pointer' }} />
+                {kpi}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Criterio de escalado</label>
+        <textarea rows={2} value={data.scalingCriteria} onChange={(e) => set('scalingCriteria', e.target.value)} placeholder="Si CPL < $X y tasa de conversión > Y%, escalar presupuesto" style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', ...AMBER_BORDER }} />
+      </div>
+      <div style={FIELD_STYLE}>
+        <label style={LABEL_STYLE}>Criterio de pausa</label>
+        <textarea rows={2} value={data.pauseCriteria} onChange={(e) => set('pauseCriteria', e.target.value)} placeholder="Si CPL > $X por 3 días consecutivos, pausar y revisar creativo" style={{ ...TEXTAREA_STYLE, fontSize: '0.78rem', borderColor: 'rgba(239,68,68,0.25)' }} />
+      </div>
     </div>
   );
 }
@@ -1381,7 +2244,8 @@ function CampaignBlock({
   onChange: (updated: CampaignFormState) => void;
   onRemove: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<'campaign' | 'adsets'>('campaign');
+  const [activeTab, setActiveTab] = useState<'campaign' | 'adsets' | 'leads'>('campaign');
+  const isLeadsCampaign = campaign.objective === 'Clientes Potenciales';
 
   function set<K extends keyof CampaignFormState>(field: K, value: CampaignFormState[K]) {
     onChange({ ...campaign, [field]: value });
@@ -1475,6 +2339,23 @@ function CampaignBlock({
         >
           ② CONJUNTOS ({campaign.adsets.length}) · ANUNCIOS ({totalAds})
         </button>
+        {isLeadsCampaign && (
+          <>
+            <span style={{ color: 'hsl(215,15%,30%)', fontSize: '0.7rem' }}>→</span>
+            <button
+              type="button"
+              onClick={() => setActiveTab('leads')}
+              style={{
+                ...campTabStyle(activeTab === 'leads'),
+                borderColor: activeTab === 'leads' ? '#f59e0b' : undefined,
+                background: activeTab === 'leads' ? 'rgba(245,158,11,0.12)' : undefined,
+                color: activeTab === 'leads' ? '#f59e0b' : undefined,
+              }}
+            >
+              ③ LEADS
+            </button>
+          </>
+        )}
       </div>
 
       {/* ── CAMPAÑA TAB ── */}
@@ -1579,6 +2460,71 @@ function CampaignBlock({
           >
             <Plus size={11} /> Agregar conjunto de anuncios
           </button>
+        </div>
+      )}
+
+      {/* ── LEADS TAB ── */}
+      {activeTab === 'leads' && isLeadsCampaign && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {/* Conversion location selector */}
+          <div style={{ padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.04)' }}>
+            <div style={FIELD_STYLE}>
+              <label style={{ ...LABEL_STYLE, ...AMBER }}>🎯 Ubicación de conversión</label>
+              <select
+                value={campaign.leadsConversionLocation}
+                onChange={(e) => set('leadsConversionLocation', e.target.value)}
+                style={{ ...INPUT_STYLE as React.CSSProperties, borderColor: 'rgba(245,158,11,0.3)' }}
+              >
+                <option value="">Selecciona dónde ocurre la conversión...</option>
+                {LEADS_CONVERSION_LOCATIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Conditional section: Formulario instantáneo */}
+          {campaign.leadsConversionLocation === '📋 Formulario instantáneo' && (
+            <div style={{ padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.15)', background: 'rgba(255,255,255,0.01)' }}>
+              <LeadsInstantFormSection
+                data={campaign.leadsInstantForm}
+                onChange={(updated) => set('leadsInstantForm', updated)}
+              />
+            </div>
+          )}
+
+          {/* Conditional section: Mensajes */}
+          {campaign.leadsConversionLocation === '💬 Mensajes (WhatsApp / Messenger / Instagram)' && (
+            <div style={{ padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.15)', background: 'rgba(255,255,255,0.01)' }}>
+              <LeadsMessagesSection
+                data={campaign.leadsMessages}
+                onChange={(updated) => set('leadsMessages', updated)}
+              />
+            </div>
+          )}
+
+          {/* Conditional section: Sitio web */}
+          {campaign.leadsConversionLocation === '🌐 Sitio web (Landing Page)' && (
+            <div style={{ padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.15)', background: 'rgba(255,255,255,0.01)' }}>
+              <LeadsLandingSection
+                data={campaign.leadsLanding}
+                onChange={(updated) => set('leadsLanding', updated)}
+              />
+            </div>
+          )}
+
+          {/* Always: Post-lead + Metrics */}
+          <div style={{ padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.1)', background: 'rgba(255,255,255,0.01)' }}>
+            <LeadsPostLeadSection
+              data={campaign.leadsPostLead}
+              onChange={(updated) => set('leadsPostLead', updated)}
+            />
+          </div>
+
+          <div style={{ padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.1)', background: 'rgba(255,255,255,0.01)' }}>
+            <LeadsMetricsSection
+              data={campaign.leadsMetrics}
+              onChange={(updated) => set('leadsMetrics', updated)}
+            />
+          </div>
         </div>
       )}
     </div>
