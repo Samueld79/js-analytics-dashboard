@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
 import { useClients } from '../hooks/useClients';
-import { useCampaignSummary, useAlerts } from '../hooks/useData';
+import { useCampaignSummary, useAlerts, useAdMetrics } from '../hooks/useData';
 import {
   aggregateCampaignKpisByClient,
   sumCampaignMonthAggregates,
@@ -17,6 +17,7 @@ export function ClientsPage() {
   const { clients, loading, saving, error, createClient } = useClients();
   // Unified campaign source — same hook as DashboardPage
   const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary();
+  const { metrics: adMetrics } = useAdMetrics(undefined, 180);
   const { alerts } = useAlerts();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -49,6 +50,20 @@ export function ClientsPage() {
         : (campaignByMonth.find((m) => m.month === activePeriod) ?? null),
     [campaignByMonth, activePeriod],
   );
+
+  // ad_metrics (windsor_ai) totals for selected period — authoritative source
+  const adMetricsPeriodTotals = useMemo(() => {
+    if (!activePeriod) return null;
+    const filtered =
+      activePeriod === 'all'
+        ? adMetrics
+        : adMetrics.filter((m) => m.date.startsWith(activePeriod));
+    if (filtered.length === 0) return null;
+    return {
+      spend: filtered.reduce((sum, m) => sum + (m.spend ?? 0), 0),
+      messages: filtered.reduce((sum, m) => sum + (m.messages ?? 0), 0),
+    };
+  }, [adMetrics, activePeriod]);
 
   const alertsByClient = useMemo(() => {
     const map = new Map<string, number>();
@@ -163,7 +178,7 @@ export function ClientsPage() {
               alignSelf: 'center',
               marginLeft: '8px',
             }}>
-              {formatCop(totalKpis.spend)} · {formatNumber(totalKpis.messages)} conv.
+              {formatCop(adMetricsPeriodTotals?.spend ?? totalKpis.spend)} · {formatNumber(adMetricsPeriodTotals?.messages ?? totalKpis.messages)} conv.
             </span>
           )}
         </div>

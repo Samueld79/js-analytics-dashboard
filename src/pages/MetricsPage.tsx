@@ -20,7 +20,7 @@ import { motion, type Transition } from 'framer-motion';
 import { BarChart3, DollarSign, MessageCircle, Percent, TrendingDown, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useCampaignSummary } from '../hooks/useData';
+import { useCampaignSummary, useAdMetrics } from '../hooks/useData';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
 import {
@@ -310,6 +310,8 @@ export function MetricsPage() {
 
   // Primary data source: ad_campaign_metrics
   const { rows: campaignRows, byMonth: campaignByMonth, loading: campaignLoading } = useCampaignSummary(queryClientId, 730);
+  // Authoritative spend source: ad_metrics (windsor_ai)
+  const { metrics: adMetrics } = useAdMetrics(queryClientId, 730);
 
   const { sales } = useDailySales({ clientId: queryClientId, days: 730 });
 
@@ -340,8 +342,28 @@ export function MetricsPage() {
     [campaignByMonth, activePeriod],
   );
 
+  // ad_metrics spend by month — authoritative source (windsor_ai)
+  const adMetricsSpendByMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const m of adMetrics) {
+      const key = m.date.slice(0, 7);
+      map.set(key, (map.get(key) ?? 0) + (m.spend ?? 0));
+    }
+    return map;
+  }, [adMetrics]);
+
+  const canonicalPeriodSpend = useMemo(() => {
+    if (!activePeriod) return periodKpi?.spend ?? 0;
+    if (activePeriod === 'all') {
+      const adTotal = [...adMetricsSpendByMonth.values()].reduce((a, b) => a + b, 0);
+      return adTotal > 0 ? adTotal : (periodKpi?.spend ?? 0);
+    }
+    const adSpend = adMetricsSpendByMonth.get(activePeriod) ?? 0;
+    return adSpend > 0 ? adSpend : (periodKpi?.spend ?? 0);
+  }, [adMetricsSpendByMonth, activePeriod, periodKpi]);
+
   const costPerConv =
-    periodKpi && periodKpi.messages > 0 ? periodKpi.spend / periodKpi.messages : null;
+    periodKpi && periodKpi.messages > 0 ? canonicalPeriodSpend / periodKpi.messages : null;
 
   // Historical section — last 6 months, spend + messages from campaigns, ROAS from daily_sales
   const historyRows = useMemo(() => {
@@ -361,7 +383,8 @@ export function MetricsPage() {
       .slice(-6)
       .map((monthKey) => {
         const campaign = campaignByMonth.find((m) => m.month === monthKey);
-        const spend = campaign?.spend ?? 0;
+        const adSpend = adMetricsSpendByMonth.get(monthKey) ?? 0;
+        const spend = adSpend > 0 ? adSpend : (campaign?.spend ?? 0);
         const messages = campaign?.messages ?? 0;
         const monthlySales = salesByMonth.get(monthKey) ?? 0;
         const roas =
@@ -371,7 +394,7 @@ export function MetricsPage() {
         return { monthKey, spend, messages, roas };
       })
       .filter((r) => r.spend > 0 || r.messages > 0);
-  }, [campaignByMonth, scopedSales]);
+  }, [campaignByMonth, scopedSales, adMetricsSpendByMonth]);
 
   const chartData = historyRows.map((row) => ({ month: row.monthKey, spend: row.spend }));
   const trendData = historyRows.map((row) => ({ month: row.monthKey, Inversión: row.spend, Mensajes: row.messages }));
@@ -441,7 +464,7 @@ export function MetricsPage() {
     {
       icon: <DollarSign size={15} />,
       label: 'INVERSIÓN',
-      value: formatCop(periodKpi?.spend ?? 0),
+      value: formatCop(canonicalPeriodSpend),
       sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod),
     },
     {

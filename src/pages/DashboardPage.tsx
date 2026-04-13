@@ -258,10 +258,12 @@ export function DashboardPage() {
     [periodCampaignRows],
   );
 
-  const kpiSpend = selectedKpis?.spend ?? 0;
-  const kpiMessages = selectedKpis?.messages ?? 0;
-  const kpiReach = selectedKpis?.reach ?? 0;
-  const kpiImpressions = selectedKpis?.impressions ?? 0;
+  // ad_metrics (windsor_ai) is the authoritative aggregate — fall back to ad_campaign_metrics
+  const adMetricsTotals = sumMetrics(executiveAdMetrics);
+  const kpiSpend = adMetricsTotals.spend > 0 ? adMetricsTotals.spend : (selectedKpis?.spend ?? 0);
+  const kpiMessages = adMetricsTotals.messages > 0 ? adMetricsTotals.messages : (selectedKpis?.messages ?? 0);
+  const kpiReach = adMetricsTotals.reach > 0 ? adMetricsTotals.reach : (selectedKpis?.reach ?? 0);
+  const kpiImpressions = adMetricsTotals.impressions > 0 ? adMetricsTotals.impressions : (selectedKpis?.impressions ?? 0);
   const kpiFrequency = selectedKpis?.frequency ?? 0;
 
   const kpiSalesTotal = useMemo(
@@ -313,17 +315,16 @@ export function DashboardPage() {
           executiveAdMetrics.filter((r) => r.client_id === client.id),
           executiveSales.filter((r) => r.client_id === client.id),
         );
-      // Campaign spend is the canonical source — also recompute real_roas with correct spend
-      const monthTotals = campaignRow
-        ? {
-            ...baseTotals,
-            spend: campaignRow.spend,
-            real_roas:
-              campaignRow.spend > 0 && baseTotals.total_sales > 0
-                ? baseTotals.total_sales / campaignRow.spend
-                : 0,
-          }
-        : baseTotals;
+      // ad_metrics (via baseTotals) is the authoritative spend source.
+      const canonicalSpend = baseTotals.spend > 0 ? baseTotals.spend : (campaignRow?.spend ?? 0);
+      const monthTotals = {
+        ...baseTotals,
+        spend: canonicalSpend,
+        real_roas:
+          canonicalSpend > 0 && baseTotals.total_sales > 0
+            ? baseTotals.total_sales / canonicalSpend
+            : 0,
+      };
       const meta = metaByClient[client.id] ?? null;
       const socialMetric =
         executiveSocialMetrics.find((r) => r.client_id === client.id) ?? null;
