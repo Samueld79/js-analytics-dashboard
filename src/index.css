@@ -155,30 +155,6 @@ html {
   backdrop-filter: blur(14px) saturate(108%);
 }
 
-.topbar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    repeating-linear-gradient(
-      0deg,
-      rgba(178, 206, 255, 0.022) 0,
-      rgba(178, 206, 255, 0.022) 1px,
-      transparent 1px,
-      transparent 22px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(178, 206, 255, 0.018) 0,
-      rgba(178, 206, 255, 0.018) 1px,
-      transparent 1px,
-      transparent 24px
-    );
-  pointer-events: none;
-  opacity: 0.3;
-  z-index: -1;
-}
 
 .hero-heading-group {
   position: relative;
@@ -6062,17 +6038,7 @@ table tbody td {
 }
 
 /* Grid lines decorativas de fondo */
-.app-shell::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(hsl(0 0% 100% / 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(0 0% 100% / 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  z-index: 0;
-}
+/* grid pattern removed */
 
 /* Texto muted/soft */
 .text-muted, .text-soft, [class*="soft"],
@@ -7103,11 +7069,6 @@ select, textarea,
   background: #f1f5f9 !important;
 }
 
-[data-theme="light"] .app-shell::before {
-  background-image:
-    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px) !important;
-}
 
 /* Sidebar */
 [data-theme="light"] .sidebar {
@@ -7573,12 +7534,6 @@ select, textarea,
   background: transparent !important;
 }
 
-/* Remove dark gradient grid lines */
-[data-theme="light"] .app-shell::before {
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px) !important;
-}
 
 /* ─── Form controls — option elements ──────────────────────── */
 
