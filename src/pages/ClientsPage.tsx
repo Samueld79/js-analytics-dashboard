@@ -142,7 +142,7 @@ export function ClientsPage() {
                   : 'transparent',
                 color: activePeriod === m.month
                   ? 'hsl(180,100%,50%)'
-                  : 'hsl(215,15%,55%)',
+                  : 'var(--color-text-secondary)',
               }}
             >
               {getMonthLabel(m.month)}
@@ -165,7 +165,7 @@ export function ClientsPage() {
                 : 'transparent',
               color: activePeriod === 'all'
                 ? 'hsl(180,100%,50%)'
-                : 'hsl(215,15%,55%)',
+                : 'var(--color-text-secondary)',
             }}
           >
             Total año
@@ -174,7 +174,7 @@ export function ClientsPage() {
             <span style={{
               fontFamily: 'JetBrains Mono',
               fontSize: '0.65rem',
-              color: 'hsl(215,15%,45%)',
+              color: 'var(--color-text-muted)',
               alignSelf: 'center',
               marginLeft: '8px',
             }}>
@@ -217,9 +217,9 @@ export function ClientsPage() {
               paddingLeft: '32px',
               paddingRight: '12px',
               background: 'var(--color-bg-input)',
-              border: '1px solid hsl(0 0% 100% / 0.08)',
+              border: '1px solid var(--color-border)',
               borderRadius: '4px',
-              color: 'hsl(0,0%,92%)',
+              color: 'var(--color-text-primary)',
               fontFamily: 'JetBrains Mono',
               fontSize: '0.78rem',
               outline: 'none',
@@ -236,9 +236,9 @@ export function ClientsPage() {
             height: '36px',
             padding: '0 12px',
             background: 'var(--color-bg-input)',
-            border: '1px solid hsl(0 0% 100% / 0.08)',
+            border: '1px solid var(--color-border)',
             borderRadius: '4px',
-            color: 'hsl(215,15%,65%)',
+            color: 'var(--color-text-secondary)',
             fontFamily: 'JetBrains Mono',
             fontSize: '0.72rem',
             letterSpacing: '0.05em',
@@ -299,7 +299,7 @@ export function ClientsPage() {
                 <col style={{ width: 80 }} />
               </colgroup>
               <thead>
-                <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.06)' }}>
+                <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                   {['Cliente', 'Inversión', 'Alcance', 'CPM', 'Actualizado', 'Portal'].map(
                     (h) => (
                       <th
@@ -311,7 +311,7 @@ export function ClientsPage() {
                           fontWeight: 400,
                           whiteSpace: 'nowrap',
                           fontSize: '0.6rem',
-                          color: 'hsl(215,15%,40%)',
+                          color: 'var(--color-text-muted)',
                         }}
                       >
                         {h}
@@ -331,12 +331,12 @@ export function ClientsPage() {
                     <tr
                       key={client.id}
                       style={{
-                        borderBottom: '1px solid hsl(0 0% 100% / 0.04)',
+                        borderBottom: '1px solid var(--color-border)',
                         transition: 'background 120ms ease',
                       }}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLTableRowElement).style.background =
-                          'hsl(0 0% 100% / 0.025)';
+                          'var(--color-bg-card-hover)';
                       }}
                       onMouseLeave={(e) => {
                         (e.currentTarget as HTMLTableRowElement).style.background = 'transparent';
@@ -368,7 +368,7 @@ export function ClientsPage() {
                                 fontFamily: 'Outfit, sans-serif',
                                 fontSize: '0.82rem',
                                 fontWeight: 600,
-                                color: 'hsl(0,0%,92%)',
+                                color: 'var(--color-text-primary)',
                                 textDecoration: 'none',
                                 display: 'block',
                                 lineHeight: 1.2,
@@ -379,7 +379,7 @@ export function ClientsPage() {
                             >
                               {client.name}
                             </Link>
-                            <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', color: 'hsl(215,15%,42%)', letterSpacing: '0.04em' }}>
+                            <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', color: 'var(--color-text-muted)', letterSpacing: '0.04em' }}>
                               {client.niche ?? '—'}
                             </span>
                             {openAlerts > 0 && (
@@ -421,8 +421,8 @@ export function ClientsPage() {
                       {/* Actualizado — dot + fecha */}
                       <td style={{ padding: '9px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: lastUpdate ? 'hsl(180,100%,50%)' : 'hsl(215,15%,28%)', flexShrink: 0 }} />
-                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', letterSpacing: '0.04em', color: lastUpdate ? 'hsl(215,15%,62%)' : 'hsl(215,15%,32%)' }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: lastUpdate ? 'hsl(180,100%,50%)' : 'var(--color-text-muted)', flexShrink: 0 }} />
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', letterSpacing: '0.04em', color: lastUpdate ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                             {updateLabel}
                           </span>
                         </div>

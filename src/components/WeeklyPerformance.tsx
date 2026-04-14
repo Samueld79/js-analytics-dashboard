@@ -95,7 +95,7 @@ function ProgressBar({ pct, color, height = 6 }: { pct: number; color: string; h
       style={{
         height,
         borderRadius: height,
-        background: 'rgba(255,255,255,0.07)',
+        background: 'var(--color-border)',
         overflow: 'hidden',
       }}
     >
@@ -305,7 +305,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
             {condition.emoji} {companyPct}%
           </span>
         )}
-        <span style={{ fontSize: '0.7rem', color: 'hsl(215,15%,40%)', userSelect: 'none' }}>
+        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', userSelect: 'none' }}>
           {collapsed ? '▸' : '▾'}
         </span>
       </div>
@@ -315,7 +315,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
       {!collapsed && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {loading ? (
-            <div style={{ padding: '18px 0', textAlign: 'center', fontSize: '0.76rem', color: 'hsl(215,15%,40%)' }}>
+            <div style={{ padding: '18px 0', textAlign: 'center', fontSize: '0.76rem', color: 'var(--color-text-muted)' }}>
               Cargando rendimiento...
             </div>
           ) : (
@@ -341,7 +341,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                     <span style={{ fontSize: '0.78rem', fontWeight: 700, color: condition.color }}>
                       {companyPct}%
                     </span>
-                    <span style={{ fontSize: '0.72rem', color: 'hsl(215,15%,55%)' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}>
                       · {condition.phrase}
                     </span>
                   </div>
@@ -420,7 +420,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                                   onClick={() => { if (!isSaving) void handleToggle(userName, task, checked); }}
                                   style={{
                                     width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                                    border: checked ? `2px solid ${meta.color}` : '2px solid rgba(255,255,255,0.2)',
+                                    border: checked ? `2px solid ${meta.color}` : '2px solid var(--color-border-strong)',
                                     background: checked ? meta.color : 'transparent',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     transition: 'all 0.15s',
@@ -438,7 +438,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                                   style={{
                                     flex: 1,
                                     fontSize: '0.71rem',
-                                    color: checked ? 'hsl(215,15%,55%)' : 'hsl(215,15%,80%)',
+                                    color: checked ? 'var(--color-text-muted)' : 'var(--color-text-primary)',
                                     textDecoration: checked ? 'line-through' : 'none',
                                     lineHeight: 1.3,
                                     transition: 'all 0.15s',
@@ -453,8 +453,8 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                                     fontWeight: 700,
                                     padding: '1px 5px',
                                     borderRadius: 4,
-                                    background: checked ? `${meta.color}20` : 'rgba(255,255,255,0.05)',
-                                    color: checked ? meta.color : 'hsl(215,15%,40%)',
+                                    background: checked ? `${meta.color}20` : 'var(--color-badge-bg)',
+                                    color: checked ? meta.color : 'var(--color-text-muted)',
                                     fontFamily: 'JetBrains Mono',
                                     flexShrink: 0,
                                     transition: 'all 0.15s',
@@ -497,7 +497,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: USER_META[leaderUser].color }}>
                           Mejor semana
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: 'hsl(215,15%,55%)' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-secondary)' }}>
                           {USER_META[leaderUser].label} · {juancaWeekPct === samuelWeekPct ? 'Empate!' : `${Math.max(juancaWeekPct, samuelWeekPct)}%`}
                         </div>
                       </div>
@@ -528,7 +528,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                              <span style={{ fontSize: '0.72rem', color: 'hsl(215,15%,75%)' }}>{meta.label}</span>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-primary)' }}>{meta.label}</span>
                               <span style={{ fontSize: '0.72rem', fontWeight: 700, color: meta.color, fontFamily: 'JetBrains Mono' }}>
                                 {weekPct}%
                               </span>
@@ -558,7 +558,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                   {/* Head-to-head bar */}
                   {(juancaWeekPct > 0 || samuelWeekPct > 0) && (
                     <div style={{ marginTop: 4 }}>
-                      <div style={{ fontSize: '0.6rem', color: 'hsl(215,15%,40%)', marginBottom: 5, letterSpacing: '0.04em' }}>
+                      <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', marginBottom: 5, letterSpacing: '0.04em' }}>
                         JC vs SD · esta semana
                       </div>
                       <div style={{ height: 8, borderRadius: 8, overflow: 'hidden', display: 'flex' }}>
@@ -569,7 +569,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                             transition: 'flex 0.4s ease',
                           }}
                         />
-                        <div style={{ width: 2, background: 'hsl(220,22%,7%)' }} />
+                        <div style={{ width: 2, background: 'var(--color-bg-secondary)' }} />
                         <div
                           style={{
                             flex: samuelWeekPct || 0.5,
@@ -590,7 +590,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
                   )}
 
                   {juancaWeekPct === 0 && samuelWeekPct === 0 && (
-                    <p style={{ fontSize: '0.72rem', color: 'hsl(215,15%,40%)', textAlign: 'center', margin: 0 }}>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', textAlign: 'center', margin: 0 }}>
                       Completa tareas para ver la comparativa
                     </p>
                   )}
@@ -646,7 +646,7 @@ create policy "Allow all" on public.daily_checklist for all using (true);`}
 function StatRow({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontSize: '0.67rem', color: 'hsl(215,15%,48%)' }}>{label}</span>
+      <span style={{ fontSize: '0.67rem', color: 'var(--color-text-secondary)' }}>{label}</span>
       <span style={{ fontSize: '0.7rem', fontWeight: 700, color, fontFamily: 'JetBrains Mono' }}>{value}</span>
     </div>
   );

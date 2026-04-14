@@ -641,8 +641,8 @@ export function SalesPage() {
       {salesByMonth.length > 0 && (
         <div
           style={{
-            background: 'rgba(6,10,18,0.85)',
-            border: '1px solid hsl(180 100% 50% / 0.12)',
+            background: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
             borderRadius: 12,
             padding: '20px 16px 14px',
             marginBottom: 24,
@@ -657,7 +657,7 @@ export function SalesPage() {
             pointerEvents: 'none',
           }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, position: 'relative' }}>
-            <span className="number-label" style={{ fontSize: '0.6rem', color: 'hsl(215,15%,42%)', letterSpacing: '0.12em' }}>
+            <span className="number-label" style={{ fontSize: '0.6rem', color: 'var(--color-chart-text)', letterSpacing: '0.12em' }}>
               TENDENCIA DE VENTAS
             </span>
             {salesByMonth.length > 0 && (
@@ -688,13 +688,13 @@ export function SalesPage() {
               </defs>
               <CartesianGrid
                 strokeDasharray="1 8"
-                stroke="rgba(255,255,255,0.04)"
+                stroke="var(--color-chart-grid)"
                 vertical={false}
               />
               <XAxis
                 dataKey="month"
                 tickFormatter={shortMonth}
-                tick={{ fontSize: 10, fill: 'hsl(215,15%,40%)', fontFamily: 'JetBrains Mono' }}
+                tick={{ fontSize: 10, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }}
                 axisLine={false}
                 tickLine={false}
                 dy={6}
@@ -704,11 +704,12 @@ export function SalesPage() {
                 formatter={(v) => [formatCopFull(v as number), 'Ventas']}
                 labelFormatter={(label: unknown) => shortMonth(String(label))}
                 contentStyle={{
-                  background: 'rgba(8,12,22,0.92)',
-                  border: '1px solid hsl(180 100% 50% / 0.25)',
+                  background: 'var(--color-tooltip-bg)',
+                  border: '1px solid var(--color-tooltip-border)',
                   borderRadius: 10,
                   fontSize: 12,
                   fontFamily: 'JetBrains Mono',
+                  color: 'var(--color-tooltip-text)',
                   backdropFilter: 'blur(12px)',
                   boxShadow: '0 4px 24px hsl(180 100% 50% / 0.12)',
                 }}
