@@ -136,7 +136,7 @@ export function ClientsPage() {
                 cursor: 'pointer',
                 border: activePeriod === m.month
                   ? '1px solid hsl(180,100%,50%)'
-                  : '1px solid hsl(0 0% 100% / 0.1)',
+                  : '1px solid var(--color-border)',
                 background: activePeriod === m.month
                   ? 'hsl(180 100% 50% / 0.1)'
                   : 'transparent',
@@ -159,7 +159,7 @@ export function ClientsPage() {
               cursor: 'pointer',
               border: activePeriod === 'all'
                 ? '1px solid hsl(180,100%,50%)'
-                : '1px solid hsl(0 0% 100% / 0.1)',
+                : '1px solid var(--color-border)',
               background: activePeriod === 'all'
                 ? 'hsl(180 100% 50% / 0.1)'
                 : 'transparent',
@@ -216,7 +216,7 @@ export function ClientsPage() {
               height: '36px',
               paddingLeft: '32px',
               paddingRight: '12px',
-              background: 'hsl(220,18%,9%)',
+              background: 'var(--color-bg-input)',
               border: '1px solid hsl(0 0% 100% / 0.08)',
               borderRadius: '4px',
               color: 'hsl(0,0%,92%)',
@@ -235,7 +235,7 @@ export function ClientsPage() {
           style={{
             height: '36px',
             padding: '0 12px',
-            background: 'hsl(220,18%,9%)',
+            background: 'var(--color-bg-input)',
             border: '1px solid hsl(0 0% 100% / 0.08)',
             borderRadius: '4px',
             color: 'hsl(215,15%,65%)',
@@ -400,7 +400,7 @@ export function ClientsPage() {
 
                       {/* Alcance = msgs · reach compact */}
                       <td style={{ padding: '9px 14px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.66rem', color: 'hsl(215,15%,55%)', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.66rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
                           {kpi
                             ? `${formatNumber(kpi.messages)} msgs · ${fmtCompact(kpi.reach)} reach`
                             : '—'}

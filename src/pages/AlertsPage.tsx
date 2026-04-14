@@ -165,7 +165,7 @@ function TaskCreateModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: 440,
-          background: 'hsl(220,22%,7%)',
+          background: 'var(--color-bg-secondary)',
           border: '1px solid hsl(180 100% 50% / 0.18)',
           boxShadow: '0 0 40px hsl(180 100% 50% / 0.06), 0 24px 80px rgba(0,0,0,0.7)',
         }}
@@ -596,7 +596,7 @@ export function AlertsPage() {
                                       {alert.title}
                                     </span>
                                     {alertClient && alertsByClient.size === 1 && (
-                                      <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', color: 'hsl(215,15%,55%)', flexShrink: 0 }}>
+                                      <span style={{ fontSize: '0.62rem', padding: '1px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-secondary)', flexShrink: 0 }}>
                                         {alertClient.name}
                                       </span>
                                     )}
@@ -836,7 +836,7 @@ function TasksPanel({
     <>
       <div
         style={{
-          background: 'hsl(220,18%,7%)',
+          background: 'var(--color-bg-secondary)',
           border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 10, padding: '14px 16px',
           display: 'flex', flexDirection: 'column', flexShrink: 0,
@@ -971,7 +971,7 @@ function TasksPanel({
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
-                            style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', background: 'transparent', color: 'hsl(215,15%,55%)', fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace' }}
+                            style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', background: 'transparent', color: 'var(--color-text-secondary)', fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace' }}
                           >
                             ✕ CANCELAR
                           </button>
@@ -1066,7 +1066,7 @@ function TasksPanel({
                             {isDone ? (
                               <button
                                 onClick={() => void handleToggleDone(task)}
-                                style={{ fontSize: '0.62rem', padding: '3px 7px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', background: 'transparent', color: 'hsl(215,15%,55%)', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}
+                                style={{ fontSize: '0.62rem', padding: '3px 7px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', background: 'transparent', color: 'var(--color-text-secondary)', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}
                               >
                                 Deshacer
                               </button>

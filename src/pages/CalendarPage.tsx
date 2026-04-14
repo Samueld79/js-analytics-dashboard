@@ -340,7 +340,7 @@ export function CalendarPage() {
             <button
               onClick={() => { setCurrentMonth(m => subMonths(m, 1)); setSelectedDay(null); }}
               style={{
-                background: 'none', border: '1px solid hsl(0 0% 100% / 0.08)',
+                background: 'none', border: '1px solid var(--color-border)',
                 borderRadius: '4px', padding: '6px 8px',
                 color: 'hsl(215,15%,60%)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center',
@@ -351,7 +351,7 @@ export function CalendarPage() {
 
             <h2 style={{
               fontFamily: 'Outfit, sans-serif', fontSize: '1rem', fontWeight: 600,
-              color: 'hsl(0,0%,92%)', textTransform: 'capitalize',
+              color: 'var(--color-text-primary)', textTransform: 'capitalize',
               letterSpacing: '-0.01em', margin: 0,
             }}>
               {format(currentMonth, 'MMMM yyyy', { locale: es })}
@@ -360,7 +360,7 @@ export function CalendarPage() {
             <button
               onClick={() => { setCurrentMonth(m => addMonths(m, 1)); setSelectedDay(null); }}
               style={{
-                background: 'none', border: '1px solid hsl(0 0% 100% / 0.08)',
+                background: 'none', border: '1px solid var(--color-border)',
                 borderRadius: '4px', padding: '6px 8px',
                 color: 'hsl(215,15%,60%)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center',
@@ -487,7 +487,7 @@ export function CalendarPage() {
                 </span>
                 <h3 style={{
                   fontFamily: 'Outfit, sans-serif', fontSize: '0.95rem', fontWeight: 600,
-                  color: 'hsl(0,0%,98%)', letterSpacing: '-0.01em', margin: '0 0 4px', lineHeight: 1.3,
+                  color: 'var(--color-text-primary)', letterSpacing: '-0.01em', margin: '0 0 4px', lineHeight: 1.3,
                 }}>
                   {nextEvent.title}
                 </h3>
@@ -505,7 +505,7 @@ export function CalendarPage() {
                     <div
                       key={unit.label}
                       style={{
-                        background: 'hsl(220,18%,9%)', border: '1px solid hsl(0 0% 100% / 0.06)',
+                        background: 'var(--color-bg-input)', border: '1px solid var(--color-border)',
                         borderRadius: '4px', padding: '10px 6px', textAlign: 'center',
                       }}
                     >
@@ -558,7 +558,7 @@ export function CalendarPage() {
 
           {/* Section B: PRÓXIMAS FECHAS CLAVE */}
           <div className="card-glass" style={{ overflow: 'hidden' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid hsl(0 0% 100% / 0.06)' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)' }}>
               <span className="number-label">PRÓXIMAS FECHAS CLAVE</span>
             </div>
             {upcomingColombia.length === 0 ? (
@@ -579,12 +579,12 @@ export function CalendarPage() {
                       key={`${ev.date}-${ev.name}`}
                       style={{
                         display: 'flex', alignItems: 'flex-start', gap: 10,
-                        padding: '11px 20px', borderBottom: '1px solid hsl(0 0% 100% / 0.04)',
+                        padding: '11px 20px', borderBottom: '1px solid var(--color-border)',
                       }}
                     >
                       <span style={{ fontSize: '1.1rem', flexShrink: 0, lineHeight: 1.4 }}>{ev.emoji}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600, color: 'hsl(0,0%,92%)', lineHeight: 1.3 }}>
+                        <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
                           {ev.name}
                         </p>
                         <p style={{ margin: '2px 0 5px', fontSize: '0.63rem', color: 'hsl(215,15%,48%)', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -629,7 +629,7 @@ export function CalendarPage() {
           {/* Section C: Event list */}
           <div className="card-glass" style={{ overflow: 'hidden' }}>
             <div style={{
-              padding: '14px 20px', borderBottom: '1px solid hsl(0 0% 100% / 0.06)',
+              padding: '14px 20px', borderBottom: '1px solid var(--color-border)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
               <span className="number-label" style={{ textTransform: 'capitalize' }}>
@@ -656,7 +656,7 @@ export function CalendarPage() {
                     key={event.id}
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: '12px',
-                      padding: '12px 20px', borderBottom: '1px solid hsl(0 0% 100% / 0.04)',
+                      padding: '12px 20px', borderBottom: '1px solid var(--color-border)',
                       transition: 'background 150ms ease',
                     }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'hsl(0 0% 100% / 0.03)')}
@@ -672,7 +672,7 @@ export function CalendarPage() {
                     </div>
 
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: 'hsl(0,0%,92%)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {event.title}
                       </p>
                       <p className="number-label" style={{ marginTop: '2px', fontSize: '0.62rem' }}>

@@ -258,7 +258,7 @@ export function ClientDetailPage() {
                     cursor: 'pointer',
                     border: activePeriod === m.month
                       ? '1px solid hsl(180,100%,50%)'
-                      : '1px solid hsl(0 0% 100% / 0.1)',
+                      : '1px solid var(--color-border)',
                     background: activePeriod === m.month
                       ? 'hsl(180 100% 50% / 0.1)'
                       : 'transparent',
@@ -281,7 +281,7 @@ export function ClientDetailPage() {
                   cursor: 'pointer',
                   border: activePeriod === 'all'
                     ? '1px solid hsl(180,100%,50%)'
-                    : '1px solid hsl(0 0% 100% / 0.1)',
+                    : '1px solid var(--color-border)',
                   background: activePeriod === 'all'
                     ? 'hsl(180 100% 50% / 0.1)'
                     : 'transparent',

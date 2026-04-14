@@ -7874,3 +7874,117 @@ select, textarea,
 [data-theme="light"] .executive-kpi-card {
   backdrop-filter: none !important;
 }
+
+/* ─── Additional light mode fixes ────────────────────────────── */
+
+/* Semi-transparent white backgrounds become card-bg in light mode */
+[data-theme="light"] [style*="rgba(255,255,255,0.07)"],
+[data-theme="light"] [style*="rgba(255,255,255,0.06)"],
+[data-theme="light"] [style*="rgba(255,255,255,0.04)"],
+[data-theme="light"] [style*="rgba(255,255,255,0.03)"] {
+  background: var(--color-bg-card) !important;
+  border-color: var(--color-border) !important;
+}
+
+/* hsl(0 0%…) near-white text → dark in light mode */
+[data-theme="light"] [style*="color: hsl(0,0%,98%)"],
+[data-theme="light"] [style*="color: hsl(0,0%,92%)"],
+[data-theme="light"] [style*="color: hsl(0,0%,85%)"] {
+  color: var(--color-text-primary) !important;
+}
+
+/* Muted blue-gray labels → proper secondary text */
+[data-theme="light"] [style*="color: hsl(215,15%,55%)"],
+[data-theme="light"] [style*="color: hsl(215,15%,50%)"],
+[data-theme="light"] [style*="color: hsl(215,15%,45%)"],
+[data-theme="light"] [style*="color: hsl(215,15%,40%)"] {
+  color: var(--color-text-secondary) !important;
+}
+
+/* Dark card/input backgrounds → white */
+[data-theme="light"] [style*="background: hsl(220,18%,9%)"],
+[data-theme="light"] [style*="background: hsl(220,22%,7%)"],
+[data-theme="light"] [style*="background: hsl(220,18%,7%)"] {
+  background: var(--color-bg-card) !important;
+}
+
+/* Semi-transparent white borders → solid light border */
+[data-theme="light"] [style*="hsl(0 0% 100% / 0.1)"],
+[data-theme="light"] [style*="hsl(0 0% 100% / 0.08)"],
+[data-theme="light"] [style*="hsl(0 0% 100% / 0.06)"],
+[data-theme="light"] [style*="hsl(0 0% 100% / 0.05)"],
+[data-theme="light"] [style*="hsl(0 0% 100% / 0.04)"] {
+  border-color: var(--color-border) !important;
+}
+
+/* Cyan (#00e5ff / hsl(180,100%,50%)) text → darker cyan on white */
+[data-theme="light"] [style*="color: hsl(180,100%,50%)"],
+[data-theme="light"] [style*="color: hsl(180,100%,55%)"],
+[data-theme="light"] [style*="color: hsl(180,100%,60%)"],
+[data-theme="light"] [style*="color: hsl(180,100%,65%)"],
+[data-theme="light"] [style*="color: hsl(180,100%,70%)"] {
+  color: var(--color-accent-cyan) !important;
+}
+
+/* Cyan borders/backgrounds stay (they're intentional accents) but
+   ensure the containing text is readable */
+[data-theme="light"] .sidebar-section-label {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .kpi-box {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+[data-theme="light"] .kpi-box-label { color: #64748b !important; }
+[data-theme="light"] .kpi-box-value { color: #0f172a !important; }
+
+[data-theme="light"] .search-input {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .search-input::placeholder { color: #94a3b8 !important; }
+
+[data-theme="light"] .activity-row {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+[data-theme="light"] .activity-row-main strong { color: #0f172a !important; }
+[data-theme="light"] .activity-row-main span  { color: #64748b !important; }
+[data-theme="light"] .activity-row-time        { color: #94a3b8 !important; }
+
+[data-theme="light"] .auth-input-wrap {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+[data-theme="light"] .portal-brand-signature {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+}
+
+/* Fix visible-chip in light mode */
+[data-theme="light"] .visible-chip {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+/* Status pills — keep colored but ensure text is dark */
+[data-theme="light"] .status-green  { color: #16a34a !important; background: rgba(22,163,74,0.1) !important; border-color: rgba(22,163,74,0.25) !important; }
+[data-theme="light"] .status-amber  { color: #d97706 !important; background: rgba(217,119,6,0.1) !important; border-color: rgba(217,119,6,0.25) !important; }
+[data-theme="light"] .status-red    { color: #dc2626 !important; background: rgba(220,38,38,0.1) !important; border-color: rgba(220,38,38,0.25) !important; }
+[data-theme="light"] .status-gray   { color: #64748b !important; background: rgba(100,116,139,0.1) !important; border-color: rgba(100,116,139,0.25) !important; }
+
+/* ROAS pills */
+[data-theme="light"] .roas-pill.roas-good { color: #16a34a !important; background: rgba(22,163,74,0.1) !important; border-color: rgba(22,163,74,0.25) !important; }
+[data-theme="light"] .roas-pill.roas-ok   { color: #d97706 !important; background: rgba(217,119,6,0.1) !important; border-color: rgba(217,119,6,0.25) !important; }
+[data-theme="light"] .roas-pill.roas-low  { color: #dc2626 !important; background: rgba(220,38,38,0.1) !important; border-color: rgba(220,38,38,0.25) !important; }
+
+/* Overwrite hardcoded dark delta colors in tables */
+[data-theme="light"] .delta-up   { color: #16a34a !important; }
+[data-theme="light"] .delta-down { color: #dc2626 !important; }
+[data-theme="light"] .delta-neutral { color: #64748b !important; }

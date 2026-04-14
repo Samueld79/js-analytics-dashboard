@@ -98,7 +98,7 @@ function CustomTooltip({
       <p
         style={{
           fontSize: '0.65rem',
-          color: 'hsl(215,15%,55%)',
+          color: 'var(--color-text-secondary)',
           marginBottom: '6px',
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
@@ -508,7 +508,7 @@ export function DashboardPage() {
                 fontFamily: 'JetBrains Mono',
                 fontSize: '0.65rem',
                 letterSpacing: '0.08em',
-                color: 'hsl(215,15%,55%)',
+                color: 'var(--color-text-secondary)',
               }}
             >
               {pendingTasks} tarea{pendingTasks !== 1 ? 's' : ''} pendiente
@@ -547,7 +547,7 @@ export function DashboardPage() {
                 cursor: 'pointer',
                 border: activePeriod === m.month
                   ? '1px solid hsl(180,100%,50%)'
-                  : '1px solid hsl(0 0% 100% / 0.1)',
+                  : '1px solid var(--color-border)',
                 background: activePeriod === m.month
                   ? 'hsl(180 100% 50% / 0.1)'
                   : 'transparent',
@@ -570,7 +570,7 @@ export function DashboardPage() {
               cursor: 'pointer',
               border: activePeriod === 'all'
                 ? '1px solid hsl(180,100%,50%)'
-                : '1px solid hsl(0 0% 100% / 0.1)',
+                : '1px solid var(--color-border)',
               background: activePeriod === 'all'
                 ? 'hsl(180 100% 50% / 0.1)'
                 : 'transparent',
@@ -611,7 +611,7 @@ export function DashboardPage() {
               style={{
                 fontSize: '1.5rem',
                 fontWeight: 700,
-                color: 'hsl(0,0%,98%)',
+                color: 'var(--color-text-primary)',
                 letterSpacing: '-0.03em',
                 lineHeight: 1,
               }}
@@ -631,7 +631,7 @@ export function DashboardPage() {
                 style={{
                   fontFamily: 'JetBrains Mono',
                   fontSize: '0.62rem',
-                  color: 'hsl(215,15%,50%)',
+                  color: 'var(--color-text-secondary)',
                 }}
               >
                 vs mes anterior
@@ -666,7 +666,7 @@ export function DashboardPage() {
                 style={{
                   fontSize: '1.1rem',
                   fontWeight: 600,
-                  color: 'hsl(0,0%,98%)',
+                  color: 'var(--color-text-primary)',
                   letterSpacing: '-0.02em',
                   margin: 0,
                 }}
@@ -731,7 +731,7 @@ export function DashboardPage() {
               style={{
                 fontSize: '1.1rem',
                 fontWeight: 600,
-                color: 'hsl(0,0%,98%)',
+                color: 'var(--color-text-primary)',
                 letterSpacing: '-0.02em',
                 margin: 0,
               }}
@@ -784,7 +784,7 @@ export function DashboardPage() {
         <div
           style={{
             padding: '16px 20px',
-            borderBottom: '1px solid hsl(0 0% 100% / 0.08)',
+            borderBottom: '1px solid var(--color-border)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -799,7 +799,7 @@ export function DashboardPage() {
               style={{
                 fontSize: '1.1rem',
                 fontWeight: 600,
-                color: 'hsl(0,0%,98%)',
+                color: 'var(--color-text-primary)',
                 letterSpacing: '-0.02em',
                 margin: 0,
               }}
@@ -892,8 +892,8 @@ export function DashboardPage() {
                 style={{
                   padding: '12px 16px',
                   borderRadius: '4px',
-                  border: '1px solid hsl(0 0% 100% / 0.06)',
-                  background: 'hsl(220,18%,9%)',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg-input)',
                 }}
               >
                 <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
@@ -904,7 +904,7 @@ export function DashboardPage() {
                   style={{
                     fontSize: '0.92rem',
                     fontWeight: 600,
-                    color: 'hsl(0,0%,98%)',
+                    color: 'var(--color-text-primary)',
                     letterSpacing: '-0.01em',
                   }}
                 >
@@ -932,7 +932,7 @@ export function DashboardPage() {
                         style={{
                           fontFamily: 'JetBrains Mono',
                           fontSize: '0.72rem',
-                          color: 'hsl(0,0%,85%)',
+                          color: 'var(--color-text-secondary)',
                         }}
                       >
                         {i + 1}. {entry.name}
@@ -941,7 +941,7 @@ export function DashboardPage() {
                         style={{
                           fontFamily: 'JetBrains Mono',
                           fontSize: '0.72rem',
-                          color: 'hsl(215,15%,55%)',
+                          color: 'var(--color-text-secondary)',
                         }}
                       >
                         {formatCop(entry.total)}
@@ -981,7 +981,7 @@ export function DashboardPage() {
         <div
           style={{
             padding: '16px 20px',
-            borderBottom: '1px solid hsl(0 0% 100% / 0.08)',
+            borderBottom: '1px solid var(--color-border)',
           }}
         >
           <span className="number-label" style={{ display: 'block', marginBottom: '4px' }}>
@@ -992,7 +992,7 @@ export function DashboardPage() {
             style={{
               fontSize: '1.1rem',
               fontWeight: 600,
-              color: 'hsl(0,0%,98%)',
+              color: 'var(--color-text-primary)',
               letterSpacing: '-0.02em',
               margin: 0,
             }}
@@ -1003,7 +1003,7 @@ export function DashboardPage() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.08)' }}>
+              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                 {['Cliente', 'Inversión', 'Ventas', 'ROAS Op.', 'Estado'].map((h) => (
                   <th
                     key={h}
@@ -1019,7 +1019,7 @@ export function DashboardPage() {
               {tableClients.map(({ client, monthTotals, alertCount }) => (
                 <tr
                   key={client.id}
-                  style={{ borderBottom: '1px solid hsl(0 0% 100% / 0.05)' }}
+                  style={{ borderBottom: '1px solid var(--color-border)' }}
                 >
                   <td style={{ padding: '14px 24px' }}>
                     <Link
@@ -1028,7 +1028,7 @@ export function DashboardPage() {
                         fontFamily: 'Outfit, sans-serif',
                         fontSize: '0.85rem',
                         fontWeight: 600,
-                        color: 'hsl(0,0%,92%)',
+                        color: 'var(--color-text-primary)',
                         textDecoration: 'none',
                       }}
                     >
@@ -1040,7 +1040,7 @@ export function DashboardPage() {
                       padding: '14px 24px',
                       fontFamily: 'JetBrains Mono',
                       fontSize: '0.78rem',
-                      color: 'hsl(0,0%,85%)',
+                      color: 'var(--color-text-secondary)',
                     }}
                   >
                     {formatCop(monthTotals.spend)}
@@ -1050,7 +1050,7 @@ export function DashboardPage() {
                       padding: '14px 24px',
                       fontFamily: 'JetBrains Mono',
                       fontSize: '0.78rem',
-                      color: 'hsl(0,0%,85%)',
+                      color: 'var(--color-text-secondary)',
                     }}
                   >
                     {monthTotals.total_sales > 0 ? formatCop(monthTotals.total_sales) : '—'}
@@ -1098,7 +1098,7 @@ export function DashboardPage() {
                       textAlign: 'center',
                       fontFamily: 'JetBrains Mono',
                       fontSize: '0.72rem',
-                      color: 'hsl(215,15%,40%)',
+                      color: 'var(--color-text-muted)',
                     }}
                   >
                     No hay clientes con datos para el mes actual.

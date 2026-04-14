@@ -215,6 +215,17 @@ const CAMPAIGN_OBJ_COLORS: Record<string, string> = {
 
 const DRAFT_KEY = 'strategy_draft';
 
+// Strip imageBase64 before saving to localStorage to prevent QuotaExceededError
+function stripImagesForDraft(campaigns: CampaignFormState[]): CampaignFormState[] {
+  return campaigns.map((c) => ({
+    ...c,
+    adsets: c.adsets.map((s) => ({
+      ...s,
+      ads: s.ads.map((a) => ({ ...a, imageBase64: '' })),
+    })),
+  }));
+}
+
 // ─── Empty factories ───────────────────────────────────────────────────────
 
 function emptyLeadsInstantForm(): LeadsInstantFormState {
@@ -800,12 +811,19 @@ function AdBlock({
       e.target.value = '';
       return;
     }
+    e.target.value = '';
     const reader = new FileReader();
+    reader.onerror = () => {
+      console.error('[AdBlock] FileReader error loading image');
+    };
     reader.onload = () => {
-      onChange({ ...ad, imageBase64: reader.result as string, imageFilename: file.name });
+      try {
+        onChange({ ...ad, imageBase64: reader.result as string, imageFilename: file.name });
+      } catch (err) {
+        console.error('[AdBlock] handleImageSelect onload error:', err);
+      }
     };
     reader.readAsDataURL(file);
-    e.target.value = '';
   }
 
   return (
@@ -941,6 +959,9 @@ function AdBlock({
             <img
               src={ad.imageBase64}
               alt="preview"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
               style={{
                 width: 80,
                 height: 80,
@@ -2572,7 +2593,8 @@ export function StrategyFormModal({
   const hasMountedRef = useRef(false);
   const isDirtyRef = useRef(false);
 
-  // Auto-save draft on every form/campaign change (new strategies only)
+  // Auto-save draft on every form/campaign change (new strategies only).
+  // Images are stripped before saving to avoid QuotaExceededError (crashes the UI).
   useEffect(() => {
     if (!hasMountedRef.current) {
       hasMountedRef.current = true;
@@ -2580,7 +2602,12 @@ export function StrategyFormModal({
     }
     isDirtyRef.current = true;
     if (!isEditing) {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, campaigns }));
+      try {
+        const draftCampaigns = stripImagesForDraft(campaigns);
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, campaigns: draftCampaigns }));
+      } catch {
+        // Ignore storage quota errors — draft is best-effort
+      }
     }
   }, [form, campaigns, isEditing]);
 
