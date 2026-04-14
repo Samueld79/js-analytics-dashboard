@@ -1,98 +1,39 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import brandLogo from '../assets/brand-logo.png';
 
-type BurstParticle = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  r: number;
-  rgb: string;
-  alpha: number;
-};
-
-export function WelcomeOverlay({ name, onDone }: { name: string; onDone: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [displayedText, setDisplayedText] = useState('');
+export function WelcomeOverlay({ name: _name, onDone }: { name: string; onDone: () => void }) {
+  const [progress, setProgress] = useState(0);
+  const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
 
-  const fullText = `✦ Bienvenido, ${name}`;
-
-  // Typewriter effect — 50 ms per character
+  // Trigger entry animation on next paint
   useEffect(() => {
-    let i = 0;
-    const id = setInterval(() => {
-      i += 1;
-      setDisplayedText(fullText.slice(0, i));
-      if (i >= fullText.length) clearInterval(id);
-    }, 50);
-    return () => clearInterval(id);
-  }, [fullText]);
+    const t = setTimeout(() => setVisible(true), 16);
+    return () => clearTimeout(t);
+  }, []);
 
-  // Exit after 2 s → fade → call onDone
+  // Progress 0 → 100% over 1.5 s
   useEffect(() => {
-    const exitTimer = setTimeout(() => setExiting(true), 2000);
-    const doneTimer = setTimeout(onDone, 2400);
+    const start = performance.now();
+    let rafId: number;
+    const tick = () => {
+      const p = Math.min((performance.now() - start) / 1500, 1);
+      setProgress(p);
+      if (p < 1) rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  // Exit at 1.6 s → fade 400 ms → done at 2 s
+  useEffect(() => {
+    const exitTimer = setTimeout(() => setExiting(true), 1600);
+    const doneTimer = setTimeout(onDone, 2000);
     return () => {
       clearTimeout(exitTimer);
       clearTimeout(doneTimer);
     };
   }, [onDone]);
-
-  // Canvas burst particles
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    canvas.width = w;
-    canvas.height = h;
-
-    const cx = w / 2;
-    const cy = h / 2;
-
-    const particles: BurstParticle[] = Array.from({ length: 60 }, (_, i) => {
-      const angle = (i / 60) * Math.PI * 2 + Math.random() * 0.3;
-      const speed = Math.random() * 7 + 2;
-      return {
-        x: cx,
-        y: cy,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        r: Math.random() * 3 + 1,
-        rgb: Math.random() > 0.5 ? '6,182,212' : '168,85,247',
-        alpha: 1,
-      };
-    });
-
-    let rafId: number;
-
-    const draw = () => {
-      ctx.clearRect(0, 0, w, h);
-      let anyAlive = false;
-      for (const p of particles) {
-        if (p.alpha <= 0) continue;
-        anyAlive = true;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vx *= 0.97;
-        p.vy *= 0.97;
-        p.alpha -= 0.008;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${p.rgb},${Math.max(0, p.alpha)})`;
-        ctx.fill();
-      }
-      if (anyAlive) rafId = requestAnimationFrame(draw);
-    };
-
-    rafId = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
-
-  const typing = displayedText.length < fullText.length;
 
   return (
     <div
@@ -100,48 +41,66 @@ export function WelcomeOverlay({ name, onDone }: { name: string; onDone: () => v
         position: 'fixed',
         inset: 0,
         zIndex: 8888,
+        background: '#0a0a0f',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(3,7,18,0.82)',
-        backdropFilter: 'blur(10px)',
+        flexDirection: 'column',
         transition: 'opacity 0.4s ease-out',
         opacity: exiting ? 0 : 1,
-        pointerEvents: 'none',
+        pointerEvents: exiting ? 'none' : 'auto',
       }}
     >
-      <canvas
-        ref={canvasRef}
-        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-      />
       <div
         style={{
-          position: 'relative',
-          zIndex: 1,
-          fontSize: '1.6rem',
-          fontWeight: 700,
-          color: '#ffffff',
-          fontFamily: 'Outfit, sans-serif',
-          letterSpacing: '-0.01em',
-          textShadow: '0 0 40px rgba(6,182,212,0.45)',
-          textAlign: 'center',
-          minWidth: 280,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 10,
+          opacity: visible ? 1 : 0,
+          transform: visible ? 'scale(1)' : 'scale(0.85)',
+          transition: 'opacity 0.6s ease-out, transform 0.6s ease-out',
         }}
       >
-        {displayedText}
-        {typing && (
-          <span
+        <img
+          src={brandLogo}
+          alt="Growth Strategy"
+          style={{ width: 54, height: 54, objectFit: 'contain' }}
+        />
+        <div
+          style={{
+            fontSize: 28,
+            fontWeight: 700,
+            color: '#ffffff',
+            fontFamily: 'Outfit, sans-serif',
+            letterSpacing: '-0.01em',
+            marginTop: 4,
+          }}
+        >
+          Growth Strategy<span style={{ color: '#06b6d4' }}>.</span>
+        </div>
+
+        <div style={{ width: 220, marginTop: 22 }}>
+          <div
             style={{
-              display: 'inline-block',
-              width: 2,
-              height: '1.2em',
-              background: 'hsl(180,100%,55%)',
-              marginLeft: 3,
-              verticalAlign: 'text-bottom',
-              opacity: 0.8,
+              height: 2,
+              background: 'rgba(255,255,255,0.08)',
+              borderRadius: 1,
+              overflow: 'hidden',
             }}
-          />
-        )}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${progress * 100}%`,
+                background: 'linear-gradient(90deg, #06b6d4, #a855f7)',
+                boxShadow: '0 0 6px #06b6d4',
+                borderRadius: 1,
+                transition: 'width 0.05s linear',
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
