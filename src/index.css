@@ -53,11 +53,11 @@
   --color-text-primary:      #0f172a;
   --color-text-secondary:    #475569;
   --color-text-muted:        #94a3b8;
-  --color-accent-cyan:       #0891b2;
+  --color-accent-cyan:       #2563eb;
   --color-accent-purple:     #7c3aed;
   --color-sidebar-bg:        #ffffff;
-  --color-sidebar-active-bg: rgba(8, 145, 178, 0.08);
-  --color-sidebar-active-fg: #0891b2;
+  --color-sidebar-active-bg: rgba(37, 99, 235, 0.08);
+  --color-sidebar-active-fg: #2563eb;
   --color-chart-grid:        #e2e8f0;
   --color-chart-text:        #475569;
   --color-tooltip-bg:        #ffffff;
@@ -7128,7 +7128,7 @@ select, textarea,
 }
 
 [data-theme="light"] .sidebar-brand-name span.accent {
-  color: #0891b2 !important;
+  color: #2563eb !important;
 }
 
 [data-theme="light"] .sidebar-brand-sub {
@@ -7140,16 +7140,16 @@ select, textarea,
 }
 
 [data-theme="light"] .sidebar-link:hover {
-  background: rgba(8,145,178,0.06) !important;
+  background: rgba(37,99,235,0.06) !important;
   color: #0f172a !important;
   border-color: transparent !important;
 }
 
 [data-theme="light"] .sidebar-link.active {
-  background: rgba(8,145,178,0.08) !important;
-  color: #0891b2 !important;
-  border-color: rgba(8,145,178,0.15) !important;
-  box-shadow: inset 2px 0 0 #0891b2 !important;
+  background: rgba(37,99,235,0.08) !important;
+  color: #2563eb !important;
+  border-color: rgba(37,99,235,0.15) !important;
+  box-shadow: inset 2px 0 0 #2563eb !important;
 }
 
 [data-theme="light"] .sidebar-footer {
@@ -7170,9 +7170,9 @@ select, textarea,
 }
 
 [data-theme="light"] .sidebar-user-avatar {
-  background: rgba(8,145,178,0.08) !important;
-  border: 1px solid rgba(8,145,178,0.2) !important;
-  color: #0891b2 !important;
+  background: rgba(37,99,235,0.08) !important;
+  border: 1px solid rgba(37,99,235,0.2) !important;
+  color: #2563eb !important;
 }
 
 [data-theme="light"] .sidebar-signout {
@@ -7181,9 +7181,9 @@ select, textarea,
 }
 
 [data-theme="light"] .sidebar-signout:hover {
-  background: rgba(8,145,178,0.08) !important;
-  color: #0891b2 !important;
-  border-color: rgba(8,145,178,0.2) !important;
+  background: rgba(37,99,235,0.08) !important;
+  color: #2563eb !important;
+  border-color: rgba(37,99,235,0.2) !important;
 }
 
 [data-theme="light"] .theme-toggle {
@@ -7191,7 +7191,7 @@ select, textarea,
 }
 
 [data-theme="light"] .theme-toggle:hover {
-  background: rgba(8,145,178,0.06) !important;
+  background: rgba(37,99,235,0.06) !important;
   color: #0f172a !important;
 }
 
@@ -7210,12 +7210,12 @@ select, textarea,
 [data-theme="light"] .card:hover, [data-theme="light"] .kpi-card:hover,
 [data-theme="light"] .section-block:hover, [data-theme="light"] .executive-kpi-card:hover,
 [data-theme="light"] .ranking-card:hover {
-  border-color: rgba(8,145,178,0.3) !important;
+  border-color: rgba(37,99,235,0.3) !important;
   background: #ffffff !important;
 }
 
 [data-theme="light"] .card-glass:hover {
-  border-color: rgba(8,145,178,0.25) !important;
+  border-color: rgba(37,99,235,0.25) !important;
 }
 
 /* Valores KPI */
@@ -7227,7 +7227,7 @@ select, textarea,
 
 [data-theme="light"] .kpi-value.positive, [data-theme="light"] .metric-positive,
 [data-theme="light"] .ranking-value {
-  color: #0891b2 !important;
+  color: #2563eb !important;
 }
 
 /* Labels KPI */
@@ -7260,13 +7260,13 @@ select, textarea,
 
 /* Buttons */
 [data-theme="light"] .btn-primary {
-  border-color: #0891b2 !important;
-  color: #0891b2 !important;
+  border-color: #2563eb !important;
+  color: #2563eb !important;
   background: transparent !important;
 }
 
 [data-theme="light"] .btn-primary:hover:not(:disabled) {
-  background: #0891b2 !important;
+  background: #2563eb !important;
   color: #ffffff !important;
 }
 
@@ -7305,8 +7305,8 @@ select, textarea,
 [data-theme="light"] .form-input:focus, [data-theme="light"] .form-select:focus,
 [data-theme="light"] input:focus, [data-theme="light"] select:focus,
 [data-theme="light"] textarea:focus {
-  border-color: rgba(8,145,178,0.5) !important;
-  box-shadow: 0 0 0 2px rgba(8,145,178,0.08) !important;
+  border-color: rgba(37,99,235,0.5) !important;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.08) !important;
 }
 
 [data-theme="light"] input::placeholder, [data-theme="light"] textarea::placeholder {
@@ -7392,7 +7392,7 @@ select, textarea,
 }
 
 [data-theme="light"] .strategy-card:hover {
-  border-color: rgba(8,145,178,0.3) !important;
+  border-color: rgba(37,99,235,0.3) !important;
 }
 
 [data-theme="light"] .strategy-card-title,
@@ -7425,16 +7425,16 @@ select, textarea,
 
 [data-theme="light"] .filter-chip.active, [data-theme="light"] .period-chip.active,
 [data-theme="light"] .range-chip.active {
-  border-color: #0891b2 !important;
-  color: #0891b2 !important;
-  background: rgba(8,145,178,0.08) !important;
+  border-color: #2563eb !important;
+  color: #2563eb !important;
+  background: rgba(37,99,235,0.08) !important;
 }
 
 /* Meta chips */
 [data-theme="light"] .meta-chip, [data-theme="light"] .badge-info {
-  background: rgba(8,145,178,0.08) !important;
-  color: #0891b2 !important;
-  border-color: rgba(8,145,178,0.15) !important;
+  background: rgba(37,99,235,0.08) !important;
+  color: #2563eb !important;
+  border-color: rgba(37,99,235,0.15) !important;
 }
 
 /* Recharts */
@@ -7696,7 +7696,7 @@ select, textarea,
 }
 
 [data-theme="light"] .client-card:hover {
-  border-color: rgba(8, 145, 178, 0.3) !important;
+  border-color: rgba(37, 99, 235, 0.3) !important;
 }
 
 /* ─── Dashboard — inline-styled period selector buttons ─────── */
@@ -7720,12 +7720,12 @@ select, textarea,
 }
 
 [data-theme="light"] .sidebar-toggle:hover {
-  background: rgba(8, 145, 178, 0.06) !important;
-  color: #0891b2 !important;
+  background: rgba(37, 99, 235, 0.06) !important;
+  color: #2563eb !important;
 }
 
 [data-theme="light"] .sidebar-chevron {
-  color: #0891b2 !important;
+  color: #2563eb !important;
 }
 
 /* ─── Mobile nav trigger ────────────────────────────────────── */
@@ -7740,7 +7740,7 @@ select, textarea,
 
 [data-theme="light"] .page-bg {
   background:
-    radial-gradient(circle at 10% 10%, rgba(8, 145, 178, 0.04), transparent 35%),
+    radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.04), transparent 35%),
     radial-gradient(circle at 90% 20%, rgba(124, 58, 237, 0.03), transparent 30%),
     linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%) !important;
 }
@@ -7839,11 +7839,11 @@ select, textarea,
 [data-theme="light"] .drive-link {
   background: #f8fafc !important;
   border-color: #e2e8f0 !important;
-  color: #0891b2 !important;
+  color: #2563eb !important;
 }
 
 [data-theme="light"] .drive-link:hover {
-  background: rgba(8, 145, 178, 0.06) !important;
+  background: rgba(37, 99, 235, 0.06) !important;
 }
 
 /* ─── Seg grid (strategy segmentation) ──────────────────────── */
@@ -7854,7 +7854,7 @@ select, textarea,
 }
 
 [data-theme="light"] .seg-label {
-  color: #0891b2 !important;
+  color: #2563eb !important;
 }
 
 [data-theme="light"] .seg-item span:last-child {
@@ -7988,3 +7988,18 @@ select, textarea,
 [data-theme="light"] .delta-up   { color: #16a34a !important; }
 [data-theme="light"] .delta-down { color: #dc2626 !important; }
 [data-theme="light"] .delta-neutral { color: #64748b !important; }
+
+/* ─── Table header — override global dark rule ───────────── */
+[data-theme="light"] table thead tr {
+  background: #f1f5f9 !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+[data-theme="light"] table thead th {
+  color: #475569 !important;
+}
+[data-theme="light"] table tbody tr {
+  border-bottom-color: #e2e8f0 !important;
+}
+[data-theme="light"] table tbody td {
+  color: #0f172a !important;
+}
