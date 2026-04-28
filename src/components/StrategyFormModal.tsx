@@ -79,6 +79,13 @@ interface AdSetFormState {
   leadsOptimizationEvent: string;
   leadsConversionWindow: string;
   leadsBidStrategy: string;
+  // Ventas optimization
+  salesConversionEvent: string;
+  salesConversionWindow: string;
+  salesBidStrategy: string;
+  salesBidAmount: string;
+  salesRoasTarget: string;
+  salesMessageDestinations: string[];
 }
 
 // ─── Leads form state types ────────────────────────────────────────────────
@@ -147,6 +154,8 @@ interface CampaignFormState {
   budgetType: 'ABO' | 'CBO';
   objective: string;
   adsets: AdSetFormState[];
+  // Ventas
+  salesConversionLocation: string;
   // Clientes Potenciales (Leads)
   leadsConversionLocation: string;
   leadsInstantForm: LeadsInstantFormState;
@@ -167,8 +176,8 @@ const AGE_OPTIONS_MAX = Array.from({ length: 46 }, (_, i) => 20 + i);
 const OPTIMIZATION_GOALS: Record<string, string[]> = {
   Reconocimiento: ['Alcance', 'Impresiones', 'Reproducciones de video', 'Reconocimiento de marca'],
   Tráfico: ['Clics en enlace', 'Visitas a página de destino', 'Clics en publicación'],
-  Interacción: ['Interacciones con publicación', 'Reproducciones de video', 'Mensajes', 'Visitas al perfil'],
-  Ventas: ['Conversiones', 'Valor de conversión', 'Ventas del catálogo'],
+  Interacción: ['Maximizar el número de conversaciones', 'Maximizar interacciones con publicación', 'Maximizar visitas al perfil', 'Maximizar reproducciones de video'],
+  Ventas: [], // dynamic — governed by salesConversionLocation; see VENTAS_GOALS
   'Clientes Potenciales': ['Clientes potenciales (recomendado)', 'Clientes potenciales de calidad', 'Conversión de clientes potenciales'],
   'Generación de leads': ['Clientes potenciales', 'Conversiones de clientes potenciales'],
   Mensajes: ['Conversaciones iniciadas', 'Respuestas a mensajes'],
@@ -176,8 +185,38 @@ const OPTIMIZATION_GOALS: Record<string, string[]> = {
 const TRAFFIC_DESTINATIONS = ['Sitio web', 'App', 'Messenger', 'Instagram', 'WhatsApp'];
 const MESSAGE_DESTINATIONS = ['WhatsApp', 'Messenger', 'Instagram DM'];
 const INTERACTION_TYPES = ['Mensajes', 'Reacciones y comentarios', 'Reproducciones de video', 'Visitas al perfil', 'Seguimiento'];
-const CONVERSION_DESTINATIONS = ['Sitio web', 'App', 'WhatsApp', 'Messenger', 'Instagram DM', 'Catálogo'];
 const LEADS_TYPES = ['Formulario nativo', 'Sitio web', 'WhatsApp', 'Messenger'];
+
+// ─── Ventas (Meta Ads 2026) ────────────────────────────────────────────────
+const VENTAS_CONV_LOC_MULTIPLE = [
+  'Sitio web y app',
+  'Sitio web y negocio',
+  'Sitio web, app y negocio',
+  'Sitio web y llamadas',
+];
+const VENTAS_CONV_LOC_SINGLE = [
+  'Sitio web',
+  'App',
+  'Destinos de mensajes',
+  'Llamadas',
+];
+const VENTAS_GOALS: Record<string, string[]> = {
+  'Sitio web': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'],
+  'Sitio web y app': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'],
+  'Sitio web y negocio': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'],
+  'Sitio web, app y negocio': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'],
+  'Sitio web y llamadas': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión'],
+  'App': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión'],
+  'Destinos de mensajes': ['Maximizar el número de conversaciones', 'Maximizar el número de conversiones', 'Maximizar el número de clics en el enlace', 'Maximizar el alcance diario único'],
+  'Llamadas': ['Maximizar el número de llamadas conectadas'],
+};
+const VENTAS_CONV_WINDOWS = [
+  '1 día después del clic',
+  '7 días después del clic (recomendado)',
+  '1 día de visualización + 7 días después del clic',
+];
+const VENTAS_BID_STRATEGIES = ['Costo más bajo (automático)', 'Límite de costo', 'ROAS mínimo'];
+const VENTAS_MESSAGE_DESTINATIONS = ['Sitio web', 'App', 'WhatsApp', 'Messenger', 'Instagram DM', 'Catálogo'];
 
 // Clientes Potenciales constants
 const LEADS_CONVERSION_LOCATIONS = [
@@ -347,6 +386,12 @@ function emptyAdSet(): AdSetFormState {
     leadsOptimizationEvent: '',
     leadsConversionWindow: '',
     leadsBidStrategy: '',
+    salesConversionEvent: '',
+    salesConversionWindow: '7 días después del clic (recomendado)',
+    salesBidStrategy: 'Costo más bajo (automático)',
+    salesBidAmount: '',
+    salesRoasTarget: '',
+    salesMessageDestinations: ['WhatsApp'],
   };
 }
 
@@ -357,6 +402,7 @@ function emptyCampaign(): CampaignFormState {
     budgetType: 'CBO',
     objective: 'Reconocimiento',
     adsets: [emptyAdSet()],
+    salesConversionLocation: 'Destinos de mensajes',
     leadsConversionLocation: '',
     leadsInstantForm: emptyLeadsInstantForm(),
     leadsMessages: emptyLeadsMessages(),
@@ -419,6 +465,7 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
     budget: c.budget?.toString() ?? '',
     budgetType: c.budgetType ?? 'CBO',
     objective: c.objective ?? 'Reconocimiento',
+    salesConversionLocation: c.salesConversionLocation ?? 'Destinos de mensajes',
     leadsConversionLocation: c.leadsConversionLocation ?? '',
     leadsInstantForm,
     leadsMessages,
@@ -497,6 +544,12 @@ function toFormCampaigns(campaigns?: StrategyCampaign[] | null): CampaignFormSta
         leadsOptimizationEvent: a.leadsOptimizationEvent ?? '',
         leadsConversionWindow: a.leadsConversionWindow ?? '',
         leadsBidStrategy: a.leadsBidStrategy ?? '',
+        salesConversionEvent: a.salesConversionEvent ?? '',
+        salesConversionWindow: a.salesConversionWindow ?? '7 días después del clic (recomendado)',
+        salesBidStrategy: a.salesBidStrategy ?? 'Costo más bajo (automático)',
+        salesBidAmount: a.salesBidAmount?.toString() ?? '',
+        salesRoasTarget: a.salesRoasTarget ?? '',
+        salesMessageDestinations: a.salesMessageDestinations ?? ['WhatsApp'],
       };
     }),
   };
@@ -555,6 +608,12 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
         leadsOptimizationEvent: c.objective === 'Clientes Potenciales' ? a.leadsOptimizationEvent || undefined : undefined,
         leadsConversionWindow: c.objective === 'Clientes Potenciales' ? a.leadsConversionWindow || undefined : undefined,
         leadsBidStrategy: c.objective === 'Clientes Potenciales' ? a.leadsBidStrategy || undefined : undefined,
+        salesConversionEvent: c.objective === 'Ventas' ? a.salesConversionEvent || undefined : undefined,
+        salesConversionWindow: c.objective === 'Ventas' ? a.salesConversionWindow || undefined : undefined,
+        salesBidStrategy: c.objective === 'Ventas' ? a.salesBidStrategy || undefined : undefined,
+        salesBidAmount: c.objective === 'Ventas' && a.salesBidAmount ? Number(a.salesBidAmount) || undefined : undefined,
+        salesRoasTarget: c.objective === 'Ventas' ? a.salesRoasTarget || undefined : undefined,
+        salesMessageDestinations: c.objective === 'Ventas' && a.salesMessageDestinations.length ? a.salesMessageDestinations : undefined,
         ads: a.ads
           .filter((ad) => ad.description || ad.existingUrl || ad.referenceUrl || ad.notes || ad.imageBase64 || ad.copyV1 || ad.headline)
           .map(
@@ -580,6 +639,8 @@ function fromFormCampaigns(campaigns: CampaignFormState[]): StrategyCampaign[] {
             }),
           ),
       })),
+      // Ventas campaign config
+      salesConversionLocation: c.objective === 'Ventas' ? c.salesConversionLocation || undefined : undefined,
       // Clientes Potenciales leads data
       leadsConversionLocation: c.objective === 'Clientes Potenciales' ? c.leadsConversionLocation || undefined : undefined,
       leadsInstantForm: c.objective === 'Clientes Potenciales' && c.leadsConversionLocation === '📋 Formulario instantáneo'
@@ -1157,6 +1218,7 @@ function AdSetBlock({
   adsetIdx,
   campaignObjective,
   campaignBudgetType,
+  campaignSalesConversionLocation,
   onChange,
   onRemove,
 }: {
@@ -1164,6 +1226,7 @@ function AdSetBlock({
   adsetIdx: number;
   campaignObjective: string;
   campaignBudgetType: 'ABO' | 'CBO';
+  campaignSalesConversionLocation: string;
   onChange: (updated: AdSetFormState) => void;
   onRemove: () => void;
 }) {
@@ -1181,6 +1244,13 @@ function AdSetBlock({
     set('messageDestinations', next);
   }
 
+  function toggleSalesMessageDest(dest: string) {
+    const next = adset.salesMessageDestinations.includes(dest)
+      ? adset.salesMessageDestinations.filter((x) => x !== dest)
+      : [...adset.salesMessageDestinations, dest];
+    set('salesMessageDestinations', next);
+  }
+
   function togglePlatform(p: string) {
     const next = adset.platforms.includes(p)
       ? adset.platforms.filter((x) => x !== p)
@@ -1196,9 +1266,15 @@ function AdSetBlock({
     set('ads', adset.ads.filter((_, i) => i !== adIdx));
   }
 
-  const goalsForObjective = OPTIMIZATION_GOALS[campaignObjective] ?? [];
+  const isVentas = campaignObjective === 'Ventas';
+  const goalsForObjective = isVentas
+    ? [] // handled inside the Ventas block
+    : (OPTIMIZATION_GOALS[campaignObjective] ?? []);
   const showMessaging = campaignObjective === 'Mensajes';
   const isLeads = campaignObjective === 'Clientes Potenciales';
+  const ventasGoals = isVentas ? (VENTAS_GOALS[campaignSalesConversionLocation] ?? []) : [];
+  const ventasHasSitioWeb = isVentas && campaignSalesConversionLocation.startsWith('Sitio web');
+  const ventasIsMessages = isVentas && campaignSalesConversionLocation === 'Destinos de mensajes';
   const displayName = adset.name.trim() || `CONJUNTO ${adsetIdx + 1}`;
 
   return (
@@ -1441,17 +1517,81 @@ function AdSetBlock({
                 </div>
               )}
 
-              {/* Conditional: Ventas */}
-              {campaignObjective === 'Ventas' && (
-                <div style={FIELD_STYLE}>
-                  <label style={LABEL_STYLE}>Destino de conversión</label>
-                  <PillToggle
-                    options={CONVERSION_DESTINATIONS}
-                    active={adset.conversionDestination}
-                    onToggle={(v) =>
-                      set('conversionDestination', adset.conversionDestination === v ? '' : v)
-                    }
-                  />
+              {/* Conditional: Ventas — optimization & delivery */}
+              {isVentas && (
+                <div style={{ borderTop: '1px solid hsl(145 100% 45% / 0.15)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'hsl(145,100%,55%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace' }}>OPTIMIZACIÓN Y ENTREGA</span>
+
+                  {/* Optimization goal — dynamic by salesConversionLocation */}
+                  <div style={FIELD_STYLE}>
+                    <label style={{ ...LABEL_STYLE, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      Objetivo de optimización
+                      <span title="Define qué resultado quiere optimizar Meta con el algoritmo de entrega" style={{ cursor: 'help', color: 'hsl(215,15%,40%)', fontSize: '0.65rem' }}>(?)</span>
+                    </label>
+                    <select value={adset.optimizationGoal} onChange={(e) => set('optimizationGoal', e.target.value)} style={INPUT_STYLE as React.CSSProperties}>
+                      <option value="">Selecciona un objetivo de optimización...</option>
+                      {ventasGoals.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Message destinations — only when "Destinos de mensajes" */}
+                  {ventasIsMessages && (
+                    <div style={FIELD_STYLE}>
+                      <label style={{ ...LABEL_STYLE, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Destinos de mensajes
+                        <span title="Selecciona una o varias plataformas donde los usuarios llegarán al hacer clic" style={{ cursor: 'help', color: 'hsl(215,15%,40%)', fontSize: '0.65rem' }}>(?)</span>
+                      </label>
+                      <PillToggle options={VENTAS_MESSAGE_DESTINATIONS} active={adset.salesMessageDestinations} onToggle={toggleSalesMessageDest} />
+                    </div>
+                  )}
+
+                  {/* Conversion event — only when location involves "Sitio web" */}
+                  {ventasHasSitioWeb && (
+                    <div style={FIELD_STYLE}>
+                      <label style={{ ...LABEL_STYLE, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Evento de conversión
+                        <span title="Nombre del evento de píxel que Meta usará como objetivo. Ej: Purchase, Lead, ViewContent" style={{ cursor: 'help', color: 'hsl(215,15%,40%)', fontSize: '0.65rem' }}>(?)</span>
+                      </label>
+                      <input value={adset.salesConversionEvent} onChange={(e) => set('salesConversionEvent', e.target.value)} placeholder="Purchase, Lead, ViewContent..." style={INPUT_STYLE} />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={FIELD_STYLE}>
+                      <label style={{ ...LABEL_STYLE, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Ventana de conversión
+                        <span title="Período después de la interacción en que Meta atribuye la conversión" style={{ cursor: 'help', color: 'hsl(215,15%,40%)', fontSize: '0.65rem' }}>(?)</span>
+                      </label>
+                      <select value={adset.salesConversionWindow} onChange={(e) => set('salesConversionWindow', e.target.value)} style={INPUT_STYLE as React.CSSProperties}>
+                        <option value="">Selecciona ventana...</option>
+                        {VENTAS_CONV_WINDOWS.map((w) => <option key={w} value={w}>{w}</option>)}
+                      </select>
+                    </div>
+                    <div style={FIELD_STYLE}>
+                      <label style={{ ...LABEL_STYLE, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Estrategia de puja
+                        <span title="Costo más bajo: Meta gasta el presupuesto buscando los mejores resultados al menor costo. Límite de costo y ROAS mínimo dan más control." style={{ cursor: 'help', color: 'hsl(215,15%,40%)', fontSize: '0.65rem' }}>(?)</span>
+                      </label>
+                      <select value={adset.salesBidStrategy} onChange={(e) => set('salesBidStrategy', e.target.value)} style={INPUT_STYLE as React.CSSProperties}>
+                        {VENTAS_BID_STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {adset.salesBidStrategy === 'Límite de costo' && (
+                    <div style={FIELD_STYLE}>
+                      <label style={LABEL_STYLE}>Límite de costo COP</label>
+                      <input type="number" min="0" value={adset.salesBidAmount} onChange={(e) => set('salesBidAmount', e.target.value)} placeholder="Ej: 15000" style={INPUT_STYLE} />
+                    </div>
+                  )}
+                  {adset.salesBidStrategy === 'ROAS mínimo' && (
+                    <div style={FIELD_STYLE}>
+                      <label style={LABEL_STYLE}>ROAS mínimo</label>
+                      <input type="number" min="0" step="0.1" value={adset.salesRoasTarget} onChange={(e) => set('salesRoasTarget', e.target.value)} placeholder="Ej: 3.5" style={INPUT_STYLE} />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2445,6 +2585,54 @@ function CampaignBlock({
               ? 'CBO: Meta optimiza el presupuesto entre todos los conjuntos automáticamente.'
               : 'ABO: Define el presupuesto individualmente en cada conjunto de anuncios.'}
           </p>
+
+          {/* Ventas: Ubicación de conversión (grouped, campaign level) */}
+          {campaign.objective === 'Ventas' && (
+            <div style={FIELD_STYLE}>
+              <label style={{ ...LABEL_STYLE, display: 'flex', alignItems: 'center', gap: 6 }}>
+                Ubicación de la conversión
+                <span title="Define dónde quieres que ocurra la conversión. Afecta las opciones de optimización disponibles en el conjunto de anuncios." style={{ cursor: 'help', color: 'hsl(215,15%,40%)', fontSize: '0.65rem' }}>(?)</span>
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Grupo: Varias */}
+                <div style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'hsl(145,100%,55%)', fontFamily: 'JetBrains Mono, monospace' }}>Varias</span>
+                    <span style={{ fontSize: '0.63rem', color: 'hsl(215,15%,45%)' }}>Dirige personas al lugar más probable de conversión</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {VENTAS_CONV_LOC_MULTIPLE.map((loc) => {
+                      const isActive = campaign.salesConversionLocation === loc;
+                      return (
+                        <button key={loc} type="button" onClick={() => set('salesConversionLocation', loc)}
+                          style={{ padding: '3px 10px', borderRadius: 5, fontSize: '0.72rem', cursor: 'pointer', fontWeight: isActive ? 600 : 400, border: isActive ? '1px solid hsl(145,100%,50%)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'hsl(145 100% 50% / 0.15)' : 'transparent', color: isActive ? 'hsl(145,100%,70%)' : 'hsl(215,15%,50%)' }}>
+                          {loc}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* Grupo: Única */}
+                <div style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'hsl(145,100%,55%)', fontFamily: 'JetBrains Mono, monospace' }}>Única</span>
+                    <span style={{ fontSize: '0.63rem', color: 'hsl(215,15%,45%)' }}>Envía personas a una ubicación específica</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {VENTAS_CONV_LOC_SINGLE.map((loc) => {
+                      const isActive = campaign.salesConversionLocation === loc;
+                      return (
+                        <button key={loc} type="button" onClick={() => set('salesConversionLocation', loc)}
+                          style={{ padding: '3px 10px', borderRadius: 5, fontSize: '0.72rem', cursor: 'pointer', fontWeight: isActive ? 600 : 400, border: isActive ? '1px solid hsl(145,100%,50%)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'hsl(145 100% 50% / 0.15)' : 'transparent', color: isActive ? 'hsl(145,100%,70%)' : 'hsl(215,15%,50%)' }}>
+                          {loc}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2458,6 +2646,7 @@ function CampaignBlock({
               adsetIdx={adsetIdx}
               campaignObjective={campaign.objective}
               campaignBudgetType={campaign.budgetType}
+              campaignSalesConversionLocation={campaign.salesConversionLocation}
               onChange={(updated) => updateAdSet(adsetIdx, updated)}
               onRemove={() => removeAdSet(adsetIdx)}
             />

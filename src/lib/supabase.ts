@@ -592,6 +592,13 @@ export type AdSetEntry = {
   leadsOptimizationEvent?: string;
   leadsConversionWindow?: string;
   leadsBidStrategy?: string;
+  // Ventas-specific optimization
+  salesConversionEvent?: string;
+  salesConversionWindow?: string;
+  salesBidStrategy?: string;
+  salesBidAmount?: number;
+  salesRoasTarget?: string;
+  salesMessageDestinations?: string[];
   // Ads (Level 3)
   ads?: MetaAdEntry[];
   // Legacy fields (backward compat)
@@ -608,6 +615,8 @@ export type StrategyCampaign = {
   budgetType?: 'ABO' | 'CBO';
   objective?: string;
   adsets?: AdSetEntry[];
+  // Ventas campaign config
+  salesConversionLocation?: string;
   // Clientes Potenciales (Leads) campaign config
   leadsConversionLocation?: string;
   leadsInstantForm?: LeadsInstantForm | null;
