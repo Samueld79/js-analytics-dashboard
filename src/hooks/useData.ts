@@ -170,18 +170,12 @@ export function useCampaignMonthlyHistory(clientId?: string) {
 }
 
 /**
- * Shared hook for Dashboard and ClientsPage.
- * Primary source: ad_campaign_metrics (covers Jan/Feb/Mar excel imports).
- * Returns:
- *   - byMonth: all months aggregated (total across all / one client)
- *   - currentPeriod: most recent month aggregate
- *   - byClient: per-client aggregate for the current period (Map<clientId, KPIs>)
- *   - loading
- *
- * Pass clientId to scope to a single client; omit for all clients.
- * days=90 covers the three available periods (2026-01-31, 2026-02-28, 2026-03-17).
+ * Shared hook for Dashboard and ClientDetailPage.
+ * Fetches 365 days of ad_campaign_metrics so all historical months are available.
+ * byMonth is the union of months with data PLUS the current calendar month,
+ * ensuring the current month always appears as a period option even before data arrives.
  */
-export function useCampaignSummary(clientId?: string, days = 90) {
+export function useCampaignSummary(clientId?: string, days = 365) {
   const [rows, setRows] = useState<AdCampaignMetric[]>([]);
   const [loading, setLoading] = useState(true);
   const prevDataRef = useRef<AdCampaignMetric[] | null>(null);
@@ -203,7 +197,17 @@ export function useCampaignSummary(clientId?: string, days = 90) {
     void load();
   }, [load]);
 
-  const byMonth = useMemo(() => aggregateCampaignMetricsByMonth(rows), [rows]);
+  const byMonth = useMemo(() => {
+    const fromData = aggregateCampaignMetricsByMonth(rows);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const hasCurrentMonth = fromData.some((m) => m.month === currentMonth);
+    if (hasCurrentMonth) return fromData;
+    // Append current month as empty placeholder so selectors always show it
+    return [
+      ...fromData,
+      { month: currentMonth, spend: 0, reach: 0, impressions: 0, cpm: 0, frequency: 0, messages: 0, profileVisits: 0, leads: 0, purchases: 0, purchaseValue: 0, linkClicks: 0, pageEngagement: 0, postEngagement: 0, videoViews: 0, thruplays: 0, campaignCount: 0, adRoas: 0, costPerConversation: null, costPerProfileVisit: null },
+    ];
+  }, [rows]);
 
   // rows exposed so callers can filter by period and call aggregateCampaignKpisByClient
   return { rows, byMonth, loading, reload: load };

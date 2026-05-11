@@ -214,10 +214,11 @@ function resolveEffectiveStatus(row: RawAdCampaignImportRow): string | null {
  */
 export function inferObjectiveFromName(name: string): string {
   const u = (name ?? '').toUpperCase();
-  if (u.includes('RECON')) return 'Reconocimiento';
+  if (u.includes('RECO')) return 'Reconocimiento';
   if (u.includes('INTER')) return 'Interacción';
-  if (u.includes('TRAFI')) return 'Tráfico';
+  if (u.includes('TRAF')) return 'Tráfico';
   if (u.includes('VENT')) return 'Ventas';
+  if (u.includes('C.P') || u.includes('POTENCIAL')) return 'Clientes Potenciales';
   if (u.includes('PRESENT')) return 'Presentación';
   if (u.includes('EVA')) return 'Evaluación';
   return 'Otro';
