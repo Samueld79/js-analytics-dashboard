@@ -19,90 +19,48 @@ const STATUS_LABELS = {
   red:    '🚨 Acción inmediata',
 };
 
-type ProgressBarProps = {
-  pct: number;
-  color: string;
-};
-
-function ProgressBar({ pct, color }: ProgressBarProps) {
+function ProgressBar({ pct, color, inactive }: { pct: number; color: string; inactive?: boolean }) {
+  if (inactive) {
+    return (
+      <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', flex: 1, display: 'flex', alignItems: 'center', paddingLeft: 8 }}>
+        <span style={{ fontSize: '0.55rem', fontFamily: 'JetBrains Mono, monospace', color: 'hsl(215,15%,38%)', letterSpacing: '0.06em' }}>
+          Sin actividad
+        </span>
+      </div>
+    );
+  }
   return (
-    <div
-      style={{
-        height: 4,
-        borderRadius: 999,
-        background: 'rgba(255,255,255,0.08)',
-        overflow: 'hidden',
-        flex: 1,
-      }}
-    >
-      <div
-        style={{
-          height: '100%',
-          width: `${pct}%`,
-          borderRadius: 999,
-          background: color,
-          transition: 'width 0.6s ease',
-        }}
-      />
+    <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', flex: 1 }}>
+      <div style={{ height: '100%', width: `${pct}%`, borderRadius: 999, background: color, transition: 'width 0.6s ease' }} />
     </div>
   );
 }
 
-export function GoalProgressCard({
-  clientName,
-  monthlyGoal,
-  currentMonthlySales,
-  currentWeeklySales,
-}: GoalProgressCardProps) {
-  const weeklyGoal = monthlyGoal / 4;
-
-  const monthStatus = getGoalStatus(currentMonthlySales, monthlyGoal);
-  const weekStatus  = getGoalStatus(currentWeeklySales, weeklyGoal);
-
-  const monthPct = getGoalPercent(currentMonthlySales, monthlyGoal);
-  const weekPct  = getGoalPercent(currentWeeklySales, weeklyGoal);
-
-  const monthColors = STATUS_COLORS[monthStatus];
+export function GoalProgressCard({ clientName, monthlyGoal, currentMonthlySales, currentWeeklySales }: GoalProgressCardProps) {
+  const weeklyGoal    = monthlyGoal / 4;
+  const monthStatus   = getGoalStatus(currentMonthlySales, monthlyGoal);
+  const weekStatus    = getGoalStatus(currentWeeklySales, weeklyGoal);
+  const monthPct      = getGoalPercent(currentMonthlySales, monthlyGoal);
+  const weekPct       = getGoalPercent(currentWeeklySales, weeklyGoal);
+  const monthColors   = STATUS_COLORS[monthStatus];
+  const noMonthlyActivity = currentMonthlySales === 0;
+  const noWeeklyActivity  = currentWeeklySales === 0;
 
   return (
     <div
       className="card-glass goal-card"
-      style={{
-        padding: '12px 14px',
-        borderLeft: `3px solid ${monthColors.bar}`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-      }}
+      style={{ padding: '12px 14px', borderLeft: `3px solid ${monthColors.bar}`, display: 'flex', flexDirection: 'column', gap: 8 }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <span
-          style={{
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            color: 'var(--color-text-primary)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3, wordBreak: 'break-word' }}>
           {clientName}
         </span>
-        <span
-          style={{
-            fontSize: '0.65rem',
-            fontWeight: 700,
-            padding: '2px 6px',
-            borderRadius: 999,
-            background: monthColors.badge,
-            color: monthColors.text,
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-            fontFamily: 'JetBrains Mono, monospace',
-            letterSpacing: '0.04em',
-          }}
-        >
+        <span style={{
+          fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+          background: monthColors.badge, color: monthColors.text,
+          whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.04em',
+        }}>
           {STATUS_LABELS[monthStatus]}
         </span>
       </div>
@@ -110,82 +68,44 @@ export function GoalProgressCard({
       {/* Monthly row */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <span
-            style={{
-              fontSize: '0.65rem',
-              fontFamily: 'JetBrains Mono, monospace',
-              letterSpacing: '0.08em',
-              color: 'hsl(215,15%,48%)',
-            }}
-          >
-            META MENSUAL
+          <span style={{ fontSize: '0.58rem', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.08em', color: 'hsl(215,15%,45%)', textTransform: 'uppercase' }}>
+            Mensual
           </span>
-          <span
-            style={{
-              fontSize: '0.75rem',
-              fontFamily: 'JetBrains Mono, monospace',
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            {formatCOP(currentMonthlySales)}{' '}
-            <span style={{ color: 'hsl(215,15%,40%)' }}>/ {formatCOP(monthlyGoal)}</span>
-          </span>
+          {!noMonthlyActivity && (
+            <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: 'var(--color-text-secondary)' }}>
+              {formatCOP(currentMonthlySales)} <span style={{ color: 'hsl(215,15%,38%)' }}>/ {formatCOP(monthlyGoal)}</span>
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ProgressBar pct={monthPct} color={STATUS_COLORS[monthStatus].bar} />
-          <span
-            style={{
-              fontSize: '0.66rem',
-              fontFamily: 'JetBrains Mono, monospace',
-              fontWeight: 700,
-              color: STATUS_COLORS[monthStatus].text,
-              minWidth: 30,
-              textAlign: 'right',
-            }}
-          >
-            {monthPct}%
-          </span>
+          <ProgressBar pct={monthPct} color={STATUS_COLORS[monthStatus].bar} inactive={noMonthlyActivity} />
+          {!noMonthlyActivity && (
+            <span style={{ fontSize: '0.64rem', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: STATUS_COLORS[monthStatus].text, minWidth: 30, textAlign: 'right' }}>
+              {monthPct}%
+            </span>
+          )}
         </div>
       </div>
 
       {/* Weekly row */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <span
-            style={{
-              fontSize: '0.65rem',
-              fontFamily: 'JetBrains Mono, monospace',
-              letterSpacing: '0.08em',
-              color: 'hsl(215,15%,48%)',
-            }}
-          >
-            META SEMANAL
+          <span style={{ fontSize: '0.58rem', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.08em', color: 'hsl(215,15%,45%)', textTransform: 'uppercase' }}>
+            Semanal (7 días)
           </span>
-          <span
-            style={{
-              fontSize: '0.75rem',
-              fontFamily: 'JetBrains Mono, monospace',
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            {formatCOP(currentWeeklySales)}{' '}
-            <span style={{ color: 'hsl(215,15%,40%)' }}>/ {formatCOP(weeklyGoal)}</span>
-          </span>
+          {!noWeeklyActivity && (
+            <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: 'var(--color-text-secondary)' }}>
+              {formatCOP(currentWeeklySales)} <span style={{ color: 'hsl(215,15%,38%)' }}>/ {formatCOP(weeklyGoal)}</span>
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ProgressBar pct={weekPct} color={STATUS_COLORS[weekStatus].bar} />
-          <span
-            style={{
-              fontSize: '0.66rem',
-              fontFamily: 'JetBrains Mono, monospace',
-              fontWeight: 700,
-              color: STATUS_COLORS[weekStatus].text,
-              minWidth: 30,
-              textAlign: 'right',
-            }}
-          >
-            {weekPct}%
-          </span>
+          <ProgressBar pct={weekPct} color={STATUS_COLORS[weekStatus].bar} inactive={noWeeklyActivity} />
+          {!noWeeklyActivity && (
+            <span style={{ fontSize: '0.64rem', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color: STATUS_COLORS[weekStatus].text, minWidth: 30, textAlign: 'right' }}>
+              {weekPct}%
+            </span>
+          )}
         </div>
       </div>
     </div>
