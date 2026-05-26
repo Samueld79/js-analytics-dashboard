@@ -50,6 +50,14 @@ import {
 } from '../lib/utils';
 import { buildClientMetaOverviewByClient } from '../services/meta';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
+import { GoalProgressCard } from '../components/GoalProgressCard';
+import {
+  formatCOP,
+  getCurrentMonthKey,
+  getGoalStatus,
+  getTodayStr,
+  getWeekStart,
+} from '../utils/goalHelpers';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
@@ -436,6 +444,58 @@ export function DashboardPage() {
   const yearEstimate =
     currentMonthIdx > 0 && yearTotal > 0 ? (yearTotal / (currentMonthIdx + 1)) * 12 : 0;
 
+  // ── Goal tracking ─────────────────────────────────────────────────────────────
+  const currentMonthKey = getCurrentMonthKey();
+  const weekStart = getWeekStart();
+  const todayStr = getTodayStr();
+
+  const goalClients = useMemo(
+    () => visibleClients.filter((c) => (c.monthly_goal ?? 0) > 0 && c.status === 'active'),
+    [visibleClients],
+  );
+
+  const monthSalesByClient = useMemo(() => {
+    const map = new Map<string, number>();
+    scopedSales.forEach((s) => {
+      if (s.date.startsWith(currentMonthKey)) {
+        map.set(s.client_id, (map.get(s.client_id) ?? 0) + s.total_sales);
+      }
+    });
+    return map;
+  }, [scopedSales, currentMonthKey]);
+
+  const weekSalesByClient = useMemo(() => {
+    const map = new Map<string, number>();
+    scopedSales.forEach((s) => {
+      if (s.date >= weekStart && s.date <= todayStr) {
+        map.set(s.client_id, (map.get(s.client_id) ?? 0) + s.total_sales);
+      }
+    });
+    return map;
+  }, [scopedSales, weekStart, todayStr]);
+
+  const goalRows = useMemo(() => {
+    const ORDER = { red: 0, yellow: 1, green: 2 };
+    return goalClients
+      .map((c) => {
+        const monthly = monthSalesByClient.get(c.id) ?? 0;
+        const weekly = weekSalesByClient.get(c.id) ?? 0;
+        const goal = c.monthly_goal ?? 0;
+        const status = getGoalStatus(monthly, goal);
+        return { client: c, monthly, weekly, goal, status };
+      })
+      .sort((a, b) => ORDER[a.status] - ORDER[b.status]);
+  }, [goalClients, monthSalesByClient, weekSalesByClient]);
+
+  const goalCountByStatus = useMemo(
+    () => ({
+      green: goalRows.filter((r) => r.status === 'green').length,
+      yellow: goalRows.filter((r) => r.status === 'yellow').length,
+      red: goalRows.filter((r) => r.status === 'red').length,
+    }),
+    [goalRows],
+  );
+
   // ── Refresh indicator ────────────────────────────────────────────────────────
   const isRefreshing = clientsLoading || kpisLoading || metricsLoading || salesLoading;
   const hasData =
@@ -640,6 +700,64 @@ export function DashboardPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* ── Seguimiento de Metas ── */}
+      {goalRows.length > 0 && (
+        <motion.div {...fadeUp(0.22)} style={{ marginBottom: 4 }}>
+          {/* Section header */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}
+          >
+            <span
+              className="number-label"
+              style={{ fontSize: '0.64rem', letterSpacing: '0.1em' }}
+            >
+              SEGUIMIENTO DE METAS — {getMonthLabel(currentMonthKey).toUpperCase()}
+            </span>
+            <span style={{ fontSize: '0.68rem', fontFamily: 'JetBrains Mono', color: 'hsl(215,15%,48%)' }}>
+              {goalCountByStatus.green > 0 && (
+                <span style={{ color: 'hsl(145,100%,55%)', marginRight: 10 }}>
+                  {goalCountByStatus.green} en objetivo
+                </span>
+              )}
+              {goalCountByStatus.yellow > 0 && (
+                <span style={{ color: 'hsl(38,100%,65%)', marginRight: 10 }}>
+                  {goalCountByStatus.yellow} en riesgo
+                </span>
+              )}
+              {goalCountByStatus.red > 0 && (
+                <span style={{ color: 'hsl(0,84%,70%)' }}>
+                  {goalCountByStatus.red} acción inmediata
+                </span>
+              )}
+            </span>
+          </div>
+
+          {/* Grid of cards */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 12,
+            }}
+          >
+            {goalRows.map(({ client, monthly, weekly, goal }) => (
+              <GoalProgressCard
+                key={client.id}
+                clientName={client.name}
+                monthlyGoal={goal}
+                currentMonthlySales={monthly}
+                currentWeeklySales={weekly}
+              />
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Charts Row ── */}
       <div className="dashboard-charts-row">

@@ -766,8 +766,8 @@ export function MetricsPage() {
         </div>
       )}
 
-      {/* ── Campaign table ── */}
-      {campaignsByCampaign.length > 0 && (
+      {/* ── Campaign table (hidden) ── */}
+      {false && campaignsByCampaign.length > 0 && (
         <div style={{ padding: '0 24px 32px' }}>
           <p className="number-label" style={{ marginBottom: 10, color: 'hsl(215,15%,36%)' }}>
             CAMPAÑAS — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}

@@ -7153,6 +7153,11 @@ select, textarea,
   color: #0f172a !important;
 }
 
+[data-theme="light"] .alerts-tab-btn.active {
+  color: #111827 !important;
+  border-bottom-color: #111827 !important;
+}
+
 /* Cards y panels */
 [data-theme="light"] .card, [data-theme="light"] .kpi-card, [data-theme="light"] .section-block,
 [data-theme="light"] .card-glass, [data-theme="light"] .period-toolbar-card,
@@ -7869,13 +7874,17 @@ select, textarea,
   border-color: var(--color-border) !important;
 }
 
-/* Cyan (#00e5ff / hsl(180,100%,50%)) text → darker cyan on white */
+/* Cyan (#00e5ff / hsl(180,100%,50%)) text → near-black in light mode */
 [data-theme="light"] [style*="color: hsl(180,100%,50%)"],
 [data-theme="light"] [style*="color: hsl(180,100%,55%)"],
 [data-theme="light"] [style*="color: hsl(180,100%,60%)"],
 [data-theme="light"] [style*="color: hsl(180,100%,65%)"],
-[data-theme="light"] [style*="color: hsl(180,100%,70%)"] {
-  color: var(--color-accent-cyan) !important;
+[data-theme="light"] [style*="color: hsl(180,100%,70%)"],
+[data-theme="light"] [style*="color: hsl(180, 100%, 50%)"],
+[data-theme="light"] [style*="color: hsl(215,80%,65%)"],
+[data-theme="light"] [style*="color: #38bdf8"],
+[data-theme="light"] [style*="color: #00e5ff"] {
+  color: #111827 !important;
 }
 
 /* Cyan borders/backgrounds stay (they're intentional accents) but

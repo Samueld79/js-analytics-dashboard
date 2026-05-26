@@ -200,16 +200,7 @@ const VENTAS_CONV_LOC_SINGLE = [
   'Destinos de mensajes',
   'Llamadas',
 ];
-const VENTAS_GOALS: Record<string, string[]> = {
-  'Sitio web': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'],
-  'Sitio web y app': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'],
-  'Sitio web y negocio': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'],
-  'Sitio web, app y negocio': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'],
-  'Sitio web y llamadas': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión'],
-  'App': ['Maximizar el número de conversiones', 'Maximizar el valor de conversión'],
-  'Destinos de mensajes': ['Maximizar el número de conversaciones', 'Maximizar el número de conversiones', 'Maximizar el número de clics en el enlace', 'Maximizar el alcance diario único'],
-  'Llamadas': ['Maximizar el número de llamadas conectadas'],
-};
+
 const VENTAS_CONV_WINDOWS = [
   '1 día después del clic',
   '7 días después del clic (recomendado)',
@@ -1272,9 +1263,24 @@ function AdSetBlock({
     : (OPTIMIZATION_GOALS[campaignObjective] ?? []);
   const showMessaging = campaignObjective === 'Mensajes';
   const isLeads = campaignObjective === 'Clientes Potenciales';
-  const ventasGoals = isVentas ? (VENTAS_GOALS[campaignSalesConversionLocation] ?? []) : [];
-  const ventasHasSitioWeb = isVentas && campaignSalesConversionLocation.startsWith('Sitio web');
-  const ventasIsMessages = isVentas && campaignSalesConversionLocation === 'Destinos de mensajes';
+
+  const loc = campaignSalesConversionLocation.trim();
+  const ventasIsMessages = isVentas && loc === 'Destinos de mensajes';
+  const ventasHasSitioWeb = isVentas && loc.startsWith('Sitio web');
+  const ventasGoals: string[] = (() => {
+    if (!isVentas) return [];
+    if (loc === 'Destinos de mensajes')
+      return ['Maximizar el número de conversaciones', 'Maximizar el número de conversiones', 'Maximizar el número de clics en el enlace', 'Maximizar el alcance diario único'];
+    if (loc === 'App')
+      return ['Maximizar el número de conversiones', 'Maximizar el valor de conversión'];
+    if (loc === 'Llamadas')
+      return ['Maximizar el número de llamadas conectadas'];
+    if (loc.startsWith('Sitio web'))
+      return loc === 'Sitio web y llamadas'
+        ? ['Maximizar el número de conversiones', 'Maximizar el valor de conversión']
+        : ['Maximizar el número de conversiones', 'Maximizar el valor de conversión', 'Ventas del catálogo'];
+    return [];
+  })();
   const displayName = adset.name.trim() || `CONJUNTO ${adsetIdx + 1}`;
 
   return (
@@ -2412,6 +2418,14 @@ function CampaignBlock({
     onChange({ ...campaign, [field]: value });
   }
 
+  function setSalesLocation(loc: string) {
+    onChange({
+      ...campaign,
+      salesConversionLocation: loc,
+      adsets: campaign.adsets.map((a) => ({ ...a, optimizationGoal: '' })),
+    });
+  }
+
   function updateAdSet(adsetIdx: number, updated: AdSetFormState) {
     onChange({
       ...campaign,
@@ -2604,7 +2618,7 @@ function CampaignBlock({
                     {VENTAS_CONV_LOC_MULTIPLE.map((loc) => {
                       const isActive = campaign.salesConversionLocation === loc;
                       return (
-                        <button key={loc} type="button" onClick={() => set('salesConversionLocation', loc)}
+                        <button key={loc} type="button" onClick={() => setSalesLocation(loc)}
                           style={{ padding: '3px 10px', borderRadius: 5, fontSize: '0.72rem', cursor: 'pointer', fontWeight: isActive ? 600 : 400, border: isActive ? '1px solid hsl(145,100%,50%)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'hsl(145 100% 50% / 0.15)' : 'transparent', color: isActive ? 'hsl(145,100%,70%)' : 'hsl(215,15%,50%)' }}>
                           {loc}
                         </button>
@@ -2622,7 +2636,7 @@ function CampaignBlock({
                     {VENTAS_CONV_LOC_SINGLE.map((loc) => {
                       const isActive = campaign.salesConversionLocation === loc;
                       return (
-                        <button key={loc} type="button" onClick={() => set('salesConversionLocation', loc)}
+                        <button key={loc} type="button" onClick={() => setSalesLocation(loc)}
                           style={{ padding: '3px 10px', borderRadius: 5, fontSize: '0.72rem', cursor: 'pointer', fontWeight: isActive ? 600 : 400, border: isActive ? '1px solid hsl(145,100%,50%)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'hsl(145 100% 50% / 0.15)' : 'transparent', color: isActive ? 'hsl(145,100%,70%)' : 'hsl(215,15%,50%)' }}>
                           {loc}
                         </button>

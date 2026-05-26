@@ -3,9 +3,17 @@ import { useAlerts } from '../hooks/useAlerts';
 import { useClients } from '../hooks/useClients';
 import { useTasks } from '../hooks/useData';
 import { useAuth } from '../hooks/useAuth';
+import { useDailySales } from '../hooks/useDailySales';
 import { createTasks } from '../services/tasks';
-import { WeeklyPerformance } from '../components/WeeklyPerformance';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import {
+  formatCOP,
+  getCurrentMonthKey,
+  getGoalPercent,
+  getGoalStatus,
+  getTodayStr,
+  getWeekStart,
+} from '../utils/goalHelpers';
 import {
   AlertTriangle,
   BarChart2,
@@ -328,6 +336,41 @@ export function AlertsPage() {
   const { alerts, dismiss, postpone, resolve, reload, loading } = useAlerts();
   const { clients } = useClients();
   const { isInternal } = useAuth();
+  // Fetch 31 days of sales to cover the current month + current week
+  const { sales: recentSales } = useDailySales({ days: 31 });
+
+  // ── Goal tracking ──────────────────────────────────────────────────────────
+  const currentMonthKey = getCurrentMonthKey();
+  const weekStart = getWeekStart();
+  const todayStr = getTodayStr();
+
+  const goalAlerts = useMemo(() => {
+    const monthMap = new Map<string, number>();
+    const weekMap = new Map<string, number>();
+    recentSales.forEach((s) => {
+      if (s.date.startsWith(currentMonthKey)) {
+        monthMap.set(s.client_id, (monthMap.get(s.client_id) ?? 0) + s.total_sales);
+      }
+      if (s.date >= weekStart && s.date <= todayStr) {
+        weekMap.set(s.client_id, (weekMap.get(s.client_id) ?? 0) + s.total_sales);
+      }
+    });
+
+    return clients
+      .filter((c) => c.status === 'active' && (c.monthly_goal ?? 0) > 0)
+      .map((c) => {
+        const monthly = monthMap.get(c.id) ?? 0;
+        const goal = c.monthly_goal ?? 0;
+        const status = getGoalStatus(monthly, goal);
+        const pct = getGoalPercent(monthly, goal);
+        return { client: c, monthly, goal, status, pct };
+      })
+      .filter((r) => r.status === 'red' || r.status === 'yellow')
+      .sort((a, b) => {
+        const order = { red: 0, yellow: 1, green: 2 };
+        return order[a.status] - order[b.status];
+      });
+  }, [clients, recentSales, currentMonthKey, weekStart, todayStr]);
 
   const [filter, setFilter] = useState<'open' | 'snoozed' | 'resolved' | 'dismissed'>('open');
   const [selectedClient, setSelectedClient] = useState('all');
@@ -335,7 +378,7 @@ export function AlertsPage() {
   const [customDates, setCustomDates] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [mobileTab, setMobileTab] = useState<'alerts' | 'rendimiento' | 'tasks'>('alerts');
+  const [mobileTab, setMobileTab] = useState<'alerts' | 'tasks'>('alerts');
   const [fabTrigger, setFabTrigger] = useState(0);
 
   // Monday weekly-report alert (once per mount per week)
@@ -473,12 +516,6 @@ export function AlertsPage() {
           Alertas {unread > 0 && <span className="alerts-tab-badge">{unread}</span>}
         </button>
         <button
-          className={`alerts-tab-btn${mobileTab === 'rendimiento' ? ' active' : ''}`}
-          onClick={() => setMobileTab('rendimiento')}
-        >
-          Rendimiento
-        </button>
-        <button
           className={`alerts-tab-btn${mobileTab === 'tasks' ? ' active' : ''}`}
           onClick={() => setMobileTab('tasks')}
         >
@@ -486,12 +523,12 @@ export function AlertsPage() {
         </button>
       </div>
 
-      {/* Three-column layout: Alertas | Rendimiento | Tareas */}
+      {/* Two-column layout: Alertas | Tareas */}
       <div
         className="alerts-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: '40% 1fr 1fr',
+          gridTemplateColumns: '55% 1fr',
           gap: 16,
           flex: 1,
           minHeight: 0,
@@ -524,6 +561,62 @@ export function AlertsPage() {
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
+
+          {/* ── Metas de Ventas ── */}
+          {goalAlerts.length > 0 && (
+            <div style={{ marginBottom: 10, flexShrink: 0 }}>
+              <p
+                className="number-label"
+                style={{ fontSize: '0.58rem', letterSpacing: '0.1em', marginBottom: 6, color: 'hsl(215,15%,40%)' }}
+              >
+                METAS DE VENTAS
+              </p>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {goalAlerts.map(({ client, monthly, goal, status, pct }) => {
+                  const isRed = status === 'red';
+                  const borderColor = isRed ? 'hsl(0,84%,60%)' : 'hsl(38,100%,55%)';
+                  const borderAlpha = isRed ? 'hsl(0 84% 60% / 0.22)' : 'hsl(38 100% 55% / 0.22)';
+                  return (
+                    <div
+                      key={client.id}
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        background: 'rgba(6,10,18,0.85)',
+                        border: `1px solid ${borderAlpha}`,
+                        borderLeft: `3px solid ${borderColor}`,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: '0 0 3px', fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.3 }}>
+                          {isRed ? '⚠️' : '📊'} {client.name}
+                        </p>
+                        <p style={{ margin: '0 0 6px', fontSize: '0.74rem', color: 'hsl(215,15%,50%)', lineHeight: 1.4 }}>
+                          {isRed
+                            ? `Lleva ${pct}% de su meta mensual (${formatCOP(monthly)} de ${formatCOP(goal)}). Requiere atención inmediata.`
+                            : `Lleva ${pct}% de su meta mensual (${formatCOP(monthly)} de ${formatCOP(goal)}). Revisar estrategia.`}
+                        </p>
+                        {/* Mini progress bar */}
+                        <div style={{ height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.08)' }}>
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${pct}%`,
+                              borderRadius: 999,
+                              background: borderColor,
+                              transition: 'width 0.6s ease',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div style={SCROLL_AREA}>
             {loading ? (
@@ -680,21 +773,7 @@ export function AlertsPage() {
           </div>
         </div>
 
-        {/* ── Col 2: Rendimiento Diario ── */}
-        <div
-          className={`rendimiento-col${mobileTab !== 'rendimiento' ? ' mobile-hidden' : ''}`}
-          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', paddingBottom: 4 }}
-        >
-          {/* Card header */}
-          <div style={{ marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-            <span style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', color: 'hsl(180,100%,50%)', fontFamily: 'JetBrains Mono' }}>
-              RENDIMIENTO DIARIO
-            </span>
-          </div>
-          <WeeklyPerformance />
-        </div>
-
-        {/* ── Col 3: Tareas de Campañas ── */}
+        {/* ── Col 2: Tareas de Campañas ── */}
         <div
           className={`tasks-col${mobileTab !== 'tasks' ? ' mobile-hidden' : ''}`}
           style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto', paddingBottom: 4 }}
