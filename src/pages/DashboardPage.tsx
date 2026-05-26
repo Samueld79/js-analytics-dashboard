@@ -52,7 +52,6 @@ import { buildClientMetaOverviewByClient } from '../services/meta';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 import { GoalProgressCard } from '../components/GoalProgressCard';
 import {
-  formatCOP,
   getCurrentMonthKey,
   getGoalStatus,
   getTodayStr,
