@@ -17,14 +17,11 @@ export function formatCOP(value: number): string {
   return `$${value.toLocaleString('es-CO')}`;
 }
 
-/** Compute the ISO date string for Monday of the current week (Monday-based). */
+/** Returns the ISO date string for 7 days ago (rolling 7-day window). */
 export function getWeekStart(): string {
-  const today = new Date();
-  const day = today.getDay(); // 0=Sun, 1=Mon, …
-  const daysToMonday = (day + 6) % 7;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - daysToMonday);
-  return monday.toISOString().slice(0, 10);
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Returns today's ISO date string (YYYY-MM-DD). */
