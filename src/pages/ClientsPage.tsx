@@ -391,9 +391,9 @@ export function ClientsPage() {
                         </div>
                       </td>
 
-                      {/* Inversión — cyan */}
+                      {/* Inversión */}
                       <td style={{ padding: '9px 14px' }}>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.76rem', color: kpi ? 'hsl(180,100%,50%)' : 'hsl(215,15%,35%)', fontWeight: 500 }}>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.76rem', color: kpi ? 'var(--color-accent-cyan)' : 'hsl(215,15%,35%)', fontWeight: 500 }}>
                           {kpi ? formatCop(kpi.spend) : '—'}
                         </span>
                       </td>

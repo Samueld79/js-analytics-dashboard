@@ -28,7 +28,7 @@ function ProgressBar({ pct, color }: ProgressBarProps) {
   return (
     <div
       style={{
-        height: 5,
+        height: 4,
         borderRadius: 999,
         background: 'rgba(255,255,255,0.08)',
         overflow: 'hidden',
@@ -66,20 +66,20 @@ export function GoalProgressCard({
 
   return (
     <div
-      className="card-glass"
+      className="card-glass goal-card"
       style={{
-        padding: '14px 16px',
+        padding: '12px 14px',
         borderLeft: `3px solid ${monthColors.bar}`,
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: 6,
       }}
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <span
           style={{
-            fontSize: '0.82rem',
+            fontSize: '0.85rem',
             fontWeight: 600,
             color: 'var(--color-text-primary)',
             overflow: 'hidden',
@@ -91,9 +91,9 @@ export function GoalProgressCard({
         </span>
         <span
           style={{
-            fontSize: '0.6rem',
+            fontSize: '0.65rem',
             fontWeight: 700,
-            padding: '2px 8px',
+            padding: '2px 6px',
             borderRadius: 999,
             background: monthColors.badge,
             color: monthColors.text,
@@ -108,11 +108,11 @@ export function GoalProgressCard({
       </div>
 
       {/* Monthly row */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <span
             style={{
-              fontSize: '0.6rem',
+              fontSize: '0.65rem',
               fontFamily: 'JetBrains Mono, monospace',
               letterSpacing: '0.08em',
               color: 'hsl(215,15%,48%)',
@@ -122,7 +122,7 @@ export function GoalProgressCard({
           </span>
           <span
             style={{
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               fontFamily: 'JetBrains Mono, monospace',
               color: 'var(--color-text-secondary)',
             }}
@@ -139,7 +139,7 @@ export function GoalProgressCard({
               fontFamily: 'JetBrains Mono, monospace',
               fontWeight: 700,
               color: STATUS_COLORS[monthStatus].text,
-              minWidth: 32,
+              minWidth: 30,
               textAlign: 'right',
             }}
           >
@@ -149,11 +149,11 @@ export function GoalProgressCard({
       </div>
 
       {/* Weekly row */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <span
             style={{
-              fontSize: '0.6rem',
+              fontSize: '0.65rem',
               fontFamily: 'JetBrains Mono, monospace',
               letterSpacing: '0.08em',
               color: 'hsl(215,15%,48%)',
@@ -163,7 +163,7 @@ export function GoalProgressCard({
           </span>
           <span
             style={{
-              fontSize: '0.7rem',
+              fontSize: '0.75rem',
               fontFamily: 'JetBrains Mono, monospace',
               color: 'var(--color-text-secondary)',
             }}
@@ -180,7 +180,7 @@ export function GoalProgressCard({
               fontFamily: 'JetBrains Mono, monospace',
               fontWeight: 700,
               color: STATUS_COLORS[weekStatus].text,
-              minWidth: 32,
+              minWidth: 30,
               textAlign: 'right',
             }}
           >

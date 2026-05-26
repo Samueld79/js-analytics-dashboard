@@ -741,8 +741,8 @@ export function DashboardPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: 12,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 8,
             }}
           >
             {goalRows.map(({ client, monthly, weekly, goal }) => (

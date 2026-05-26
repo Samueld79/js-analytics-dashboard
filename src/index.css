@@ -7964,3 +7964,45 @@ select, textarea,
 [data-theme="light"] table tbody td {
   color: #0f172a !important;
 }
+
+/* ── Goal card compact border-radius ──────────────────────── */
+.goal-card.card-glass {
+  border-radius: 8px !important;
+}
+
+/* ── Fix inversiones y valores monetarios cyan en modo claro ─ */
+[data-theme="light"] .client-spend,
+[data-theme="light"] .client-investment,
+[data-theme="light"] .spend-value,
+[data-theme="light"] .metric-value,
+[data-theme="light"] .kpi-value,
+[data-theme="light"] .investment-amount {
+  color: #111827 !important;
+}
+
+/* ── Fix tabs activos en modo claro ───────────────────────── */
+[data-theme="light"] .tab-btn {
+  color: #475569 !important;
+}
+[data-theme="light"] .tab-btn.active,
+[data-theme="light"] .tab-btn:focus,
+[data-theme="light"] button[aria-selected="true"],
+[data-theme="light"] .view-tab.active {
+  color: #111827 !important;
+  border-color: #111827 !important;
+  background: rgba(0,0,0,0.06) !important;
+}
+
+/* ── Fix texto informativo cyan (calendario, alertas) ────── */
+[data-theme="light"] .info-banner,
+[data-theme="light"] .calendar-status,
+[data-theme="light"] .connection-status,
+[data-theme="light"] [class*="status-text"],
+[data-theme="light"] [class*="info-text"] {
+  color: #374151 !important;
+}
+
+/* ── var(--color-accent-cyan) text in light mode → #111827 ── */
+[data-theme="light"] [style*="color: var(--color-accent-cyan)"] {
+  color: #111827 !important;
+}
