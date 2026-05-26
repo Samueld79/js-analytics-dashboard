@@ -325,15 +325,11 @@ export function SalesPage() {
       {/* ── Header ── */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">
-            <TrendingUp
-              size={20}
-              style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }}
-            />
-            Ventas
-          </h1>
-          <p className="number-label" style={{ marginTop: 4, letterSpacing: '0.08em' }}>
-            REGISTRO DE VENTAS DIARIAS
+          <h1 className="page-title">Ventas</h1>
+          <p className="page-subtitle">
+            Registro de ventas diarias
+            {activePeriod && activePeriod !== 'all' && activePeriod !== '' && ` · ${getMonthLabel(activePeriod)}`}
+            {activePeriod === 'all' && ' · Año completo'}
           </p>
         </div>
       </div>
@@ -613,21 +609,7 @@ export function SalesPage() {
                   title="Agregar venta"
                   onClick={() => void handleQuickAdd()}
                   disabled={!quickClientId || !quickAmount || quickAdding}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 30,
-                    height: 30,
-                    borderRadius: 6,
-                    border: 'none',
-                    cursor: 'pointer',
-                    background: 'hsl(180,100%,45%)',
-                    color: '#000',
-                    fontWeight: 700,
-                    flexShrink: 0,
-                    opacity: !quickClientId || !quickAmount || quickAdding ? 0.4 : 1,
-                  }}
+                  className="quick-add-btn"
                 >
                   <Plus size={14} />
                 </button>
@@ -661,7 +643,7 @@ export function SalesPage() {
               TENDENCIA DE VENTAS
             </span>
             {salesByMonth.length > 0 && (
-              <span style={{ fontSize: '0.68rem', color: 'hsl(180,100%,55%)', fontFamily: 'JetBrains Mono' }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--color-accent-cyan)', fontFamily: 'JetBrains Mono' }}>
                 {formatCopCompact(Math.max(...salesByMonth.map((m) => m.total)))} máx
               </span>
             )}

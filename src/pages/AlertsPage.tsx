@@ -67,7 +67,7 @@ function toCustomIso(dateKey: string): string | null {
 function severityColor(severity: AlertSeverity): string {
   if (severity === 'critical') return 'hsl(0,84%,60%)';
   if (severity === 'warning') return 'hsl(38,100%,55%)';
-  return 'hsl(180,80%,55%)';
+  return 'var(--color-accent-cyan)';
 }
 
 function AlertIcon({ type, severity }: { type: string; severity: AlertSeverity }) {
@@ -99,7 +99,7 @@ function taskDueness(task: Task): Dueness {
 function taskBorderColor(d: Dueness): string {
   if (d === 'overdue') return 'hsl(0,84%,60%)';
   if (d === 'today') return 'hsl(38,100%,55%)';
-  if (d === 'upcoming') return 'hsl(180,100%,50%)';
+  if (d === 'upcoming') return 'var(--color-accent-cyan)';
   return 'rgba(255,255,255,0.07)';
 }
 
@@ -157,7 +157,7 @@ function TaskCreateModal({
   }
 
   const PRIORITIES: Array<{ key: 'low' | 'medium' | 'high'; label: string; color: string }> = [
-    { key: 'low',    label: 'LOW',    color: 'hsl(180,100%,45%)' },
+    { key: 'low',    label: 'LOW',    color: 'var(--color-accent-cyan)' },
     { key: 'medium', label: 'MEDIUM', color: 'hsl(38,100%,55%)' },
     { key: 'high',   label: 'HIGH',   color: 'hsl(0,84%,60%)' },
   ];
@@ -174,17 +174,17 @@ function TaskCreateModal({
         style={{
           maxWidth: 440,
           background: 'var(--color-bg-secondary)',
-          border: '1px solid hsl(180 100% 50% / 0.18)',
-          boxShadow: '0 0 40px hsl(180 100% 50% / 0.06), 0 24px 80px rgba(0,0,0,0.7)',
+          border: '1px solid var(--color-border-strong)',
+          boxShadow: '0 0 40px rgba(0,0,0,0.15), 0 24px 80px rgba(0,0,0,0.7)',
         }}
       >
         {/* Header */}
         <div
           className="modal-header"
-          style={{ borderBottom: '1px solid hsl(180 100% 50% / 0.1)', background: 'hsl(180 100% 50% / 0.04)', paddingBottom: 14 }}
+          style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-card)', paddingBottom: 14 }}
         >
           <div>
-            <h2 className="modal-title" style={{ color: 'hsl(180,100%,60%)', fontSize: '1rem' }}>
+            <h2 className="modal-title" style={{ color: 'var(--color-accent-cyan)', fontSize: '1rem' }}>
               + Nueva tarea
             </h2>
             <p className="modal-subtitle" style={{ color: 'hsl(215,15%,45%)', fontSize: '0.72rem' }}>
@@ -209,7 +209,7 @@ function TaskCreateModal({
               style={{
                 padding: '8px 10px', fontSize: '0.86rem',
                 background: 'rgba(255,255,255,0.05)',
-                border: '1px solid hsl(180 100% 50% / 0.18)',
+                border: '1px solid var(--color-border-strong)',
                 borderRadius: 7, color: 'inherit', outline: 'none',
               }}
             />
@@ -226,7 +226,7 @@ function TaskCreateModal({
               style={{
                 padding: '7px 10px', fontSize: '0.84rem',
                 background: 'rgba(255,255,255,0.05)',
-                border: '1px solid hsl(180 100% 50% / 0.15)',
+                border: '1px solid var(--color-border-strong)',
                 borderRadius: 7, color: 'inherit',
               }}
             >
@@ -247,7 +247,7 @@ function TaskCreateModal({
               style={{
                 padding: '7px 10px', fontSize: '0.84rem',
                 background: 'rgba(255,255,255,0.05)',
-                border: '1px solid hsl(180 100% 50% / 0.15)',
+                border: '1px solid var(--color-border-strong)',
                 borderRadius: 7, color: 'inherit',
               }}
             />
@@ -293,7 +293,7 @@ function TaskCreateModal({
               style={{
                 padding: '7px 10px', fontSize: '0.82rem',
                 background: 'rgba(255,255,255,0.04)',
-                border: '1px solid hsl(180 100% 50% / 0.12)',
+                border: '1px solid var(--color-border)',
                 borderRadius: 7, color: 'inherit', resize: 'vertical',
                 fontFamily: 'inherit', lineHeight: 1.5,
               }}
@@ -308,7 +308,7 @@ function TaskCreateModal({
         {/* Footer */}
         <div
           className="modal-footer"
-          style={{ borderTop: '1px solid hsl(180 100% 50% / 0.1)', padding: '14px 22px' }}
+          style={{ borderTop: '1px solid var(--color-border)', padding: '14px 22px' }}
         >
           <button className="btn-ghost" onClick={onClose}>Cancelar</button>
           <button
@@ -317,7 +317,7 @@ function TaskCreateModal({
             style={{
               padding: '8px 22px', borderRadius: 7, border: 'none',
               cursor: saving ? 'not-allowed' : 'pointer',
-              background: 'hsl(180,100%,45%)', color: '#000',
+              background: 'var(--color-accent-cyan)', color: 'var(--color-accent-cyan-fg, #000)',
               fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.06em',
               fontFamily: 'JetBrains Mono, monospace',
               opacity: saving ? 0.55 : 1,
@@ -502,7 +502,7 @@ export function AlertsPage() {
       </div>
 
       {notice && (
-        <p style={{ flexShrink: 0, fontSize: '0.8rem', color: 'hsl(180,100%,50%)', marginBottom: 8, padding: '0 2px' }}>
+        <p style={{ flexShrink: 0, fontSize: '0.8rem', color: 'var(--color-text-primary)', marginBottom: 8, padding: '0 2px' }}>
           {notice}
         </p>
       )}
@@ -798,7 +798,7 @@ export function AlertsPage() {
 
 // ── Tasks panel ───────────────────────────────────────────────────────────────
 const PRIORITY_COLORS: Record<string, string> = {
-  low:    'hsl(180,100%,45%)',
+  low:    'var(--color-accent-cyan)',
   medium: 'hsl(38,100%,55%)',
   high:   'hsl(0,84%,60%)',
   urgent: 'hsl(300,84%,60%)',
@@ -936,7 +936,7 @@ function TasksPanel({
           )}
           <button
             onClick={() => { setModalOpen(true); setTaskNotice(null); }}
-            style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 6, border: '1px solid hsl(180 100% 50% / 0.3)', cursor: 'pointer', background: 'hsl(180 100% 50% / 0.08)', color: 'hsl(180,100%,55%)', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}
+            style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--color-accent-cyan) 30%, transparent)', cursor: 'pointer', background: 'color-mix(in srgb, var(--color-accent-cyan) 8%, transparent)', color: 'var(--color-accent-cyan)', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}
           >
             <Plus size={12} /> NUEVA TAREA
           </button>
@@ -953,14 +953,14 @@ function TasksPanel({
               onClick={() => setTaskTab(key)}
               style={{
                 padding: '7px 14px', border: 'none', cursor: 'pointer', background: 'transparent',
-                borderBottom: taskTab === key ? '2px solid hsl(180,100%,50%)' : '2px solid transparent',
-                color: taskTab === key ? 'hsl(180,100%,60%)' : 'hsl(215,15%,48%)',
+                borderBottom: taskTab === key ? '2px solid var(--color-accent-cyan)' : '2px solid transparent',
+                color: taskTab === key ? 'var(--color-accent-cyan)' : 'hsl(215,15%,48%)',
                 fontSize: '0.76rem', fontWeight: taskTab === key ? 700 : 400,
                 transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6,
               }}
             >
               {label}
-              <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: taskTab === key ? 'hsl(180 100% 50% / 0.15)' : 'rgba(255,255,255,0.06)', color: taskTab === key ? 'hsl(180,100%,60%)' : 'hsl(215,15%,45%)' }}>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: taskTab === key ? 'color-mix(in srgb, var(--color-accent-cyan) 15%, transparent)' : 'rgba(255,255,255,0.06)', color: taskTab === key ? 'var(--color-accent-cyan)' : 'hsl(215,15%,45%)' }}>
                 {count}
               </span>
             </button>
@@ -1015,7 +1015,7 @@ function TasksPanel({
                           value={editFields.title}
                           onChange={(e) => setEditFields((f) => ({ ...f, title: e.target.value }))}
                           placeholder="Título"
-                          style={{ padding: '6px 9px', fontSize: '0.82rem', background: 'rgba(255,255,255,0.06)', border: '1px solid hsl(180 100% 50% / 0.25)', borderRadius: 6, color: 'inherit', outline: 'none' }}
+                          style={{ padding: '6px 9px', fontSize: '0.82rem', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--color-border-strong)', borderRadius: 6, color: 'inherit', outline: 'none' }}
                         />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                           <input
@@ -1044,7 +1044,7 @@ function TasksPanel({
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button
                             onClick={() => void saveEdit(task.id)}
-                            style={{ flex: 1, padding: '6px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'hsl(180,100%,45%)', color: '#000', fontWeight: 700, fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace' }}
+                            style={{ flex: 1, padding: '6px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--color-accent-cyan)', color: 'var(--color-accent-cyan-fg, #000)', fontWeight: 700, fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace' }}
                           >
                             ✓ GUARDAR
                           </button>

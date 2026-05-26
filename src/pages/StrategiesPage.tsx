@@ -17,12 +17,12 @@ const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 const ACTIVE_STATUSES: Strategy['status'][] = ['active', 'mounted', 'reviewed', 'approved'];
 
 const STATUS_BORDER: Record<string, string> = {
-  pending: 'hsl(180,100%,50%)',  // cyan
+  pending: 'var(--color-accent-cyan)',
   active: 'hsl(145,100%,45%)',   // green
 };
 
 const OBJECTIVE_STYLE: Record<string, { background: string; color: string }> = {
-  Reconocimiento: { background: 'hsl(180 100% 50% / 0.12)', color: 'hsl(180,100%,55%)' },
+  Reconocimiento: { background: 'hsl(180 100% 50% / 0.12)', color: 'var(--color-accent-cyan)' },
   Tráfico: { background: 'hsl(215 80% 55% / 0.15)', color: 'hsl(215,80%,70%)' },
   Interacción: { background: 'hsl(280 80% 60% / 0.15)', color: 'hsl(280,80%,70%)' },
   Ventas: { background: 'hsl(145 100% 45% / 0.12)', color: 'hsl(145,100%,55%)' },
@@ -45,7 +45,7 @@ const DATE_INPUT_STYLE: React.CSSProperties = {
   padding: '4px 8px',
   fontSize: '0.76rem',
   background: 'rgba(255,255,255,0.05)',
-  border: '1px solid hsl(180 100% 50% / 0.2)',
+  border: '1px solid var(--color-border-strong)',
   borderRadius: 6,
   color: 'inherit',
   minWidth: 0,
@@ -61,7 +61,7 @@ const CAL_BTN_STYLE: React.CSSProperties = {
   border: 'none',
   cursor: 'pointer',
   background: 'hsl(180 100% 45% / 0.15)',
-  color: 'hsl(180,100%,55%)',
+  color: 'var(--color-accent-cyan)',
   flexShrink: 0,
 };
 
@@ -353,7 +353,7 @@ export function StrategiesPage() {
 
         {/* ROW 1: client + date pill + trash (hover only) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-          <span style={{ flex: 1, fontSize: '0.63rem', fontWeight: 700, color: 'hsl(180,100%,55%)', textTransform: 'uppercase', letterSpacing: '0.07em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="strategy-client-name" style={{ flex: 1 }}>
             {client?.name ?? '—'}
           </span>
           {strategy.month && (
@@ -455,9 +455,9 @@ export function StrategiesPage() {
               style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: 22, height: 22, borderRadius: 5, cursor: 'pointer',
-                border: `1px solid ${isExpanded ? 'hsl(180 100% 50% / 0.4)' : 'rgba(255,255,255,0.1)'}`,
+                border: `1px solid ${isExpanded ? 'var(--color-accent-cyan)' : 'var(--color-border)'}`,
                 background: isExpanded ? 'hsl(180 100% 45% / 0.1)' : 'transparent',
-                color: isExpanded ? 'hsl(180,100%,55%)' : 'hsl(215,15%,38%)',
+                color: isExpanded ? 'var(--color-accent-cyan)' : 'hsl(215,15%,38%)',
                 flexShrink: 0,
               }}
             >
@@ -471,7 +471,7 @@ export function StrategiesPage() {
           <div onClick={(e) => e.stopPropagation()}
             style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'grid', gap: 8 }}>
             <div>
-              <p style={{ margin: '0 0 4px', fontSize: '0.58rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CREATIVOS</p>
+              <p style={{ margin: '0 0 4px', fontSize: '0.58rem', color: 'var(--color-accent-cyan)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CREATIVOS</p>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input type="date" value={creativeDates[strategy.id] ?? ''} onChange={(e) => setCreativeDates((d) => ({ ...d, [strategy.id]: e.target.value }))} style={DATE_INPUT_STYLE} />
                 <button type="button" disabled={!creativeDates[strategy.id] || alertSaving.has(`${strategy.id}:creatives`)} onClick={() => void handleCreateOptimizeAlert(strategy, 'creatives')} style={{ ...CAL_BTN_STYLE, opacity: !creativeDates[strategy.id] ? 0.35 : 1 }}>
@@ -480,7 +480,7 @@ export function StrategiesPage() {
               </div>
             </div>
             <div>
-              <p style={{ margin: '0 0 4px', fontSize: '0.58rem', color: 'hsl(180,100%,50%)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CONJUNTOS</p>
+              <p style={{ margin: '0 0 4px', fontSize: '0.58rem', color: 'var(--color-accent-cyan)', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono' }}>📅 CONJUNTOS</p>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input type="date" value={adsetDates[strategy.id] ?? ''} onChange={(e) => setAdsetDates((d) => ({ ...d, [strategy.id]: e.target.value }))} style={DATE_INPUT_STYLE} />
                 <button type="button" disabled={!adsetDates[strategy.id] || alertSaving.has(`${strategy.id}:adsets`)} onClick={() => void handleCreateOptimizeAlert(strategy, 'adsets')} style={{ ...CAL_BTN_STYLE, opacity: !adsetDates[strategy.id] ? 0.35 : 1 }}>
@@ -681,10 +681,10 @@ export function StrategiesPage() {
                           type="button"
                           onClick={() => void handleStatusChange(s.id, 'pending')}
                           style={{
-                            padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
+                            padding: '4px 10px', borderRadius: 6, border: '1px solid var(--color-border)',
                             background: 'transparent', cursor: 'pointer',
-                            color: 'hsl(180,100%,55%)', fontSize: '0.68rem', fontWeight: 600,
-                            alignSelf: 'flex-start', opacity: 1,
+                            color: 'var(--color-accent-cyan)', fontSize: '0.68rem', fontWeight: 600,
+                            alignSelf: 'flex-start',
                           }}
                         >
                           Restaurar

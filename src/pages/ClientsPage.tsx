@@ -8,7 +8,7 @@ import {
   sumCampaignMonthAggregates,
 } from '../services/adCampaignMetrics';
 import { getMonthLabel } from '../utils/monthLabel';
-import { ExternalLink, Plus, Search, Users } from 'lucide-react';
+import { ChevronDown, ExternalLink, Plus, Search, Users } from 'lucide-react';
 import { formatCop, formatNumber } from '../lib/utils';
 
 type StatusFilter = 'all' | 'active' | 'paused';
@@ -107,7 +107,7 @@ export function ClientsPage() {
         <div>
           <h1 className="page-title">Clientes</h1>
           <p className="page-subtitle">
-            BASE OPERATIVA · {clients.length} ACTIVOS
+            Base operativa · {clients.filter(c => c.status === 'active').length} activos
           </p>
         </div>
         <button
@@ -122,61 +122,25 @@ export function ClientsPage() {
 
       {/* ── Period Selector ── */}
       {campaignByMonth.length > 0 && (
-        <div style={{ display: 'flex', gap: '6px', padding: '0 24px 0' }}>
-          {campaignByMonth.map((m) => (
-            <button
-              key={m.month}
-              onClick={() => setSelectedPeriod(m.month)}
-              style={{
-                fontFamily: 'JetBrains Mono',
-                fontSize: '0.65rem',
-                letterSpacing: '0.08em',
-                padding: '5px 12px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                border: activePeriod === m.month
-                  ? '1px solid hsl(180,100%,50%)'
-                  : '1px solid var(--color-border)',
-                background: activePeriod === m.month
-                  ? 'hsl(180 100% 50% / 0.1)'
-                  : 'transparent',
-                color: activePeriod === m.month
-                  ? 'hsl(180,100%,50%)'
-                  : 'var(--color-text-secondary)',
-              }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 24px 0', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <select
+              className="page-period-select"
+              value={activePeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
             >
-              {getMonthLabel(m.month)}
-            </button>
-          ))}
-          <button
-            onClick={() => setSelectedPeriod('all')}
-            style={{
-              fontFamily: 'JetBrains Mono',
-              fontSize: '0.65rem',
-              letterSpacing: '0.08em',
-              padding: '5px 12px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              border: activePeriod === 'all'
-                ? '1px solid hsl(180,100%,50%)'
-                : '1px solid var(--color-border)',
-              background: activePeriod === 'all'
-                ? 'hsl(180 100% 50% / 0.1)'
-                : 'transparent',
-              color: activePeriod === 'all'
-                ? 'hsl(180,100%,50%)'
-                : 'var(--color-text-secondary)',
-            }}
-          >
-            Total año
-          </button>
+              {campaignByMonth.map((m) => (
+                <option key={m.month} value={m.month}>{getMonthLabel(m.month)}</option>
+              ))}
+              <option value="all">Total año</option>
+            </select>
+            <ChevronDown size={12} style={{ position: 'absolute', right: 10, pointerEvents: 'none', color: 'var(--color-text-muted)' }} />
+          </div>
           {totalKpis && (
             <span style={{
               fontFamily: 'JetBrains Mono',
               fontSize: '0.65rem',
               color: 'var(--color-text-muted)',
-              alignSelf: 'center',
-              marginLeft: '8px',
             }}>
               {formatCop(adMetricsPeriodTotals?.spend ?? totalKpis.spend)} · {formatNumber(adMetricsPeriodTotals?.messages ?? totalKpis.messages)} conv.
             </span>
@@ -372,9 +336,6 @@ export function ClientsPage() {
                                 textDecoration: 'none',
                                 display: 'block',
                                 lineHeight: 1.2,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
                               }}
                             >
                               {client.name}
@@ -421,7 +382,7 @@ export function ClientsPage() {
                       {/* Actualizado — dot + fecha */}
                       <td style={{ padding: '9px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: lastUpdate ? 'hsl(180,100%,50%)' : 'var(--color-text-muted)', flexShrink: 0 }} />
+                          <span className={`accent-dot${lastUpdate ? '' : ' muted'}`} />
                           <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', letterSpacing: '0.04em', color: lastUpdate ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                             {updateLabel}
                           </span>
@@ -435,7 +396,7 @@ export function ClientsPage() {
                           target="_blank"
                           rel="noreferrer"
                           title="Abrir portal del cliente"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: '4px', border: '1px solid hsl(180 100% 50% / 0.3)', color: 'hsl(180,100%,60%)', textDecoration: 'none', fontFamily: 'JetBrains Mono', fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', background: 'hsl(180 100% 50% / 0.06)', whiteSpace: 'nowrap' }}
+                          className="portal-link-btn"
                         >
                           <ExternalLink size={11} /> Ver
                         </a>

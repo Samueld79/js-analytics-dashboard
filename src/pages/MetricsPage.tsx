@@ -17,7 +17,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { motion, type Transition } from 'framer-motion';
-import { BarChart3, DollarSign, MessageCircle, Percent, TrendingDown, Users } from 'lucide-react';
+import { BarChart3, ChevronDown, DollarSign, MessageCircle, Percent, TrendingDown, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaignSummary, useAdMetrics } from '../hooks/useData';
@@ -509,8 +509,8 @@ export function MetricsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Métricas Ads</h1>
-          <p className="number-label" style={{ marginTop: 4, letterSpacing: '0.08em' }}>
-            RENDIMIENTO DE CAMPAÑAS
+          <p className="page-subtitle">
+            Rendimiento de campañas
           </p>
         </div>
         {selectedClient !== 'all' && (
@@ -540,24 +540,20 @@ export function MetricsPage() {
           </span>
         )}
 
-        {/* Period selector — same pattern as Dashboard / Clientes */}
+        {/* Period selector — same dropdown as Dashboard */}
         {campaignByMonth.length > 0 && (
-          <div className="filter-row" style={{ flexWrap: 'wrap', gap: 4 }}>
-            {campaignByMonth.map((m) => (
-              <button
-                key={m.month}
-                className={`filter-chip ${activePeriod === m.month ? 'active' : ''}`}
-                onClick={() => setSelectedPeriod(m.month)}
-              >
-                {getMonthLabel(m.month)}
-              </button>
-            ))}
-            <button
-              className={`filter-chip ${activePeriod === 'all' ? 'active' : ''}`}
-              onClick={() => setSelectedPeriod('all')}
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <select
+              className="page-period-select"
+              value={activePeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
             >
-              Total año
-            </button>
+              {campaignByMonth.map((m) => (
+                <option key={m.month} value={m.month}>{getMonthLabel(m.month)}</option>
+              ))}
+              <option value="all">Total año</option>
+            </select>
+            <ChevronDown size={12} style={{ position: 'absolute', right: 10, pointerEvents: 'none', color: 'var(--color-text-muted)' }} />
           </div>
         )}
       </div>

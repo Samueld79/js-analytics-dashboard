@@ -299,16 +299,7 @@ export function CalendarPage() {
       {/* ── Info banner (replaces red error) ── */}
       {error && (
         <div style={{ padding: '0 24px 14px' }}>
-          <p style={{
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: '0.72rem',
-            color: 'hsl(180,100%,60%)',
-            padding: '10px 14px',
-            background: 'hsl(180 100% 50% / 0.07)',
-            border: '1px solid hsl(180 100% 50% / 0.18)',
-            borderRadius: '6px',
-            margin: 0,
-          }}>
+          <p className="info-banner-block">
             📅 Calendario local activo · Google Calendar desconectado
           </p>
         </div>
@@ -516,7 +507,7 @@ export function CalendarPage() {
                           animate={{ scale: 1, opacity: 1 }}
                           exit={{ scale: 0.85, opacity: 0 }}
                           transition={{ duration: 0.15 } as Transition}
-                          style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'hsl(180,100%,50%)', lineHeight: 1 }}
+                          style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-accent-cyan)', lineHeight: 1 }}
                         >
                           {String(unit.value).padStart(2, '0')}
                         </motion.div>
@@ -594,16 +585,18 @@ export function CalendarPage() {
                           {isToday_ ? (
                             <span style={{
                               fontSize: '0.6rem', fontWeight: 700, padding: '1px 7px', borderRadius: 10,
-                              background: 'hsl(180 100% 50% / 0.15)', color: 'hsl(180,100%,65%)',
+                              background: 'var(--color-info-bg)', color: 'var(--color-info-fg)',
                               fontFamily: 'JetBrains Mono, monospace',
+                              border: '1px solid hsl(200 80% 52% / 0.25)',
                             }}>
                               HOY 🎉
                             </span>
                           ) : (
                             <span style={{
                               fontSize: '0.6rem', fontWeight: 700, padding: '1px 7px', borderRadius: 10,
-                              background: 'hsl(180 100% 50% / 0.1)', color: 'hsl(180,100%,55%)',
+                              background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-secondary)',
                               fontFamily: 'JetBrains Mono, monospace',
+                              border: '1px solid var(--color-border)',
                             }}>
                               en {days} días
                             </span>
@@ -663,7 +656,7 @@ export function CalendarPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '28px', flexShrink: 0 }}>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.85rem', fontWeight: 700, color: 'hsl(180,100%,50%)', lineHeight: 1 }}>
+                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-accent-cyan)', lineHeight: 1 }}>
                         {format(new Date(event.start), 'd')}
                       </span>
                       <span className="number-label" style={{ fontSize: '0.55rem', marginTop: '2px', textTransform: 'uppercase' }}>

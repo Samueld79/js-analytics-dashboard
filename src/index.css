@@ -17,6 +17,7 @@
   --color-text-secondary:    hsl(215, 15%, 55%);
   --color-text-muted:        hsl(215, 15%, 40%);
   --color-accent-cyan:       hsl(180, 100%, 50%);
+  --color-accent-cyan-fg:    #000;
   --color-accent-purple:     hsl(280, 80%, 60%);
   --color-sidebar-bg:        hsl(220, 18%, 5%);
   --color-sidebar-active-bg: hsl(180 100% 50% / 0.1);
@@ -54,6 +55,7 @@
   --color-text-secondary:    #475569;
   --color-text-muted:        #94a3b8;
   --color-accent-cyan:       #2563eb;
+  --color-accent-cyan-fg:    #ffffff;
   --color-accent-purple:     #7c3aed;
   --color-sidebar-bg:        #ffffff;
   --color-sidebar-active-bg: rgba(37, 99, 235, 0.08);
@@ -8167,3 +8169,186 @@ select, textarea,
   transform: translateY(-1px) scale(1.005);
   box-shadow: 0 4px 28px rgba(0,0,0,0.35) !important;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   UNIFIED DESIGN SYSTEM — cross-page tokens & helpers
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Page period select — same style as dash-period-select ─── */
+.page-period-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  outline: none;
+  padding: 7px 32px 7px 12px;
+  transition: border-color 0.15s;
+}
+.page-period-select:hover,
+.page-period-select:focus { border-color: var(--color-accent-cyan); }
+[data-theme="light"] .page-period-select { background: #ffffff; border-color: #cbd5e1; color: #0f172a; }
+[data-theme="light"] .page-period-select:hover,
+[data-theme="light"] .page-period-select:focus { border-color: #2563eb; }
+
+/* ── Portal link button — cyan in dark, blue in light ───────── */
+.portal-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid hsl(180 100% 50% / 0.3);
+  color: var(--color-accent-cyan);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: hsl(180 100% 50% / 0.06);
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.portal-link-btn:hover {
+  background: hsl(180 100% 50% / 0.12);
+  border-color: hsl(180 100% 50% / 0.5);
+}
+[data-theme="light"] .portal-link-btn {
+  border-color: rgba(37,99,235,0.3);
+  color: #2563eb;
+  background: rgba(37,99,235,0.06);
+}
+[data-theme="light"] .portal-link-btn:hover {
+  background: rgba(37,99,235,0.12);
+  border-color: rgba(37,99,235,0.5);
+}
+
+/* ── Info banner (calendar, general) ───────────────────────── */
+.info-banner-block {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  padding: 10px 14px;
+  background: var(--color-info-bg);
+  border: 1px solid hsl(200 80% 52% / 0.25);
+  border-radius: 8px;
+  margin: 0;
+  color: var(--color-info-fg);
+}
+[data-theme="light"] .info-banner-block {
+  background: rgba(2,132,199,0.08);
+  border-color: rgba(2,132,199,0.2);
+  color: #0369a1;
+}
+
+/* ── Accent dot indicator ──────────────────────────────────── */
+.accent-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent-cyan);
+  flex-shrink: 0;
+}
+.accent-dot.muted { background: var(--color-text-muted); }
+
+/* ── Quick-add action button (Sales page) ─────────────────── */
+.quick-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: var(--color-accent-cyan);
+  color: var(--color-accent-cyan-fg);
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.quick-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Strategy client name ──────────────────────────────────── */
+.strategy-client-name {
+  font-size: 0.63rem;
+  font-weight: 700;
+  color: var(--color-accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-theme="light"] .strategy-client-name { color: #2563eb !important; }
+
+/* ── Task panel tab active ─────────────────────────────────── */
+.task-tab-btn {
+  padding: 7px 14px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  font-size: 0.76rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.task-tab-btn.active {
+  border-bottom: 2px solid var(--color-accent-cyan);
+  color: var(--color-accent-cyan);
+  font-weight: 700;
+}
+.task-tab-btn:not(.active) {
+  border-bottom: 2px solid transparent;
+  color: hsl(215,15%,48%);
+  font-weight: 400;
+}
+[data-theme="light"] .task-tab-btn.active {
+  border-bottom-color: #2563eb !important;
+  color: #111827 !important;
+}
+[data-theme="light"] .task-tab-btn:not(.active) { color: #64748b !important; }
+
+.task-tab-count {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+.task-tab-btn.active .task-tab-count {
+  background: hsl(180 100% 50% / 0.15);
+  color: var(--color-accent-cyan);
+}
+.task-tab-btn:not(.active) .task-tab-count {
+  background: rgba(255,255,255,0.06);
+  color: hsl(215,15%,45%);
+}
+[data-theme="light"] .task-tab-btn.active .task-tab-count { background: rgba(37,99,235,0.12); color: #1d4ed8; }
+[data-theme="light"] .task-tab-btn:not(.active) .task-tab-count { background: #f1f5f9; color: #64748b; }
+
+/* ── Light mode: accent-cyan inline text override ─────────── */
+[data-theme="light"] [style*="color: hsl(180,100%,55%)"] { color: #111827 !important; }
+[data-theme="light"] [style*="color: hsl(180, 100%, 55%)"] { color: #111827 !important; }
+[data-theme="light"] [style*="color: hsl(180,100%,45%)"] { color: #111827 !important; }
+[data-theme="light"] [style*="color: hsl(38,100%,65%)"]  { color: #92400e !important; }
+[data-theme="light"] [style*="color: hsl(38, 100%, 65%)"] { color: #92400e !important; }
+
+/* ── Light mode: notice / info text ────────────────────────── */
+[data-theme="light"] .page-notice-text { color: #2563eb !important; }
+
+/* ── Niche chip ────────────────────────────────────────────── */
+.niche-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+}
+[data-theme="light"] .niche-chip { color: #64748b !important; }
