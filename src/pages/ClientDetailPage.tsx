@@ -45,16 +45,20 @@ function formatCopFull(value: unknown): string {
 const FADE = { duration: 0.3, ease: 'easeOut' } as Transition;
 
 // Maps inferred objective label → color for Pie chart
+// All colors chosen to have good contrast on both light and dark backgrounds.
 type ObjectiveInfo = { label: string; color: string };
 function objectiveInfo(label: string | null | undefined): ObjectiveInfo {
   switch (label) {
-    case 'Reconocimiento': return { label, color: CHART.amber };
-    case 'Interacción':    return { label, color: CHART.violet };
-    case 'Tráfico':        return { label, color: CHART.cyan };
-    case 'Ventas':         return { label, color: CHART.green };
-    case 'Presentación':   return { label, color: '#38bdf8' };
-    case 'Evaluación':     return { label, color: CHART.orange };
-    default:               return { label: label || 'Otro', color: 'rgba(255,255,255,0.3)' };
+    case 'Reconocimiento':      return { label, color: CHART.amber };    // #ffab40 orange-amber
+    case 'Interacción':         return { label, color: CHART.violet };   // #7c3aed violet
+    case 'Tráfico':             return { label, color: CHART.cyan };     // #00e5ff cyan
+    case 'Ventas':              return { label, color: CHART.green };    // #00e676 green
+    case 'Presentación':        return { label, color: '#38bdf8' };      // sky blue
+    case 'Evaluación':          return { label, color: CHART.orange };   // #ff6d00 orange
+    case 'Clientes Potenciales':
+    case 'Generación de leads':
+    case 'Mensajes':            return { label, color: '#6366f1' };      // indigo — visible in both modes
+    default:                    return { label: label || 'Otro', color: '#94a3b8' }; // slate — visible in both modes
   }
 }
 

@@ -17,11 +17,25 @@ export function formatCOP(value: number): string {
   return `$${value.toLocaleString('es-CO')}`;
 }
 
-/** Returns the ISO date string for 7 days ago (rolling 7-day window). */
+/**
+ * Returns the ISO date string for the start of the "current week window"
+ * used in goal tracking.
+ *
+ * Rule: the larger of (today − 7 days) and (first day of current month).
+ * This prevents sales from the previous month from bleeding into the weekly
+ * goal at the start of a new month (e.g. June 1 would otherwise pull from
+ * May 25 if we simply used a raw 7-day lookback).
+ */
 export function getWeekStart(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 7);
-  return d.toISOString().slice(0, 10);
+  const today = new Date();
+
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(today.getDate() - 7);
+
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  const start = sevenDaysAgo > firstOfMonth ? sevenDaysAgo : firstOfMonth;
+  return start.toISOString().slice(0, 10);
 }
 
 /** Returns today's ISO date string (YYYY-MM-DD). */
