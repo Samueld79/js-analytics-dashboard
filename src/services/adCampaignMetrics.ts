@@ -228,6 +228,25 @@ function getMonthKey(date: string): string {
   return date.slice(0, 7);
 }
 
+/**
+ * Deduplicates AdCampaignMetric rows by (client_id, campaign_id, date).
+ *
+ * Root-cause guard: the DB unique key is (client_id, ad_account_id, campaign_id, date),
+ * so if the same campaign was synced with two different ad_account_id values in
+ * separate n8n runs both rows exist and all downstream sums become inflated.
+ * Keeping the first occurrence is safe because the Supabase query already orders
+ * by date DESC, spend DESC — so the highest-spend row arrives first.
+ */
+function deduplicateCampaignRows(rows: AdCampaignMetric[]): AdCampaignMetric[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = `${row.client_id}:${row.campaign_id}:${row.date}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function computeAdRoas(spend: number, purchaseValue: number): number {
   if (spend <= 0) return 0;
   return Math.round((purchaseValue / spend) * 10_000) / 10_000;
@@ -499,7 +518,7 @@ export function aggregateCampaignMetricsByCampaign(
 ): CampaignAggregateByCampaign[] {
   const grouped = new Map<string, MutableCampaignAggregate>();
 
-  rows.forEach((row) => {
+  deduplicateCampaignRows(rows).forEach((row) => {
     const key = row.campaign_id;
     const current = grouped.get(key);
     if (current) {
@@ -560,7 +579,7 @@ export function aggregateCampaignMetricsByObjective(
 ): CampaignAggregateByObjective[] {
   const grouped = new Map<string, MutableObjectiveAggregate>();
 
-  rows.forEach((row) => {
+  deduplicateCampaignRows(rows).forEach((row) => {
     const objective = inferObjectiveFromName(row.campaign_name ?? '');
     const current = grouped.get(objective);
 
@@ -608,7 +627,7 @@ export function aggregateCampaignMetricsByMonth(
 ): CampaignAggregateByMonth[] {
   const grouped = new Map<string, MutableMonthAggregate>();
 
-  rows.forEach((row) => {
+  deduplicateCampaignRows(rows).forEach((row) => {
     const month = getMonthKey(row.date);
     const current = grouped.get(month);
 
@@ -722,20 +741,21 @@ export function aggregateCampaignKpisByClient(
 export function computeCampaignPerformanceSummary(
   rows: AdCampaignMetric[],
 ): CampaignPerformanceSummary {
-  const byCampaign = aggregateCampaignMetricsByCampaign(rows);
-  const byObjective = aggregateCampaignMetricsByObjective(rows);
-  const byMonth = aggregateCampaignMetricsByMonth(rows);
+  const dedupedRows = deduplicateCampaignRows(rows);
+  const byCampaign = aggregateCampaignMetricsByCampaign(dedupedRows);
+  const byObjective = aggregateCampaignMetricsByObjective(dedupedRows);
+  const byMonth = aggregateCampaignMetricsByMonth(dedupedRows);
 
-  const spend = rows.reduce((sum, row) => sum + normalizeMoney(row.spend), 0);
-  const messages = rows.reduce((sum, row) => sum + normalizeInteger(row.messages), 0);
-  const profileVisits = rows.reduce((sum, row) => sum + normalizeInteger(row.profile_visits), 0);
-  const leads = rows.reduce((sum, row) => sum + normalizeInteger(row.leads), 0);
-  const purchases = rows.reduce((sum, row) => sum + normalizeInteger(row.purchases), 0);
-  const purchaseValue = rows.reduce((sum, row) => sum + normalizeMoney(row.purchase_value), 0);
+  const spend = dedupedRows.reduce((sum, row) => sum + normalizeMoney(row.spend), 0);
+  const messages = dedupedRows.reduce((sum, row) => sum + normalizeInteger(row.messages), 0);
+  const profileVisits = dedupedRows.reduce((sum, row) => sum + normalizeInteger(row.profile_visits), 0);
+  const leads = dedupedRows.reduce((sum, row) => sum + normalizeInteger(row.leads), 0);
+  const purchases = dedupedRows.reduce((sum, row) => sum + normalizeInteger(row.purchases), 0);
+  const purchaseValue = dedupedRows.reduce((sum, row) => sum + normalizeMoney(row.purchase_value), 0);
 
   return {
-    rowCount: rows.length,
-    campaignCount: new Set(rows.map((row) => row.campaign_id)).size,
+    rowCount: dedupedRows.length,
+    campaignCount: new Set(dedupedRows.map((row) => row.campaign_id)).size,
     spend,
     messages,
     profileVisits,
