@@ -18,23 +18,33 @@ export function formatCOP(value: number): string {
 }
 
 /**
- * Returns the ISO date string for the start of the "current week window"
- * used in goal tracking.
+ * Returns the ISO date string for the Monday of the current calendar week,
+ * clamped to the first day of the current month so we never cross months.
  *
- * Rule: the larger of (today − 7 days) and (first day of current month).
- * This prevents sales from the previous month from bleeding into the weekly
- * goal at the start of a new month (e.g. June 1 would otherwise pull from
- * May 25 if we simply used a raw 7-day lookback).
+ * Examples (week Mon–Sun):
+ *   Mon 2026-06-09 → '2026-06-09'  (today is Monday, use today)
+ *   Wed 2026-06-11 → '2026-06-09'  (Monday of this week)
+ *   Mon 2026-06-02 → '2026-06-02'  (first Monday of June)
+ *   Mon 2026-06-01 (if June starts Monday) → '2026-06-01'
+ *
+ * Clamping to the first of the month ensures that data entered on Monday
+ * for the *previous* week (e.g. catching up on Sunday's sales) is NOT
+ * counted in the current week's goal window.
  */
 export function getWeekStart(): string {
   const today = new Date();
 
-  const sevenDaysAgo = new Date(today);
-  sevenDaysAgo.setDate(today.getDate() - 7);
+  // Find the Monday of the current ISO week (getDay: 0=Sun, 1=Mon...6=Sat)
+  const dayOfWeek = today.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const thisMonday = new Date(today);
+  thisMonday.setDate(today.getDate() - daysToMonday);
+  thisMonday.setHours(0, 0, 0, 0);
 
+  // Clamp to first day of the month so the window never crosses a month boundary
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  const start = sevenDaysAgo > firstOfMonth ? sevenDaysAgo : firstOfMonth;
+  const start = thisMonday >= firstOfMonth ? thisMonday : firstOfMonth;
   return start.toISOString().slice(0, 10);
 }
 
