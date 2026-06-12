@@ -16,6 +16,7 @@ import { MetricsPage } from './pages/MetricsPage';
 import { SalesPage } from './pages/SalesPage';
 import { StrategiesPage } from './pages/StrategiesPage';
 import { CalendarPage } from './pages/CalendarPage';
+import { AIToolsPage } from './pages/ai-tools/AIToolsPage';
 import { SplashScreen } from './components/SplashScreen';
 import { WelcomeOverlay } from './components/WelcomeOverlay';
 
@@ -94,6 +95,7 @@ function AppContent() {
       <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
       <Route path="/calendar" element={<RequireInternal><CalendarPage /></RequireInternal>} />
       <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} />
+      <Route path="/ai-tools/*" element={<RequireInternal><AIToolsPage /></RequireInternal>} />
       <Route path="/settings" element={<RequireSignedIn><SettingsPage /></RequireSignedIn>} />
       <Route path="*" element={<RoleAwareFallback />} />
     </Routes>

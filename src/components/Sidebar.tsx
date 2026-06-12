@@ -19,6 +19,7 @@ import {
   X,
   Sun,
   Moon,
+  Sparkles,
 } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useAuth } from '../hooks/useAuth';
@@ -39,6 +40,7 @@ const INTERNAL_NAV: NavItem[] = [
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
   { to: '/strategies', icon: ClipboardList, label: 'Estrategias' },
   { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
+  { to: '/ai-tools', icon: Sparkles, label: 'AI Tools' },
 ];
 
 const CLIENT_NAV: NavItem[] = [
