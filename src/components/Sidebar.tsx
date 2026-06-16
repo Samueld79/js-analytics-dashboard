@@ -38,9 +38,8 @@ const INTERNAL_NAV: NavItem[] = [
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/metrics', icon: BarChart2, label: 'Métricas Ads' },
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
-  { to: '/strategies', icon: ClipboardList, label: 'Estrategias' },
   { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
-  { to: '/ai-tools', icon: Sparkles, label: 'AI Tools' },
+  { to: '/ai-tools', icon: Sparkles, label: 'Área de Trabajo' },
 ];
 
 const CLIENT_NAV: NavItem[] = [

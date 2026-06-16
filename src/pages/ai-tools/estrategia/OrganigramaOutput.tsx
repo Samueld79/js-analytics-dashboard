@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Copy, Check, Printer, BookmarkPlus, CheckCircle, Send } from 'lucide-react';
+import { Copy, Check, BookmarkPlus, CheckCircle, Send } from 'lucide-react';
 import {
   insertToolOutput,
   updateToolOutputInputs,
@@ -81,17 +81,100 @@ export function OrganigramaOutput({ output, toolKey, formSummary }: Props) {
   }, [output]);
 
   const handlePrint = useCallback(() => {
+    const dateStr = new Date().toLocaleDateString('es-CO', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    });
+
+    // Build HTML line by line, inserting page-breaks before each campaign section
+    let firstDivider = true;
+    const htmlLines = output.split('\n').map((line) => {
+      const esc = line
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      if (line.trim().startsWith('━━━')) {
+        if (firstDivider) {
+          firstDivider = false;
+          return `<div class="divider">${esc}</div>`;
+        }
+        return `<div class="page-break"></div><div class="divider">${esc}</div>`;
+      }
+      if (!line.trim()) return '<div class="empty-line"></div>';
+      return `<div>${esc}</div>`;
+    }).join('');
+
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.write(`
-      <html><head><title>Organigrama Estrategia</title>
-      <style>
-        body { font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.6;
-               background: #fff; color: #111; padding: 24px; white-space: pre-wrap; }
-        @page { margin: 20mm; }
-      </style></head>
-      <body>${output.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</body></html>
-    `);
+
+    w.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Estrategia de Ads — Growth Strategy JS</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 1.5cm;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10pt;
+      line-height: 1.55;
+      color: #000;
+      background: #fff;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .print-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1.5pt solid #333;
+      padding-bottom: 6pt;
+      margin-bottom: 14pt;
+    }
+    .print-header-brand {
+      font-weight: bold;
+      font-size: 10pt;
+      color: #000;
+    }
+    .print-header-date {
+      font-size: 8pt;
+      color: #555;
+    }
+    .print-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 7.5pt;
+      color: #888;
+      border-top: 0.5pt solid #ccc;
+      padding: 4pt 0;
+      background: #fff;
+    }
+    .page-break {
+      page-break-before: always;
+      break-before: page;
+      height: 0;
+    }
+    .empty-line { height: 5pt; }
+    .divider { color: #333; }
+  </style>
+</head>
+<body>
+  <div class="print-header">
+    <span class="print-header-brand">Growth Strategy JS</span>
+    <span class="print-header-date">${dateStr}</span>
+  </div>
+  <div class="print-footer">Documento confidencial &middot; Growth Strategy JS</div>
+  ${htmlLines}
+</body>
+</html>`);
+
     w.document.close();
     w.print();
   }, [output]);
@@ -159,7 +242,7 @@ export function OrganigramaOutput({ output, toolKey, formSummary }: Props) {
             onClick={handlePrint}
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: '0.76rem' }}
           >
-            <Printer size={13} /> Imprimir
+            📄 Exportar PDF
           </button>
           {selectedClientId && (
             <button
