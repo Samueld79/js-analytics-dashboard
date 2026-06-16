@@ -8,7 +8,6 @@ import {
   ENGAGEMENT_PUBLICOS,
   TRAFFIC_PUBLICOS,
   createEmptyAd,
-  uid,
 } from './types';
 import { AdForm } from './AdForm';
 
