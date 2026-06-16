@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Calendar, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Calendar, ChevronDown, ChevronUp, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { StrategyDetailModal } from '../components/StrategyDetailModal';
 import { StrategyFormModal } from '../components/StrategyFormModal';
 import { useAuth } from '../hooks/useAuth';
@@ -66,6 +66,7 @@ const CAL_BTN_STYLE: React.CSSProperties = {
 };
 
 export function StrategiesPage() {
+  const navigate = useNavigate();
   const { clients } = useClients();
   const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
   const visibleClients = useMemo(
@@ -510,15 +511,27 @@ export function StrategiesPage() {
         </div>
         <div className="header-actions">
           {isInternal ? (
-            <button
-              className="btn-primary"
-              onClick={() => {
-                setSelectedStrategyId(null);
-                setFormMode('create');
-              }}
-            >
-              <Plus size={16} /> Nueva Estrategia
-            </button>
+            <>
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  const clientId = selectedClient !== 'all' ? selectedClient : undefined;
+                  navigate(clientId ? `/ai-tools/estrategia?clientId=${clientId}` : '/ai-tools/estrategia');
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid var(--color-accent-cyan)', color: 'var(--color-accent-cyan)' }}
+              >
+                <Sparkles size={15} /> Crear con AI Tools
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setSelectedStrategyId(null);
+                  setFormMode('create');
+                }}
+              >
+                <Plus size={16} /> Nueva Estrategia
+              </button>
+            </>
           ) : (
             <span className="meta-chip">Solo lectura</span>
           )}

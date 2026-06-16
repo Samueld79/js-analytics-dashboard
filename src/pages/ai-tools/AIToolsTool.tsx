@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { AIToolsEstrategia } from './AIToolsEstrategia';
 import { ArrowLeft, Sparkles, Copy, Check, AlertCircle, Image, X } from 'lucide-react';
 import { getToolConfig, SYSTEM_PROMPT_AI } from './toolConfigs';
 import type { ToolField, ToolMode } from './toolConfigs';
@@ -236,6 +237,9 @@ export function AIToolsTool() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  // Estrategia has its own dedicated page component
+  if (toolKey === 'estrategia') return <AIToolsEstrategia />;
 
   if (!config) {
     return (

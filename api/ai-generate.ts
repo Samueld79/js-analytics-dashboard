@@ -1,6 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-type ImageInput = { data: string; media_type: string };
+// Accept both snake_case (legacy) and camelCase (new) image formats
+type ImageInputSnake = { data: string; media_type: string };
+type ImageInputCamel = { base64: string; mediaType: string };
+type ImageInput = ImageInputSnake | ImageInputCamel;
+
+function normalizeImage(img: ImageInput): { data: string; media_type: string } {
+  if ('base64' in img) return { data: img.base64, media_type: img.mediaType };
+  return img;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,9 +33,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const content: object[] = [];
   if (images?.length) {
     for (const img of images) {
+      const { data, media_type } = normalizeImage(img);
       content.push({
         type: 'image',
-        source: { type: 'base64', media_type: img.media_type, data: img.data },
+        source: { type: 'base64', media_type, data },
       });
     }
   }
