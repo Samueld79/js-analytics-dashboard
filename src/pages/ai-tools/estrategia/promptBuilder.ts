@@ -1,6 +1,83 @@
 import type { Campaign } from './types';
 import type { BrandKit, ToolKnowledgeBase } from '../../../services/aiToolsService';
 
+export type GeneradorForm = {
+  objetivo: string;
+  presupuesto: string;
+  contexto: string;
+  numCampanas: string;
+  extra: string;
+};
+
+export function buildGeneradorPrompt(
+  form: GeneradorForm,
+  kit: BrandKit | null,
+  knowledge: ToolKnowledgeBase | null,
+): string {
+  const kitSection = kit
+    ? `=== CLIENTE ===
+Nombre: ${kit.name}
+Colores: ${kit.colors || 'no definido'}
+Fuentes: ${kit.fonts || 'no definido'}
+Voz de marca: ${kit.voice || 'no definido'}
+Audiencias objetivo: ${kit.audiences || 'no definido'}
+Diferenciadores: ${kit.differentiators || 'no definido'}
+No hacer: ${kit.do_not || 'no definido'}`
+    : '=== CLIENTE ===\n(Sin kit de marca — usa criterio general para el mercado colombiano)';
+
+  const knowledgeSection = knowledge?.content
+    ? `\n=== CONOCIMIENTO BASE ===\n${knowledge.content}\n`
+    : '';
+
+  const presupuestoMensual = Number(form.presupuesto.replace(/\D/g, ''));
+  const presupuestoDiario = presupuestoMensual > 0
+    ? `$${Math.round(presupuestoMensual / 30).toLocaleString('es-CO')} COP/día (≈ $${presupuestoMensual.toLocaleString('es-CO')} COP/mes)`
+    : form.presupuesto;
+
+  return `${kitSection}
+${knowledgeSection}
+=== SOLICITUD ===
+Objetivo principal: ${form.objetivo}
+Presupuesto mensual disponible: $${form.presupuesto} COP → equivale a ${presupuestoDiario}
+Contexto especial: ${form.contexto}
+Número de campañas solicitadas: ${form.numCampanas}
+${form.extra ? `Indicaciones adicionales: ${form.extra}` : ''}
+
+=== INSTRUCCIONES DE OUTPUT ===
+Genera una estrategia completa de Meta Ads lista para montar. Toma TODAS las decisiones técnicas.
+
+Para CADA CAMPAÑA incluye:
+- Nombre exacto (formato: [Cliente]_[Etapa]_[MesAño])
+- Objetivo de Meta (Reconocimiento / Tráfico / Interacción / Clientes potenciales / Ventas)
+- Tipo de presupuesto: ABO o CBO con justificación de 1 línea
+- Presupuesto diario en COP (distribuyendo el total entre campañas/conjuntos)
+
+Para CADA CONJUNTO dentro de la campaña:
+- Nombre descriptivo del conjunto
+- Objetivo de rendimiento exacto de Meta Ads
+- Ubicación de conversión si aplica
+- Audiencia detallada: lugares (país + ciudades clave), edad mínima y máxima, género
+- Públicos personalizados a incluir (de: IG engagement 365d, FB engagement 365d, video views 25/50/75/95%, visitantes web 180d, lookalike 1%)
+- Exclusiones recomendadas
+- Plataformas activas (cuáles sí, cuáles no, con razón de 1 línea)
+- Presupuesto diario del conjunto en COP
+
+Para CADA ANUNCIO dentro del conjunto:
+- Formato recomendado (Video Reel / Imagen / Carrusel) con justificación
+- Ángulo de venta aplicado (TOFU/MOFU/BOFU)
+- Copy sugerido: texto principal + CTA (usar la voz de marca del kit del cliente)
+- Configuración de conversaciones: mensaje de bienvenida + 3 preguntas frecuentes sugeridas
+- Multi-anunciante: activado o desactivado con razón
+
+AL FINAL del organigrama:
+- Resumen ejecutivo: total inversión diaria, mensual, número de campañas/conjuntos/anuncios
+- KPIs objetivo con valores reales del mercado colombiano para este nicho
+- 3-5 recomendaciones accionables específicas para este cliente
+- Sección "⚠️ Para confirmar con el cliente:" con cualquier dato que no tengas completamente claro
+
+${ORGANIGRAMA_FORMAT_INSTRUCTIONS}`;
+}
+
 export function buildFormPrompt(
   campaigns: Campaign[],
   kit: BrandKit | null,

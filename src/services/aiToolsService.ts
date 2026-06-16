@@ -29,7 +29,7 @@ export type ToolOutput = {
   id: string;
   client_id: string;
   tool_key: string;
-  inputs: Record<string, string>;
+  inputs: Record<string, unknown>;
   output: string;
   created_at: string;
 };
@@ -149,6 +149,19 @@ export async function deleteToolOutput(id: string): Promise<{ error: string | nu
   if (!isSupabaseConfigured || !supabase) return { error: 'Supabase no configurado' };
   const { error } = await supabase.from('tool_outputs').delete().eq('id', id);
   if (error) return { error: getErrorMessage(error, 'No se pudo eliminar') };
+  return { error: null };
+}
+
+export async function updateToolOutputInputs(
+  id: string,
+  inputs: Record<string, unknown>,
+): Promise<{ error: string | null }> {
+  if (!isSupabaseConfigured || !supabase) return { error: 'Supabase no configurado' };
+  const { error } = await supabase
+    .from('tool_outputs')
+    .update({ inputs })
+    .eq('id', id);
+  if (error) return { error: getErrorMessage(error, 'No se pudo actualizar') };
   return { error: null };
 }
 

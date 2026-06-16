@@ -538,6 +538,39 @@ export function StrategiesPage() {
         </div>
       </div>
 
+      {/* AI Tools banner — visible solo para internos */}
+      {isInternal && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 18px', marginBottom: 4,
+          background: 'color-mix(in srgb, var(--color-accent-cyan) 6%, var(--color-bg-card))',
+          border: '1px solid color-mix(in srgb, var(--color-accent-cyan) 20%, transparent)',
+          borderRadius: 10,
+          flexWrap: 'wrap', gap: 10,
+        }}>
+          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+            ⚡ ¿Quieres crear una estrategia con IA?
+          </span>
+          <button
+            onClick={() => {
+              const clientId = selectedClient !== 'all' ? selectedClient : undefined;
+              navigate(clientId ? `/ai-tools/estrategia?clientId=${clientId}` : '/ai-tools/estrategia');
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+              borderRadius: 8, border: '1px solid var(--color-accent-cyan)',
+              background: 'transparent', color: 'var(--color-accent-cyan)',
+              fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--color-accent-cyan) 10%, transparent)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            Generar con AI Tools →
+          </button>
+        </div>
+      )}
+
       {/* Client filter pills */}
       <div className="filter-row">
         {canSelectAllClients && (
