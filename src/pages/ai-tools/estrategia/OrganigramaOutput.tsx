@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Copy, Check, BookmarkPlus, CheckCircle, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
+import { Copy, Check, BookmarkPlus, CheckCircle, Send, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
 import {
   insertToolOutput,
   updateToolOutputInputs,
@@ -732,6 +733,7 @@ type Props = {
 export function OrganigramaOutput({ output, toolKey, formSummary, mode }: Props) {
   const { selectedClientId } = useAITools();
   const parsed = useMemo(() => tryParseOrganigrama(output), [output]);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -739,7 +741,15 @@ export function OrganigramaOutput({ output, toolKey, formSummary, mode }: Props)
   const [savedId, setSavedId] = useState<string | null>(null);
   const [marked, setMarked] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3500);
+  }
 
   const handleCopy = useCallback(async () => {
     const text = parsed ? buildCopyText(parsed) : output;
@@ -748,24 +758,66 @@ export function OrganigramaOutput({ output, toolKey, formSummary, mode }: Props)
     setTimeout(() => setCopied(false), 2000);
   }, [output, parsed]);
 
-  const handlePrint = useCallback(() => {
-    const dateStr = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const html = parsed ? buildJsonPrintHtml(parsed, dateStr) : buildTextPrintHtml(output, dateStr);
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.print();
-  }, [output, parsed]);
+  const handleExportPDF = useCallback(async () => {
+    const element = contentRef.current;
+    if (!element || exportingPdf) return;
+    setExportingPdf(true);
+    const prev = { overflow: element.style.overflow, maxHeight: element.style.maxHeight };
+    element.style.overflow = 'visible';
+    element.style.maxHeight = 'none';
+    try {
+      const clientName = (parsed?.cliente ?? 'Estrategia').replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]/g, '_');
+      const fileDate = new Date().toLocaleDateString('es-CO').replace(/\//g, '-');
+      await html2pdf()
+        .set({
+          margin: [15, 15, 15, 15],
+          filename: `Estrategia_${clientName}_${fileDate}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' },
+        })
+        .from(element)
+        .save();
+    } finally {
+      element.style.overflow = prev.overflow;
+      element.style.maxHeight = prev.maxHeight;
+      setExportingPdf(false);
+    }
+  }, [parsed, exportingPdf]);
 
-  const handleSave = useCallback(async () => {
-    if (!selectedClientId || saving || saved) return;
+  const handleSaveInternal = useCallback(async (): Promise<string | null> => {
+    if (saved && savedId) return savedId;
+    if (!selectedClientId) return null;
     setSaving(true);
     const { data } = await insertToolOutput({ client_id: selectedClientId, tool_key: toolKey, inputs: formSummary, output });
-    if (data?.id) setSavedId(data.id);
+    const id = data?.id ?? null;
+    if (id) setSavedId(id);
     setSaved(true);
     setSaving(false);
-  }, [selectedClientId, saving, saved, toolKey, formSummary, output]);
+    return id;
+  }, [saved, savedId, selectedClientId, toolKey, formSummary, output]);
+
+  const handleSave = useCallback(async () => {
+    if (saving || saved) return;
+    await handleSaveInternal();
+  }, [saving, saved, handleSaveInternal]);
+
+  const handleCopyLink = useCallback(async () => {
+    if (!selectedClientId) {
+      showToast('⚠️ Selecciona un cliente para generar el enlace');
+      return;
+    }
+    const id = await handleSaveInternal();
+    if (!id) {
+      showToast('⚠️ No se pudo guardar la estrategia');
+      return;
+    }
+    const url = `${window.location.origin}/ai-tools/historial?preview=${id}`;
+    await navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2500);
+    showToast('✅ Enlace copiado — válido para quien tenga acceso a Agency OS');
+  }, [selectedClientId, handleSaveInternal]);
 
   const handleMarkForSamuel = useCallback(async () => {
     if (!savedId || marking || marked) return;
@@ -792,8 +844,26 @@ export function OrganigramaOutput({ output, toolKey, formSummary, mode }: Props)
             {copied ? <Check size={13} /> : <Copy size={13} />}
             {copied ? 'Copiado' : 'Copiar texto'}
           </button>
-          <button className="btn-ghost" onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: '0.76rem' }}>
-            📄 Exportar PDF
+          <button
+            className="btn-ghost"
+            onClick={() => void handleExportPDF()}
+            disabled={exportingPdf}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: '0.76rem', opacity: exportingPdf ? 0.6 : 1 }}
+          >
+            {exportingPdf ? (
+              <>
+                <span style={{ width: 12, height: 12, border: '1.5px solid rgba(0,0,0,0.15)', borderTop: '1.5px solid currentColor', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                Generando...
+              </>
+            ) : '📄 Exportar PDF'}
+          </button>
+          <button
+            className="btn-ghost"
+            onClick={() => void handleCopyLink()}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: '0.76rem', color: linkCopied ? '#22c55e' : undefined }}
+          >
+            {linkCopied ? <Check size={13} /> : <Link2 size={13} />}
+            {linkCopied ? 'Enlace copiado' : 'Copiar enlace'}
           </button>
           {selectedClientId && (
             <button
@@ -830,11 +900,11 @@ export function OrganigramaOutput({ output, toolKey, formSummary, mode }: Props)
 
       {/* Content */}
       {parsed ? (
-        <div style={{ maxHeight: 900, overflowY: 'auto' }}>
+        <div ref={contentRef} id="organigrama-content" style={{ maxHeight: 900, overflowY: 'auto' }}>
           <VisualOrganigrama data={parsed} mode={mode} />
         </div>
       ) : (
-        <div style={{
+        <div ref={contentRef} id="organigrama-content" style={{
           padding: '20px 24px', fontFamily: 'JetBrains Mono, monospace',
           fontSize: '0.78rem', lineHeight: 1.65, overflowX: 'auto',
           maxHeight: 700, overflowY: 'auto',
@@ -842,6 +912,23 @@ export function OrganigramaOutput({ output, toolKey, formSummary, mode }: Props)
           {output.split('\n').map((line, i) => colorizeLine(line, i))}
         </div>
       )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 28, right: 28, zIndex: 9999,
+          background: 'var(--color-bg-card)',
+          border: '1px solid color-mix(in srgb, #22c55e 60%, transparent)',
+          borderRadius: 12, padding: '12px 18px', fontSize: '0.82rem',
+          color: 'var(--color-text-primary)', boxShadow: '0 6px 24px rgba(0,0,0,0.35)',
+          display: 'flex', alignItems: 'center', gap: 8, maxWidth: 400,
+          animation: 'fadeInUp 0.2s ease',
+        }}>
+          <CheckCircle size={15} style={{ color: '#22c55e', flexShrink: 0 }} />
+          {toast}
+        </div>
+      )}
+      <style>{`@keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );
 }
