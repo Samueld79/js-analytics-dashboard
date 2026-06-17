@@ -9,6 +9,94 @@ export type GeneradorForm = {
   extra: string;
 };
 
+const JSON_OUTPUT_INSTRUCTION = `
+REGLAS OBLIGATORIAS PARA LOS COPIES:
+- PROHIBIDO usar placeholders: "Beneficio 1", "Tu producto aquí", "Resultado X", "CTA aquí"
+- Estructura de cada copy: GANCHO (primera línea que detiene el scroll: pregunta directa, dato impactante o afirmación provocadora) + DESARROLLO (1-2 líneas con la propuesta concreta, usando diferenciadores reales del kit) + CTA específico
+- El GANCHO debe nombrar el dolor o deseo real de la audiencia de ESTE cliente en específico
+- El CTA debe ser concreto según el objetivo: "Escríbenos al IG", "Agenda tu cita gratis", "Ver precio", "Pide el tuyo hoy"
+- Usa la voz de marca del kit si está definida; respeta el campo "no hacer"
+- Máximo 3 párrafos cortos + CTA. Sin asteriscos. Máximo 2 emojis por copy.
+- Cada anuncio debe tener un ángulo DIFERENTE (no copies idénticos con distinto formato)
+- Razonamiento de campaña y de plataformas: máximo 1 línea cada uno
+
+FORMATO DE SALIDA — OBLIGATORIO:
+Responde ÚNICAMENTE con un objeto JSON válido. Sin texto adicional, sin bloques markdown, sin explicaciones fuera del JSON.
+
+{
+  "cliente": "nombre del cliente",
+  "fecha": "Junio 2026",
+  "campanas": [
+    {
+      "nombre": "CLIENTE_ETAPA_Jun2026",
+      "objetivo": "Tráfico",
+      "tipoPresupuesto": "ABO",
+      "presupuesto": "$15.000 COP/día por conjunto",
+      "razonamiento": "Una sola línea: por qué este objetivo para este cliente.",
+      "conjuntos": [
+        {
+          "nombre": "Nombre descriptivo del conjunto",
+          "objetivoRendimiento": "Maximizar visitas a página de destino",
+          "ubicacionConversion": "Sitio web",
+          "presupuesto": "$15.000 COP/día",
+          "audiencia": {
+            "lugares": "Colombia · Medellín, Bogotá",
+            "edad": "25-44 años",
+            "genero": "Todos",
+            "incluir": ["IG engagement 365d", "Video views 50%"],
+            "excluir": "Compradores últimos 30 días",
+            "advantagePlus": false
+          },
+          "plataformas": {
+            "activas": ["Instagram (Feed, Reels, Stories)", "Facebook (Feed, Reels)"],
+            "excluidas": ["Audience Network", "Messenger"],
+            "razonamiento": "Una línea: por qué estas plataformas para esta audiencia."
+          },
+          "anuncios": [
+            {
+              "tipo": "nuevo",
+              "formato": "Video Reel 15s",
+              "angulo": "TOFU — Reconocimiento / Educativo",
+              "url": "",
+              "multiAnunciante": false,
+              "copy": "Copy completo con gancho real + desarrollo + CTA. Mínimo 3 líneas.",
+              "conversacion": {
+                "tipoPlantilla": "Plantilla sugerida por Meta",
+                "saludo": "Mensaje de bienvenida personalizado para ESTA marca específica",
+                "preguntas": [
+                  "Pregunta frecuente 1 relevante para este negocio",
+                  "Pregunta frecuente 2",
+                  "Pregunta frecuente 3"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "resumen": {
+    "totalDiario": "$XX.XXX COP",
+    "totalMensual": "$XXX.XXX COP (~30 días)",
+    "numCampanas": 1,
+    "numConjuntos": 2,
+    "numAnuncios": 4,
+    "kpis": [
+      "CTR esperado: X%-Y% (benchmark Colombia para este nicho)",
+      "CPM: $X.XXX-$X.XXX COP",
+      "Métrica específica del objetivo principal con valor estimado"
+    ],
+    "recomendaciones": [
+      "Recomendación accionable y específica para este cliente #1",
+      "Recomendación accionable y específica #2",
+      "Recomendación accionable y específica #3"
+    ]
+  },
+  "paraConfirmar": [
+    "Solo incluir si hay datos realmente necesarios que no tienes"
+  ]
+}`;
+
 export function buildGeneradorPrompt(
   form: GeneradorForm,
   kit: BrandKit | null,
@@ -43,39 +131,9 @@ Contexto especial: ${form.contexto}
 Número de campañas solicitadas: ${form.numCampanas}
 ${form.extra ? `Indicaciones adicionales: ${form.extra}` : ''}
 
-=== INSTRUCCIONES DE OUTPUT ===
-Genera una estrategia completa de Meta Ads lista para montar. Toma TODAS las decisiones técnicas.
-
-Para CADA CAMPAÑA incluye:
-- Nombre exacto (formato: [Cliente]_[Etapa]_[MesAño])
-- Objetivo de Meta (Reconocimiento / Tráfico / Interacción / Clientes potenciales / Ventas)
-- Tipo de presupuesto: ABO o CBO con justificación de 1 línea
-- Presupuesto diario en COP (distribuyendo el total entre campañas/conjuntos)
-
-Para CADA CONJUNTO dentro de la campaña:
-- Nombre descriptivo del conjunto
-- Objetivo de rendimiento exacto de Meta Ads
-- Ubicación de conversión si aplica
-- Audiencia detallada: lugares (país + ciudades clave), edad mínima y máxima, género
-- Públicos personalizados a incluir (de: IG engagement 365d, FB engagement 365d, video views 25/50/75/95%, visitantes web 180d, lookalike 1%)
-- Exclusiones recomendadas
-- Plataformas activas (cuáles sí, cuáles no, con razón de 1 línea)
-- Presupuesto diario del conjunto en COP
-
-Para CADA ANUNCIO dentro del conjunto:
-- Formato recomendado (Video Reel / Imagen / Carrusel) con justificación
-- Ángulo de venta aplicado (TOFU/MOFU/BOFU)
-- Copy sugerido: texto principal + CTA (usar la voz de marca del kit del cliente)
-- Configuración de conversaciones: mensaje de bienvenida + 3 preguntas frecuentes sugeridas
-- Multi-anunciante: activado o desactivado con razón
-
-AL FINAL del organigrama:
-- Resumen ejecutivo: total inversión diaria, mensual, número de campañas/conjuntos/anuncios
-- KPIs objetivo con valores reales del mercado colombiano para este nicho
-- 3-5 recomendaciones accionables específicas para este cliente
-- Sección "⚠️ Para confirmar con el cliente:" con cualquier dato que no tengas completamente claro
-
-${ORGANIGRAMA_FORMAT_INSTRUCTIONS}`;
+=== INSTRUCCIONES ===
+Eres el estratega experto de Meta Ads de Growth Strategy JS. Genera la estrategia completa lista para montar en el Administrador de Anuncios. Toma TODAS las decisiones técnicas (objetivos, presupuestos, audiencias, plataformas, copies) basándote en el kit del cliente y el mercado colombiano.
+${JSON_OUTPUT_INSTRUCTION}`;
 }
 
 export function buildFormPrompt(
@@ -119,9 +177,9 @@ export function buildFormPrompt(
           Ángulo: ${a.angulo}
           URL: ${a.url || 'N/A'}
           Multi-anunciante: ${a.multiAnunciante ? 'SÍ' : 'NO'}
-          Copy: ${a.copy || '(sin copy)'}
+          Copy: ${a.copy || '(sin copy — GENERA TÚ uno específico para este cliente usando el kit)'}
           Plantilla conversación: ${a.tipoPlantilla}${a.plantillaNombre ? ` — "${a.plantillaNombre}"` : ''}
-          Saludo: ${a.saludo || '(sin saludo)'}
+          Saludo: ${a.saludo || '(sin saludo — GENERA TÚ uno personalizado para esta marca)'}
           Pregunta 1: ${a.pregunta1 || '(vacío)'}
           Pregunta 2: ${a.pregunta2 || '(vacío)'}
           Pregunta 3: ${a.pregunta3 || '(vacío)'}`;
@@ -196,84 +254,15 @@ ${knowledgeSection}${contextSection}
 ${campaignsText}
 
 ## INSTRUCCIÓN
-Genera el organigrama completo de estrategia de Meta Ads usando EXACTAMENTE el formato de plantilla que sigue. Enriquece cada sección con razonamiento estratégico breve basado en el kit de marca del cliente y los benchmarks del mercado colombiano.
-
-Reglas de enriquecimiento:
-- En "💡 Razonamiento" de cada campaña: 1-2 oraciones explicando por qué el objetivo es correcto para este cliente
-- En "💡" de plataformas de cada conjunto: 1 oración justificando las inclusiones/exclusiones
-- En "Recomendaciones" del resumen: 3-5 insights accionables y específicos para este cliente y nicho
-- En "KPIs objetivo": usa benchmarks reales del mercado colombiano para este objetivo/nicho
-
-FORMATO DE SALIDA EXACTO:
-
-┌─────────────────────────────────────────────────────────────┐
-│  ⚡ ESTRATEGIA: [cliente] · [mes año actual]                 │
-│  Generado por Growth Strategy JS                            │
-└─────────────────────────────────────────────────────────────┘
-[una línea en blanco]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 CAMPAÑA [N]: [nombre]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 Objetivo Meta:        [objetivo]
-💰 Tipo presupuesto:     [ABO o CBO con monto]
-💡 Razonamiento:         [1-2 oraciones estratégicas]
-[una línea en blanco]
-  ┌──────────────────────────────────────────────────┐
-  │ 📦 CONJUNTO [N]: [nombre]                        │
-  ├──────────────────────────────────────────────────┤
-  │ 🎯 Rendimiento:    [objetivo]                    │
-  │ 📍 Conversión:     [ubicacion o N/A]             │
-  │ 💰 Presupuesto:    [monto o heredado de CBO]     │
-  │                                                  │
-  │ 👥 AUDIENCIA                                     │
-  │  ├─ Lugares:       [lugares]                     │
-  │  ├─ Edad:          [rango]                       │
-  │  ├─ Género:        [genero]                      │
-  │  ├─ Incluir:       [lista o ninguno]             │
-  │  ├─ Excluir:       [lista o ninguno]             │
-  │  └─ Fuera config:  [SÍ / NO]                    │
-  │                                                  │
-  │ 📱 PLATAFORMAS                                   │
-  │  ├─ ✅ [plataformas activas una por línea]       │
-  │  ├─ ❌ [plataformas excluidas una por línea]     │
-  │  └─ 💡 [razonamiento 1 oración]                 │
-  │                                                  │
-  │ 🎨 ANUNCIO [N]                                   │
-  │  ├─ Tipo:          [tipo] · [ángulo]             │
-  │  ├─ URL:           [url o N/A]                   │
-  │  ├─ Multi-anunc:   [SÍ / NO]                    │
-  │  ├─ Copy:          [copy completo]               │
-  │  └─ Conversación:                                │
-  │     • Saludo: [texto]                            │
-  │     • P1: [pregunta]                             │
-  │     • P2: [pregunta]                             │
-  │     • P3: [pregunta]                             │
-  └──────────────────────────────────────────────────┘
-[repetir para cada conjunto y campaña]
-[una línea en blanco]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 RESUMEN EJECUTIVO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total inversión diaria:   $X.XXX COP
-Total inversión mensual:  $X.XXX.XXX COP (~30 días)
-Número de campañas:       X
-Número de conjuntos:      X
-Número de anuncios:       X
-KPIs objetivo:
-  • [KPI específico con valor benchmark Colombia]
-  • [otro KPI con valor]
-  • [otro KPI con valor]
-Recomendaciones:
-  1. [insight accionable específico]
-  2. [insight accionable específico]
-  3. [insight accionable específico]`;
+Enriquece esta estructura con razonamiento estratégico real. Mantén exactamente la misma cantidad de campañas/conjuntos/anuncios. Para copies vacíos, genera copies específicos con el kit del cliente. Para saludos vacíos, genera mensajes personalizados.
+${JSON_OUTPUT_INSTRUCTION}`;
 }
 
 const IMAGE_SYSTEM_PREFIX = `Eres un estratega experto de Meta Ads para el mercado colombiano, trabajando para la agencia Growth Strategy JS.`;
 
 export function buildImagePrompt(contextNote: string, kit: BrandKit | null): string {
   const kitSection = kit
-    ? `\nCLIENTE: ${kit.name}\nVoz: ${kit.voice || 'no definida'}\nAudiencias: ${kit.audiences || 'no definidas'}`
+    ? `\nCLIENTE: ${kit.name}\nVoz: ${kit.voice || 'no definida'}\nDiferenciadores: ${kit.differentiators || 'no definidos'}\nAudiencias: ${kit.audiences || 'no definidas'}`
     : '';
 
   return `${IMAGE_SYSTEM_PREFIX}${kitSection}
@@ -282,14 +271,12 @@ Analiza la imagen adjunta (mapa mental, pizarrón o captura de estrategia de Met
 
 Instrucciones:
 1. Extrae TODA la información visible: campañas, objetivos, conjuntos, anuncios, audiencias, presupuestos, plataformas
-2. Interpreta texto parcialmente legible usando el contexto de Meta Ads colombiano
-3. Estructura la información en el organigrama estándar con el mismo formato de plantilla
-4. Enriquece con razonamiento estratégico donde sea útil
-5. Al final agrega:
-   ⚠️ Información faltante: [lista de campos obligatorios que no pudiste determinar]
+2. Interpreta texto parcialmente legible usando contexto de Meta Ads colombiano
+3. Para copies: si el kit tiene datos del cliente, genera copies específicos para esa marca; nunca uses placeholders
+4. Completa con criterio estratégico lo que la imagen no muestre claramente
 
 ${contextNote ? `CONTEXTO DEL USUARIO: ${contextNote}\n` : ''}
-${ORGANIGRAMA_FORMAT_INSTRUCTIONS}`;
+${JSON_OUTPUT_INSTRUCTION}`;
 }
 
 export function buildTranscriptPrompt(
@@ -298,7 +285,7 @@ export function buildTranscriptPrompt(
   knowledge: ToolKnowledgeBase | null,
 ): string {
   const kitSection = kit
-    ? `CLIENTE: ${kit.name} — Voz: ${kit.voice || 'N/D'} — Audiencias: ${kit.audiences || 'N/D'}`
+    ? `CLIENTE: ${kit.name} — Voz: ${kit.voice || 'N/D'} — Diferenciadores: ${kit.differentiators || 'N/D'} — Audiencias: ${kit.audiences || 'N/D'}`
     : 'CLIENTE: Sin kit de marca';
 
   const knowledgeSection = knowledge?.content
@@ -314,66 +301,9 @@ ${transcripcion}
 
 Instrucciones:
 1. Interpreta el lenguaje natural y extrae la estructura de campaña Meta Ads
-2. Asigna valores a: objetivo, tipo de presupuesto, conjuntos, anuncios, audiencias, plataformas
-3. Estructura en el organigrama estándar con razonamiento estratégico
-4. Al final agrega:
-   ⚠️ Información faltante: [lo obligatorio que no se mencionó]
-   ❓ Por confirmar: [ambigüedades detectadas]
+2. Asigna valores a todos los campos: objetivo, presupuesto, conjuntos, anuncios, audiencias, plataformas
+3. Para copies vacíos o incompletos: genera copies específicos con el kit del cliente (nunca placeholders)
+4. Agrega razonamiento estratégico conciso donde sea útil
 
-${ORGANIGRAMA_FORMAT_INSTRUCTIONS}`;
+${JSON_OUTPUT_INSTRUCTION}`;
 }
-
-const ORGANIGRAMA_FORMAT_INSTRUCTIONS = `FORMATO DE SALIDA EXACTO (usa este template):
-
-┌─────────────────────────────────────────────────────────────┐
-│  ⚡ ESTRATEGIA: [cliente] · [mes año]                        │
-│  Generado por Growth Strategy JS                            │
-└─────────────────────────────────────────────────────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 CAMPAÑA [N]: [nombre]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 Objetivo Meta:        [objetivo]
-💰 Tipo presupuesto:     [ABO o CBO con monto]
-💡 Razonamiento:         [razonamiento estratégico]
-
-  ┌──────────────────────────────────────────────────┐
-  │ 📦 CONJUNTO [N]: [nombre]                        │
-  ├──────────────────────────────────────────────────┤
-  │ 🎯 Rendimiento:    [objetivo rendimiento]        │
-  │ 📍 Conversión:     [ubicacion]                   │
-  │ 💰 Presupuesto:    [monto COP/día]               │
-  │ 👥 AUDIENCIA                                     │
-  │  ├─ Lugares:       [...]                         │
-  │  ├─ Edad:          [...]                         │
-  │  ├─ Género:        [...]                         │
-  │  ├─ Incluir:       [...]                         │
-  │  ├─ Excluir:       [...]                         │
-  │  └─ Fuera config:  [SÍ/NO]                      │
-  │ 📱 PLATAFORMAS                                   │
-  │  ├─ ✅ [activas]                                 │
-  │  ├─ ❌ [excluidas]                               │
-  │  └─ 💡 [razonamiento]                           │
-  │ 🎨 ANUNCIO [N]                                   │
-  │  ├─ Tipo:    [tipo] · [ángulo]                   │
-  │  ├─ URL:     [url o N/A]                         │
-  │  ├─ Multi:   [SÍ/NO]                             │
-  │  ├─ Copy:    [texto]                             │
-  │  └─ Conversación:                                │
-  │     • Saludo: [texto]                            │
-  │     • P1: [...]  P2: [...]  P3: [...]            │
-  └──────────────────────────────────────────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 RESUMEN EJECUTIVO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total inversión diaria:   $X.XXX COP
-Total inversión mensual:  $X.XXX.XXX COP
-Número de campañas:       X | Conjuntos: X | Anuncios: X
-KPIs objetivo:
-  • [KPI con valor benchmark Colombia]
-  • [KPI con valor]
-Recomendaciones:
-  1. [insight accionable]
-  2. [insight accionable]
-  3. [insight accionable]`;
