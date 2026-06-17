@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Sparkles, AlertCircle, Image, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Sparkles, AlertCircle, Image, X, ChevronDown } from 'lucide-react';
 import { useAITools } from '../../hooks/useAIToolsContext';
 import { callAI, getToolKnowledgeBase, type ToolKnowledgeBase } from '../../services/aiToolsService';
 import { SYSTEM_PROMPT_AI } from './toolConfigs';
@@ -29,15 +29,6 @@ const MODES: { key: Mode; label: string; primary?: boolean }[] = [
   { key: 'formulario', label: '📋 Formulario detallado' },
   { key: 'imagen', label: '🖼️ Desde imagen' },
   { key: 'transcripcion', label: '🎙️ Desde transcripción' },
-];
-
-const LOADING_MESSAGES = [
-  'Analizando el Kit de Marca...',
-  'Definiendo audiencias objetivo...',
-  'Construyendo la estructura de campañas...',
-  'Redactando el copy de anuncios...',
-  'Calculando presupuestos y KPIs...',
-  'Finalizando el organigrama...',
 ];
 
 const GENERADOR_SYSTEM = `Eres el estratega experto de Meta Ads de la agencia Growth Strategy JS para el mercado colombiano. Tu tarea es generar una estrategia completa de Meta Ads lista para montar. Debes tomar TODAS las decisiones técnicas — el usuario no debe llenar nada más. Respondes siempre en español colombiano.`;
@@ -90,6 +81,26 @@ const EMPTY_GENERADOR: GeneradorForm = {
   extra: '',
 };
 
+function QuestionCard({ number, children }: { number: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <div style={{
+        fontSize: '1.4rem', fontWeight: 900, color: 'var(--color-accent-cyan)',
+        fontFamily: 'Outfit, sans-serif', minWidth: 38, paddingTop: 1,
+        opacity: 0.55, letterSpacing: '-0.03em', lineHeight: 1,
+      }}>
+        {number}
+      </div>
+      <div style={{ flex: 1 }}>{children}</div>
+    </div>
+  );
+}
+
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
 function GeneradorTab({
   form,
   onChange,
@@ -105,23 +116,42 @@ function GeneradorTab({
     onChange({ ...form, [field]: value });
   }
 
+  const budgetFormatted = form.presupuesto
+    ? `$${Number(form.presupuesto).toLocaleString('es-CO')} COP/mes`
+    : null;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
       <div style={{
         background: 'color-mix(in srgb, var(--color-accent-cyan) 6%, var(--color-bg-card))',
         border: '1px solid color-mix(in srgb, var(--color-accent-cyan) 25%, transparent)',
         borderRadius: 12,
         padding: '16px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        flexWrap: 'wrap',
+        gap: 10,
       }}>
-        <p style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text-primary)', margin: '0 0 4px' }}>
-          ✨ Generador Automático
-        </p>
-        <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
-          Claude construye la estrategia completa basándose en
-          el Kit de Marca{kitName ? ` de ${kitName}` : ' del cliente seleccionado'}.
-          Solo responde 4 preguntas.
-        </p>
+        <div>
+          <p style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text-primary)', margin: '0 0 4px' }}>
+            ✨ Generador Automático
+          </p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
+            Claude construye la estrategia completa basándose en
+            el Kit de Marca{kitName ? ` de ${kitName}` : ' del cliente seleccionado'}.
+            Solo responde 4 preguntas.
+          </p>
+        </div>
+        <span style={{
+          fontSize: '0.6rem', padding: '3px 9px', borderRadius: 20,
+          background: 'color-mix(in srgb, var(--color-accent-cyan) 10%, transparent)',
+          color: 'var(--color-text-muted)', border: '1px solid var(--color-border)',
+          whiteSpace: 'nowrap', alignSelf: 'flex-start', flexShrink: 0,
+        }}>
+          Powered by Claude Sonnet
+        </span>
       </div>
 
       {!hasClient && (
@@ -135,8 +165,8 @@ function GeneradorTab({
         </div>
       )}
 
-      {/* Pregunta 1 */}
-      <div>
+      {/* Pregunta 01 */}
+      <QuestionCard number="01">
         <label style={S.label}>¿Qué quieres lograr este mes? <span style={{ color: '#ef4444' }}>*</span></label>
         <select
           className="form-select"
@@ -146,10 +176,10 @@ function GeneradorTab({
           <option value="">Seleccionar objetivo...</option>
           {OBJETIVO_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
-      </div>
+      </QuestionCard>
 
-      {/* Pregunta 2 */}
-      <div>
+      {/* Pregunta 02 */}
+      <QuestionCard number="02">
         <label style={S.label}>¿Cuánto presupuesto tiene disponible este mes? (COP) <span style={{ color: '#ef4444' }}>*</span></label>
         <input
           className="form-input"
@@ -159,11 +189,17 @@ function GeneradorTab({
           value={form.presupuesto}
           onChange={(e) => set('presupuesto', e.target.value)}
         />
-        <p style={S.hint}>Claude distribuirá este presupuesto entre las campañas automáticamente</p>
-      </div>
+        {budgetFormatted ? (
+          <p style={{ ...S.hint, color: 'var(--color-accent-cyan)', fontWeight: 600 }}>
+            {budgetFormatted} · Claude distribuirá entre las campañas
+          </p>
+        ) : (
+          <p style={S.hint}>Claude distribuirá este presupuesto entre las campañas automáticamente</p>
+        )}
+      </QuestionCard>
 
-      {/* Pregunta 3 */}
-      <div>
+      {/* Pregunta 03 */}
+      <QuestionCard number="03">
         <label style={S.label}>¿Hay algo especial este mes?</label>
         <select
           className="form-select"
@@ -172,10 +208,10 @@ function GeneradorTab({
         >
           {CONTEXTO_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
-      </div>
+      </QuestionCard>
 
-      {/* Pregunta 4 */}
-      <div>
+      {/* Pregunta 04 */}
+      <QuestionCard number="04">
         <label style={S.label}>¿Cuántas campañas necesitas? <span style={{ color: '#ef4444' }}>*</span></label>
         <select
           className="form-select"
@@ -184,17 +220,19 @@ function GeneradorTab({
         >
           {NUM_CAMPANAS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
-      </div>
+      </QuestionCard>
 
-      {/* Extra opcional */}
-      <div>
+      {/* Extra opcional (sin número) */}
+      <div style={{ paddingLeft: 54 }}>
         <label style={S.label}>¿Algo más que Claude deba saber? (opcional)</label>
         <textarea
           className="form-textarea"
-          rows={3}
+          rows={2}
           placeholder="Ej: Esta semana hay descuento del 20%, enfocarse en lentes de contacto, evitar Bogotá este mes..."
           value={form.extra}
           onChange={(e) => set('extra', e.target.value)}
+          onInput={(e) => autoResize(e.currentTarget)}
+          style={{ resize: 'none', overflow: 'hidden' }}
         />
       </div>
     </div>
@@ -212,11 +250,16 @@ function CampaignBlock({
   onRemove: () => void;
   canRemove: boolean;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   function updateAdSet<K extends keyof AdSet>(setId: string, field: K, value: AdSet[K]) {
     onChange('conjuntos', campaign.conjuntos.map((s) => (s.id === setId ? { ...s, [field]: value } : s)));
   }
   function addAdSet() { onChange('conjuntos', [...campaign.conjuntos, createEmptyAdSet()]); }
   function removeAdSet(setId: string) { onChange('conjuntos', campaign.conjuntos.filter((s) => s.id !== setId)); }
+
+  const totalAds = campaign.conjuntos.reduce((n, s) => n + s.anuncios.length, 0);
+  const summary = `${campaign.objetivo} · ${campaign.conjuntos.length} conjunto${campaign.conjuntos.length !== 1 ? 's' : ''} · ${totalAds} anuncio${totalAds !== 1 ? 's' : ''}`;
 
   return (
     <div style={{ border: '2px solid var(--color-border)', borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
@@ -224,7 +267,7 @@ function CampaignBlock({
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '12px 18px',
         background: 'color-mix(in srgb, var(--color-accent-cyan) 10%, var(--color-bg-secondary))',
-        borderBottom: '2px solid var(--color-border)',
+        borderBottom: collapsed ? 'none' : '2px solid var(--color-border)',
       }}>
         <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
           📋 Campaña {index + 1}
@@ -234,67 +277,83 @@ function CampaignBlock({
             </span>
           )}
         </span>
-        {canRemove && (
-          <button className="btn-ghost" onClick={onRemove} style={{ color: '#ef4444', padding: '4px 8px' }}>
-            <Trash2 size={14} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {collapsed && campaign.objetivo && (
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginRight: 4 }}>
+              {summary}
+            </span>
+          )}
+          <button className="btn-ghost" onClick={() => setCollapsed((c) => !c)}
+            style={{ padding: '4px 8px', display: 'flex', alignItems: 'center' }}>
+            <ChevronDown size={14} style={{
+              transform: collapsed ? 'rotate(-90deg)' : 'none',
+              transition: 'transform 0.2s',
+            }} />
           </button>
-        )}
-      </div>
-
-      <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <label style={S.label}>Nombre de la campaña <span style={{ color: '#ef4444' }}>*</span></label>
-          <input className="form-input" type="text" placeholder="Ej: OpticaPL_TOFU_Junio2026"
-            value={campaign.nombre} onChange={(e) => onChange('nombre', e.target.value)} />
-        </div>
-        <div style={S.row2}>
-          <div>
-            <label style={S.label}>Objetivo de campaña <span style={{ color: '#ef4444' }}>*</span></label>
-            <select className="form-select" value={campaign.objetivo}
-              onChange={(e) => onChange('objetivo', e.target.value as Campaign['objetivo'])}>
-              {CAMPAIGN_OBJECTIVES.map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={S.label}>Tipo de presupuesto</label>
-            <div style={{ display: 'flex', gap: 16, paddingTop: 6 }}>
-              {(['ABO', 'CBO'] as const).map((v) => (
-                <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
-                  <input type="radio" checked={campaign.tipoPresupuesto === v} onChange={() => onChange('tipoPresupuesto', v)} />
-                  <span><strong>{v}</strong> — {v === 'ABO' ? 'Por conjunto' : 'Advantage+'}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div style={{ maxWidth: 240 }}>
-          <label style={S.label}>
-            {campaign.tipoPresupuesto === 'CBO' ? 'Presupuesto de campaña (COP/día)' : 'Presupuesto por conjunto (COP/día)'}
-          </label>
-          {campaign.tipoPresupuesto === 'CBO' ? (
-            <input className="form-input" type="number" min={0} placeholder="Ej: 50000"
-              value={campaign.presupuesto || ''} onChange={(e) => onChange('presupuesto', Number(e.target.value))} />
-          ) : (
-            <p style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)', padding: '8px 0' }}>
-              Configura el presupuesto en cada conjunto abajo
-            </p>
+          {canRemove && (
+            <button className="btn-ghost" onClick={onRemove} style={{ color: '#ef4444', padding: '4px 8px' }}>
+              <Trash2 size={14} />
+            </button>
           )}
         </div>
-        <div>
-          <p style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
-            Conjuntos de anuncios
-          </p>
-          {campaign.conjuntos.map((s, si) => (
-            <AdSetForm key={s.id} adset={s} index={si} campaignObjective={campaign.objetivo} budgetType={campaign.tipoPresupuesto}
-              onChange={(field, value) => updateAdSet(s.id, field, value)}
-              onRemove={() => removeAdSet(s.id)} canRemove={campaign.conjuntos.length > 1} />
-          ))}
-          <button className="btn-ghost" onClick={addAdSet}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: '0.8rem' }}>
-            <Plus size={14} /> Agregar conjunto
-          </button>
-        </div>
       </div>
+
+      {!collapsed && (
+        <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={S.label}>Nombre de la campaña <span style={{ color: '#ef4444' }}>*</span></label>
+            <input className="form-input" type="text" placeholder="Ej: OpticaPL_TOFU_Junio2026"
+              value={campaign.nombre} onChange={(e) => onChange('nombre', e.target.value)} />
+          </div>
+          <div style={S.row2}>
+            <div>
+              <label style={S.label}>Objetivo de campaña <span style={{ color: '#ef4444' }}>*</span></label>
+              <select className="form-select" value={campaign.objetivo}
+                onChange={(e) => onChange('objetivo', e.target.value as Campaign['objetivo'])}>
+                {CAMPAIGN_OBJECTIVES.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={S.label}>Tipo de presupuesto</label>
+              <div style={{ display: 'flex', gap: 16, paddingTop: 6 }}>
+                {(['ABO', 'CBO'] as const).map((v) => (
+                  <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+                    <input type="radio" checked={campaign.tipoPresupuesto === v} onChange={() => onChange('tipoPresupuesto', v)} />
+                    <span><strong>{v}</strong> — {v === 'ABO' ? 'Por conjunto' : 'Advantage+'}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div style={{ maxWidth: 240 }}>
+            <label style={S.label}>
+              {campaign.tipoPresupuesto === 'CBO' ? 'Presupuesto de campaña (COP/día)' : 'Presupuesto por conjunto (COP/día)'}
+            </label>
+            {campaign.tipoPresupuesto === 'CBO' ? (
+              <input className="form-input" type="number" min={0} placeholder="Ej: 50000"
+                value={campaign.presupuesto || ''} onChange={(e) => onChange('presupuesto', Number(e.target.value))} />
+            ) : (
+              <p style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)', padding: '8px 0' }}>
+                Configura el presupuesto en cada conjunto abajo
+              </p>
+            )}
+          </div>
+          <div>
+            <p style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+              Conjuntos de anuncios
+            </p>
+            {campaign.conjuntos.map((s, si) => (
+              <AdSetForm key={s.id} adset={s} index={si} campaignObjective={campaign.objetivo} budgetType={campaign.tipoPresupuesto}
+                onChange={(field, value) => updateAdSet(s.id, field, value)}
+                onRemove={() => removeAdSet(s.id)} canRemove={campaign.conjuntos.length > 1} />
+            ))}
+            <button className="btn-ghost" onClick={addAdSet}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: '0.8rem' }}>
+              <Plus size={14} /> Agregar conjunto
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -325,23 +384,36 @@ export function AIToolsEstrategia() {
 
   // Shared state
   const [loading, setLoading] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
+  const [loadingMsg, setLoadingMsg] = useState('');
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
+  const loadingMessages = useMemo(() => {
+    const name = kit?.name ?? 'el cliente';
+    return [
+      `Analizando el Kit de Marca de ${name}...`,
+      'Definiendo audiencias objetivo...',
+      'Construyendo la estructura de campañas...',
+      `Redactando copies para ${name}...`,
+      'Calculando presupuestos y KPIs...',
+      'Finalizando el organigrama completo...',
+    ];
+  }, [kit?.name]);
+
   // Cycle loading messages
   useEffect(() => {
-    if (!loading) { setLoadingMsg(LOADING_MESSAGES[0]); return; }
+    if (!loading) { setLoadingMsg(loadingMessages[0]); return; }
     let i = 0;
+    setLoadingMsg(loadingMessages[0]);
     const interval = setInterval(() => {
-      i = (i + 1) % LOADING_MESSAGES.length;
-      setLoadingMsg(LOADING_MESSAGES[i]);
+      i = (i + 1) % loadingMessages.length;
+      setLoadingMsg(loadingMessages[i]);
     }, 2500);
     return () => clearInterval(interval);
-  }, [loading]);
+  }, [loading, loadingMessages]);
 
-  // Read ?clientId= URL param (when coming from StrategiesPage)
+  // Read ?clientId= URL param
   useEffect(() => {
     const clientId = searchParams.get('clientId');
     if (clientId && clients.some((c) => c.id === clientId)) {
@@ -500,6 +572,20 @@ export function AIToolsEstrategia() {
       {/* ─── MODO FORMULARIO ─── */}
       {mode === 'formulario' && (
         <>
+          <div style={{
+            padding: '14px 18px', borderRadius: 10,
+            background: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border)',
+            fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.6,
+          }}>
+            <strong style={{ color: 'var(--color-text-primary)' }}>Modo Formulario</strong>
+            {' '}— Llena la estructura de la campaña que vas a montar. Los copies vacíos serán generados por Claude con el Kit de Marca del cliente.
+            <br />
+            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+              Convención de nombres: <code style={{ background: 'var(--color-bg-secondary)', padding: '1px 5px', borderRadius: 4 }}>ClienteAbrev_Etapa_MesAño</code>
+              {' '}para campañas · <code style={{ background: 'var(--color-bg-secondary)', padding: '1px 5px', borderRadius: 4 }}>Etapa_Ciudad_GeneroEdad</code> para conjuntos
+            </span>
+          </div>
           {campaigns.map((c, ci) => (
             <CampaignBlock key={c.id} campaign={c} index={ci}
               onChange={(field, value) => updateCampaign(c.id, field, value)}
@@ -520,19 +606,41 @@ export function AIToolsEstrategia() {
 
       {/* ─── MODO IMAGEN ─── */}
       {mode === 'imagen' && (
-        <div style={{ ...S.sectionCard, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{
+            padding: '16px 20px', borderRadius: 12,
+            background: 'color-mix(in srgb, #8b5cf6 6%, var(--color-bg-card))',
+            border: '1px solid color-mix(in srgb, #8b5cf6 25%, transparent)',
+          }}>
+            <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: '0 0 4px', color: 'var(--color-text-primary)' }}>
+              🖼️ Estrategia desde imagen
+            </p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              Sube una foto del pizarrón, mapa mental o captura de pantalla con la estrategia.
+              Claude extrae la estructura completa y genera los copies con el Kit de Marca del cliente.
+            </p>
+          </div>
+
+          <div style={S.sectionCard}>
             <label style={S.label}>Imagen del mapa mental o pizarrón <span style={{ color: '#ef4444' }}>*</span></label>
             {!imagePreview ? (
               <button type="button" onClick={() => fileInputRef.current?.click()} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                width: '100%', padding: '36px 16px', border: '2px dashed var(--color-border-strong)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
+                width: '100%', padding: '48px 16px', border: '2px dashed var(--color-border-strong)',
                 borderRadius: 10, background: 'transparent', cursor: 'pointer',
-                color: 'var(--color-text-muted)', fontSize: '0.82rem', transition: 'border-color 0.15s',
+                color: 'var(--color-text-muted)', fontSize: '0.82rem', transition: 'border-color 0.15s, background 0.15s',
               }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent-cyan)')}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border-strong)')}>
-                <Image size={20} /> Haz clic para subir la imagen (PNG, JPG, WEBP)
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-accent-cyan)';
+                  e.currentTarget.style.background = 'color-mix(in srgb, var(--color-accent-cyan) 4%, transparent)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-border-strong)';
+                  e.currentTarget.style.background = 'transparent';
+                }}>
+                <Image size={28} style={{ opacity: 0.4 }} />
+                <span>Haz clic para subir la imagen</span>
+                <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>PNG, JPG o WEBP · máx. 5MB</span>
               </button>
             ) : (
               <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -548,11 +656,13 @@ export function AIToolsEstrategia() {
             )}
             <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif"
               style={{ display: 'none' }} onChange={handleImageChange} />
+            <p style={S.hint}>💡 Entre más texto legible tenga la imagen, mejor será el resultado</p>
           </div>
-          <div>
-            <label style={S.label}>Pregunta o contexto adicional</label>
+
+          <div style={S.sectionCard}>
+            <label style={S.label}>Contexto adicional (opcional)</label>
             <textarea className="form-textarea" rows={3}
-              placeholder="¿Qué cliente es? ¿Hay algo específico que quieras analizar?"
+              placeholder="¿Qué cliente es? ¿Hay algo específico que quieras que Claude enfoque?"
               value={contextNote} onChange={(e) => setContextNote(e.target.value)} />
           </div>
         </div>
@@ -560,14 +670,35 @@ export function AIToolsEstrategia() {
 
       {/* ─── MODO TRANSCRIPCIÓN ─── */}
       {mode === 'transcripcion' && (
-        <div style={{ ...S.sectionCard, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{
+            padding: '16px 20px', borderRadius: 12,
+            background: 'color-mix(in srgb, #ec4899 6%, var(--color-bg-card))',
+            border: '1px solid color-mix(in srgb, #ec4899 25%, transparent)',
+          }}>
+            <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: '0 0 4px', color: 'var(--color-text-primary)' }}>
+              🎙️ Estrategia desde transcripción
+            </p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              Pega la transcripción de la reunión de estrategia o notas en lenguaje natural.
+              Claude interpreta y estructura la campaña Meta Ads automáticamente.
+            </p>
+          </div>
+
+          <div style={S.sectionCard}>
             <label style={S.label}>Transcripción o notas de estrategia <span style={{ color: '#ef4444' }}>*</span></label>
-            <textarea className="form-textarea" rows={12}
-              placeholder="Pega aquí la transcripción de voz o notas de reunión. Ej: 'Para Óptica vamos a montar una campaña de tráfico con ABO, dos conjuntos...'"
-              value={transcripcion} onChange={(e) => setTranscripcion(e.target.value)} />
+            <textarea
+              className="form-textarea"
+              rows={10}
+              placeholder="Pega aquí la transcripción de voz o notas de reunión. Ej: 'Para Óptica vamos a montar una campaña de tráfico con ABO, dos conjuntos, uno para Medellín mujeres 25-40 y otro para Bogotá...'"
+              value={transcripcion}
+              onChange={(e) => setTranscripcion(e.target.value)}
+              onInput={(e) => autoResize(e.currentTarget)}
+              style={{ resize: 'none', overflow: 'hidden', minHeight: 200 }}
+            />
             <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: 6 }}>
-              {transcripcion.length} caracteres · Claude interpreta el lenguaje natural y estructura la campaña
+              {transcripcion.length} caracteres
+              {transcripcion.length === 0 && ' · Claude interpreta lenguaje natural: "vamos a montar TOFU con ABO, dos conjuntos..."'}
             </p>
           </div>
         </div>
@@ -590,35 +721,39 @@ export function AIToolsEstrategia() {
 
       {/* Generate button */}
       {mode === 'generador' ? (
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
-          <button
-            onClick={() => void handleGenerate()}
-            disabled={isGenerateDisabled}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '14px 32px', borderRadius: 12, border: 'none', cursor: isGenerateDisabled ? 'default' : 'pointer',
-              background: isGenerateDisabled ? 'var(--color-bg-secondary)' : 'var(--color-accent-cyan)',
-              color: isGenerateDisabled ? 'var(--color-text-muted)' : 'var(--color-accent-cyan-fg, #000)',
-              fontSize: '0.95rem', fontWeight: 800,
-              transition: 'opacity 0.15s, transform 0.15s',
-              boxShadow: isGenerateDisabled ? 'none' : '0 4px 24px color-mix(in srgb, var(--color-accent-cyan) 30%, transparent)',
-            }}
-          >
-            {loading ? (
-              <>
-                <span style={{
-                  width: 16, height: 16, border: '2px solid rgba(0,0,0,0.2)', borderTop: '2px solid #000',
-                  borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite',
-                }} />
-                {loadingMsg}
-              </>
-            ) : (
-              <>
-                <Sparkles size={18} /> ⚡ Generar estrategia completa
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={() => void handleGenerate()}
+          disabled={isGenerateDisabled}
+          style={{
+            width: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            padding: '16px 32px', borderRadius: 12, border: 'none',
+            cursor: isGenerateDisabled ? 'default' : 'pointer',
+            background: isGenerateDisabled
+              ? 'var(--color-bg-secondary)'
+              : 'linear-gradient(135deg, var(--color-accent-cyan) 0%, #0d9488 100%)',
+            color: isGenerateDisabled ? 'var(--color-text-muted)' : '#000',
+            fontSize: '0.95rem', fontWeight: 800,
+            transition: 'opacity 0.15s',
+            boxShadow: isGenerateDisabled ? 'none' : '0 4px 24px color-mix(in srgb, var(--color-accent-cyan) 30%, transparent)',
+            marginTop: 8,
+          }}
+        >
+          {loading ? (
+            <>
+              <span style={{
+                width: 16, height: 16, border: '2px solid rgba(0,0,0,0.2)', borderTop: '2px solid #000',
+                borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite',
+              }} />
+              {loadingMsg}
+            </>
+          ) : (
+            <>
+              <Sparkles size={18} />
+              ⚡ Generar estrategia completa{kit?.name ? ` para ${kit.name}` : ''}
+            </>
+          )}
+        </button>
       ) : (
         <button
           className="btn-primary"
@@ -643,7 +778,7 @@ export function AIToolsEstrategia() {
       {/* Output */}
       {output && (
         <div ref={outputRef}>
-          <OrganigramaOutput output={output} toolKey="estrategia" formSummary={formSummary} />
+          <OrganigramaOutput output={output} toolKey="estrategia" formSummary={formSummary} mode={mode} />
         </div>
       )}
 

@@ -20,6 +20,11 @@ REGLAS OBLIGATORIAS PARA LOS COPIES:
 - Cada anuncio debe tener un ángulo DIFERENTE (no copies idénticos con distinto formato)
 - Razonamiento de campaña y de plataformas: máximo 1 línea cada uno
 
+CONVENCIÓN DE NOMBRES OBLIGATORIA:
+- Campaña: [ClienteAbrev]_[Etapa]_[MesAño]  Ej: OpticaPL_TOFU_Jun26
+- Conjunto: [Etapa]_[Ciudad]_[GeneroEdad]  Ej: TOFU_Medellin_M22-45
+- Los nombres deben ser cortos, en CamelCase/PascalCase, sin espacios
+
 FORMATO DE SALIDA — OBLIGATORIO:
 Responde ÚNICAMENTE con un objeto JSON válido. Sin texto adicional, sin bloques markdown, sin explicaciones fuera del JSON.
 

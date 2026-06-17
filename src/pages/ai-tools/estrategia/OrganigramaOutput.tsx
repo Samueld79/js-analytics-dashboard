@@ -296,7 +296,10 @@ function Pill({ text, color = 'gray' }: { text: string; color?: PillColor }) {
 
 function AdCard({ ad, index }: { ad: OrganigramaAd; index: number }) {
   const [open, setOpen] = useState(true);
+  const [convOpen, setConvOpen] = useState(false);
   const showMeta = ad.url || ad.multiAnunciante !== undefined;
+  const copyPreview = ad.copy ? ad.copy.replace(/\n/g, ' ').substring(0, 80) + (ad.copy.length > 80 ? '…' : '') : null;
+
   return (
     <div style={{ border: '1px solid color-mix(in srgb, #818cf8 30%, var(--color-border))', borderRadius: 8 }}>
       <div
@@ -306,14 +309,25 @@ function AdCard({ ad, index }: { ad: OrganigramaAd; index: number }) {
           padding: '7px 12px', cursor: 'pointer',
           background: 'color-mix(in srgb, #818cf8 8%, var(--color-bg-secondary))',
           borderRadius: open ? '8px 8px 0 0' : 8,
+          gap: 8,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
           <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#818cf8', letterSpacing: '0.06em', flexShrink: 0 }}>
             🎨 ANUNCIO {index + 1}
           </span>
           {ad.formato && <Pill text={ad.formato} color="purple" />}
-          {ad.angulo && (
+          {ad.angulo && !open && (
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {ad.angulo}
+            </span>
+          )}
+          {!open && copyPreview && (
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>
+              {copyPreview}
+            </span>
+          )}
+          {open && ad.angulo && (
             <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {ad.angulo}
             </span>
@@ -328,7 +342,10 @@ function AdCard({ ad, index }: { ad: OrganigramaAd; index: number }) {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {ad.url && <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>🔗 {ad.url}</span>}
               {ad.multiAnunciante !== undefined && (
-                <Pill text={`Multi-anunciante: ${ad.multiAnunciante ? 'SÍ' : 'NO'}`} color="gray" />
+                <Pill
+                  text={`Multi-anunciante: ${ad.multiAnunciante ? 'ON' : 'OFF'}`}
+                  color={ad.multiAnunciante ? 'green' : 'gray'}
+                />
               )}
             </div>
           )}
@@ -346,23 +363,35 @@ function AdCard({ ad, index }: { ad: OrganigramaAd; index: number }) {
           )}
           {ad.conversacion && (
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
-              <div style={{ fontSize: '0.58rem', fontWeight: 700, color: '#818cf8', marginBottom: 6, letterSpacing: '0.08em' }}>💬 CONVERSACIÓN</div>
-              {ad.conversacion.tipoPlantilla && (
-                <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                  Plantilla: {ad.conversacion.tipoPlantilla}
+              <div
+                onClick={() => setConvOpen(c => !c)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: convOpen ? 8 : 0 }}
+              >
+                <div style={{ fontSize: '0.58rem', fontWeight: 700, color: '#818cf8', letterSpacing: '0.08em', flex: 1 }}>
+                  💬 CONVERSACIÓN {!convOpen && <span style={{ color: 'var(--color-text-muted)', fontWeight: 400, fontStyle: 'italic' }}>· clic para ver</span>}
                 </div>
+                {convOpen ? <ChevronUp size={11} color="var(--color-text-muted)" /> : <ChevronDown size={11} color="var(--color-text-muted)" />}
+              </div>
+              {convOpen && (
+                <>
+                  {ad.conversacion.tipoPlantilla && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                      Plantilla: {ad.conversacion.tipoPlantilla}
+                    </div>
+                  )}
+                  {ad.conversacion.saludo && (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>Saludo: </span>
+                      {ad.conversacion.saludo}
+                    </div>
+                  )}
+                  {ad.conversacion.preguntas?.map((p, pi) => (
+                    <div key={pi} style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)', marginBottom: 3 }}>
+                      <span style={{ fontWeight: 600 }}>P{pi + 1}:</span> {p}
+                    </div>
+                  ))}
+                </>
               )}
-              {ad.conversacion.saludo && (
-                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-                  <span style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>Saludo: </span>
-                  {ad.conversacion.saludo}
-                </div>
-              )}
-              {ad.conversacion.preguntas?.map((p, pi) => (
-                <div key={pi} style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)', marginBottom: 3 }}>
-                  <span style={{ fontWeight: 600 }}>P{pi + 1}:</span> {p}
-                </div>
-              ))}
             </div>
           )}
         </div>
@@ -584,23 +613,51 @@ function ResumenCard({ resumen }: { resumen: NonNullable<OrganigramaData['resume
   );
 }
 
-function VisualOrganigrama({ data }: { data: OrganigramaData }) {
+const MODE_LABELS: Record<string, string> = {
+  generador: '✨ IA',
+  formulario: '📋 Formulario',
+  imagen: '🖼️ Imagen',
+  transcripcion: '🎙️ Voz',
+};
+
+function VisualOrganigrama({ data, mode }: { data: OrganigramaData; mode?: string }) {
+  const timestamp = new Date().toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const modeLabel = mode ? (MODE_LABELS[mode] ?? mode) : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '12px 20px 14px', borderBottom: '1px solid var(--color-border)',
+        padding: '14px 20px',
+        borderBottom: '1px solid var(--color-border)',
+        background: 'color-mix(in srgb, var(--color-accent-cyan) 4%, var(--color-bg-secondary))',
+        display: 'flex', flexDirection: 'column', gap: 6,
       }}>
-        <div>
-          <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--color-accent-cyan)', letterSpacing: '0.1em', marginBottom: 3 }}>
-            ⚡ ESTRATEGIA META ADS
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--color-accent-cyan)', letterSpacing: '0.12em' }}>
+            ⚡ ESTRATEGIA META ADS · GROWTH STRATEGY JS
           </div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            {data.cliente ?? 'Cliente'}
-            {data.fecha && <span style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>{data.fecha}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {modeLabel && (
+              <span style={{
+                fontSize: '0.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                background: 'color-mix(in srgb, var(--color-accent-cyan) 15%, transparent)',
+                color: 'var(--color-accent-cyan)',
+                border: '1px solid color-mix(in srgb, var(--color-accent-cyan) 30%, transparent)',
+              }}>
+                {modeLabel}
+              </span>
+            )}
+            <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>{timestamp}</span>
           </div>
         </div>
-        <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Growth Strategy JS</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            {data.cliente ?? 'Cliente'}
+          </span>
+          {data.fecha && (
+            <span style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>{data.fecha}</span>
+          )}
+        </div>
       </div>
 
       <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -669,9 +726,10 @@ type Props = {
   output: string;
   toolKey: string;
   formSummary: Record<string, unknown>;
+  mode?: string;
 };
 
-export function OrganigramaOutput({ output, toolKey, formSummary }: Props) {
+export function OrganigramaOutput({ output, toolKey, formSummary, mode }: Props) {
   const { selectedClientId } = useAITools();
   const parsed = useMemo(() => tryParseOrganigrama(output), [output]);
 
@@ -773,7 +831,7 @@ export function OrganigramaOutput({ output, toolKey, formSummary }: Props) {
       {/* Content */}
       {parsed ? (
         <div style={{ maxHeight: 900, overflowY: 'auto' }}>
-          <VisualOrganigrama data={parsed} />
+          <VisualOrganigrama data={parsed} mode={mode} />
         </div>
       ) : (
         <div style={{
