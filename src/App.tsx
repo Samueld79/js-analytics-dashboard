@@ -17,6 +17,7 @@ import { SalesPage } from './pages/SalesPage';
 import { StrategiesPage } from './pages/StrategiesPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { AIToolsPage } from './pages/ai-tools/AIToolsPage';
+import { DashboardClientPage } from './pages/DashboardClientPage';
 import { SplashScreen } from './components/SplashScreen';
 import { WelcomeOverlay } from './components/WelcomeOverlay';
 
@@ -89,6 +90,7 @@ function AppContent() {
       <Route path="/mi-espacio" element={<ClientWorkspaceEntry />} />
       <Route path="/clients" element={<RequireInternal><ClientsPage /></RequireInternal>} />
       <Route path="/clients/:id" element={<RequireClientAccess><ClientDetailPage /></RequireClientAccess>} />
+      <Route path="/dashboard/cliente/:clientId" element={<RequireInternal><DashboardClientPage /></RequireInternal>} />
       <Route path="/portal/:id" element={<ClientDetailPage />} />
       <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
       <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />

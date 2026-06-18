@@ -36,7 +36,6 @@ const INTERNAL_NAV: NavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Clientes' },
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
-  { to: '/metrics', icon: BarChart2, label: 'Métricas Ads' },
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
   { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
   { to: '/ai-tools', icon: Sparkles, label: 'Área de Trabajo' },
