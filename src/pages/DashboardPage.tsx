@@ -1,6 +1,6 @@
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   LineChart,
   Line,
   XAxis,
@@ -23,6 +23,7 @@ import {
   Users,
   CheckCircle,
   AlertCircle,
+  Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
@@ -53,10 +54,10 @@ import {
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
 const BADGE_CFG = {
-  objetivo: { text: 'En objetivo',   bg: 'hsl(145 100% 45% / 0.12)', color: '#22c55e', border: 'hsl(145 100% 45% / 0.25)' },
-  riesgo:   { text: 'En riesgo',     bg: 'hsl(38 92% 50% / 0.12)',   color: '#f59e0b', border: 'hsl(38 92% 50% / 0.25)' },
-  accion:   { text: 'Acción inmediata', bg: 'hsl(0 84% 60% / 0.12)', color: '#ef4444', border: 'hsl(0 84% 60% / 0.25)' },
-  inactivo: { text: 'Sin actividad', bg: 'hsl(215 15% 50% / 0.12)', color: 'hsl(215,15%,55%)', border: 'hsl(215 15% 50% / 0.2)' },
+  objetivo: { text: 'En objetivo',      bg: 'rgba(34,197,94,0.15)',   color: '#22c55e', border: 'rgba(34,197,94,0.3)' },
+  riesgo:   { text: 'En riesgo',        bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+  accion:   { text: 'Acción inmediata', bg: 'rgba(239,68,68,0.15)',   color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+  inactivo: { text: 'Sin actividad',    bg: 'rgba(100,116,139,0.15)', color: '#64748b', border: 'rgba(100,116,139,0.25)' },
 } as const;
 
 type BadgeKey = keyof typeof BADGE_CFG;
@@ -93,20 +94,20 @@ function RefreshIndicator() {
 
 type ChartPayloadEntry = { dataKey: string; name: string; value: number; color: string };
 
-function WeeklyTooltip({ active, payload, label }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string }) {
+function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
-      background: 'var(--color-tooltip-bg)',
-      border: '1px solid var(--color-tooltip-border)',
+      background: 'rgba(0,0,0,0.88)',
+      border: '1px solid rgba(6,182,212,0.3)',
       borderRadius: 8,
       padding: '10px 14px',
       fontFamily: 'JetBrains Mono, monospace',
       fontSize: 11,
-      boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-      color: 'var(--color-tooltip-text)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+      color: '#fff',
     }}>
-      <p style={{ margin: '0 0 6px', fontSize: '0.62rem', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+      <p style={{ margin: '0 0 6px', fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
         {label}
       </p>
       {payload.map((entry) => (
@@ -115,6 +116,18 @@ function WeeklyTooltip({ active, payload, label }: { active?: boolean; payload?:
         </p>
       ))}
     </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function SparkLine({ data, dataKey, color, height = 44 }: { data: any[]; dataKey: string; color: string; height?: number }) {
+  if (!data.length) return <div style={{ height }} />;
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data} margin={{ top: 3, bottom: 3, left: 0, right: 0 }}>
+        <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -279,44 +292,124 @@ export function DashboardPage() {
       const spend = campaignRows
         .filter((r) => r.date.startsWith(key))
         .reduce((sum, r) => sum + r.spend, 0);
-      return { label, sales: Math.round(sales), spend: Math.round(spend) };
+      const msgs = sumMetrics(scopedAdMetrics.filter((r) => getMonthKey(r.date) === key)).messages;
+      return { label, sales: Math.round(sales), spend: Math.round(spend), msgs };
     });
-  }, [scopedSales, campaignRows]);
+  }, [scopedSales, campaignRows, scopedAdMetrics]);
 
-  // ── NEW: client grid rows ─────────────────────────────────────────────────────
+  // ── NEW: today's sales per client ────────────────────────────────────────────
+  const todaySalesByClient = useMemo(() => {
+    const map = new Map<string, number>();
+    scopedSales.forEach((s) => {
+      if (s.date === todayStr) map.set(s.client_id, (map.get(s.client_id) ?? 0) + s.total_sales);
+    });
+    return map;
+  }, [scopedSales, todayStr]);
+
+  // ── NEW: previous week dates for deltas ──────────────────────────────────────
+  const prevWeekStart = useMemo(() => {
+    const d = new Date(weekStart); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10);
+  }, [weekStart]);
+  const prevWeekEnd = useMemo(() => {
+    const d = new Date(weekStart); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10);
+  }, [weekStart]);
+
+  const prevWeekSalesByClient = useMemo(() => {
+    const map = new Map<string, number>();
+    scopedSales.forEach((s) => {
+      if (s.date >= prevWeekStart && s.date <= prevWeekEnd)
+        map.set(s.client_id, (map.get(s.client_id) ?? 0) + s.total_sales);
+    });
+    return map;
+  }, [scopedSales, prevWeekStart, prevWeekEnd]);
+
+  const prevMonthKey = useMemo(() => {
+    const [y, m] = currentMonthKey.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, [currentMonthKey]);
+
+  const prevMonthSalesByClient = useMemo(() => {
+    const map = new Map<string, number>();
+    scopedSales.forEach((s) => {
+      if (s.date.startsWith(prevMonthKey))
+        map.set(s.client_id, (map.get(s.client_id) ?? 0) + s.total_sales);
+    });
+    return map;
+  }, [scopedSales, prevMonthKey]);
+
+  // ── NEW: 4-week sparkline data per client ────────────────────────────────────
+  const clientSparklines = useMemo(() => {
+    const map = new Map<string, { v: number }[]>();
+    const today = new Date();
+    const dow = today.getDay();
+    const daysToMon = dow === 0 ? 6 : dow - 1;
+    visibleClients.forEach((c) => {
+      const points = Array.from({ length: 4 }, (_, i) => {
+        const weeksAgo = 3 - i;
+        const wS = new Date(today); wS.setDate(today.getDate() - daysToMon - weeksAgo * 7);
+        const wE = new Date(wS); wE.setDate(wS.getDate() + 6);
+        const ws = wS.toISOString().slice(0, 10);
+        const we = wE.toISOString().slice(0, 10);
+        const v = scopedSales
+          .filter((s) => s.client_id === c.id && s.date >= ws && s.date <= we)
+          .reduce((sum, s) => sum + s.total_sales, 0);
+        return { v };
+      });
+      map.set(c.id, points);
+    });
+    return map;
+  }, [visibleClients, scopedSales]);
+
+  // ── NEW: today's agency pulse ────────────────────────────────────────────────
+  const todayPulse = useMemo(() => {
+    const todaySpend = campaignRows.filter((r) => r.date === todayStr).reduce((sum, r) => sum + r.spend, 0);
+    const weekSpendTotal = campaignRows.filter((r) => r.date >= weekStart && r.date <= todayStr).reduce((sum, r) => sum + r.spend, 0);
+    const activeClients = visibleClients.filter((c) => c.status === 'active').length;
+    let bestCtrName = '';
+    let bestCtr = 0;
+    monthCampaignByClient.forEach((stats, clientId) => {
+      const ctr = stats.impressions > 0 ? (stats.clicks / stats.impressions) * 100 : 0;
+      if (ctr > bestCtr) { bestCtr = ctr; bestCtrName = visibleClients.find((x) => x.id === clientId)?.name ?? ''; }
+    });
+    return { todaySpend, weekSpendTotal, activeClients, bestCtr, bestCtrName };
+  }, [campaignRows, todayStr, weekStart, visibleClients, monthCampaignByClient]);
+
+  // ── Client grid rows ─────────────────────────────────────────────────────────
   const clientGridRows = useMemo(() => {
     return visibleClients
       .filter((c) => c.status !== 'churned')
       .map((c) => {
-        const monthlySales = monthSalesByClient.get(c.id) ?? 0;
-        const weekSales = weekSalesByClient.get(c.id) ?? 0;
-        const weekSpend = weekSpendByClient.get(c.id) ?? 0;
-        const monthCamp = monthCampaignByClient.get(c.id);
+        const monthlySales  = monthSalesByClient.get(c.id) ?? 0;
+        const weekSales     = weekSalesByClient.get(c.id) ?? 0;
+        const daySales      = todaySalesByClient.get(c.id) ?? 0;
+        const prevWeekSales = prevWeekSalesByClient.get(c.id) ?? 0;
+        const prevMonthSales = prevMonthSalesByClient.get(c.id) ?? 0;
+        const weekDelta  = prevWeekSales > 0  ? ((weekSales - prevWeekSales) / prevWeekSales) * 100 : null;
+        const monthDelta = prevMonthSales > 0 ? ((monthlySales - prevMonthSales) / prevMonthSales) * 100 : null;
+        const weekSpend  = weekSpendByClient.get(c.id) ?? 0;
+        const monthCamp  = monthCampaignByClient.get(c.id);
         const monthSpend = monthCamp?.spend ?? 0;
-        const ctr = monthCamp && monthCamp.impressions > 0
-          ? (monthCamp.clicks / monthCamp.impressions) * 100 : null;
-        const cpm = monthCamp && monthCamp.impressions > 0
-          ? (monthCamp.spend / monthCamp.impressions) * 1000 : null;
+        const ctr = monthCamp && monthCamp.impressions > 0 ? (monthCamp.clicks / monthCamp.impressions) * 100 : null;
+        const cpm = monthCamp && monthCamp.impressions > 0 ? (monthCamp.spend / monthCamp.impressions) * 1000 : null;
+        const sparkData = clientSparklines.get(c.id) ?? [];
 
         const hasData = monthlySales > 0 || monthSpend > 0;
         let badge: BadgeKey;
-        if (!hasData) {
-          badge = 'inactivo';
-        } else if (c.monthly_goal && c.monthly_goal > 0) {
+        if (!hasData) badge = 'inactivo';
+        else if (c.monthly_goal && c.monthly_goal > 0) {
           const pct = monthlySales / c.monthly_goal;
           badge = pct >= 0.8 ? 'objetivo' : pct >= 0.5 ? 'riesgo' : 'accion';
-        } else {
-          badge = 'objetivo';
-        }
+        } else badge = 'objetivo';
 
         const goalPct = c.monthly_goal && c.monthly_goal > 0
           ? Math.min(100, Math.round((monthlySales / c.monthly_goal) * 100))
           : null;
 
-        return { client: c, monthlySales, weekSales, weekSpend, monthSpend, ctr, cpm, badge, goalPct };
+        return { client: c, daySales, weekSales, weekDelta, monthlySales, monthDelta, weekSpend, monthSpend, ctr, cpm, badge, goalPct, sparkData };
       })
       .sort((a, b) => b.monthlySales - a.monthlySales);
-  }, [visibleClients, monthSalesByClient, weekSalesByClient, weekSpendByClient, monthCampaignByClient]);
+  }, [visibleClients, monthSalesByClient, weekSalesByClient, todaySalesByClient, prevWeekSalesByClient, prevMonthSalesByClient, weekSpendByClient, monthCampaignByClient, clientSparklines]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
   const isRefreshing = clientsLoading || kpisLoading || metricsLoading || salesLoading;
@@ -333,11 +426,11 @@ export function DashboardPage() {
   });
 
   // ── Primary KPIs ──────────────────────────────────────────────────────────────
-  type PrimaryKpi = { label: string; value: string; Icon: LucideIcon; iconColor: string; iconBg: string };
+  type PrimaryKpi = { label: string; value: string; Icon: LucideIcon; iconColor: string; iconBg: string; sparkKey: 'spend' | 'sales' | 'msgs'; sparkColor: string };
   const primaryKpis: PrimaryKpi[] = [
-    { label: `Inversión · ${activePeriodLabel}`,      value: formatCop(kpiSpend),                           Icon: DollarSign,   iconColor: 'hsl(200,80%,60%)', iconBg: 'hsl(200 80% 55% / 0.15)' },
-    { label: `Ventas · ${activePeriodLabel}`,         value: kpiSalesTotal > 0 ? formatCop(kpiSalesTotal) : '—', Icon: Banknote,  iconColor: 'hsl(145,70%,55%)', iconBg: 'hsl(145 65% 45% / 0.15)' },
-    { label: `Conversaciones · ${activePeriodLabel}`, value: kpiMessages > 0 ? kpiMessages.toLocaleString('es-CO') : '—', Icon: MessageCircle, iconColor: 'hsl(280,70%,65%)', iconBg: 'hsl(280 70% 60% / 0.15)' },
+    { label: `INVERSIÓN · ${activePeriodLabel.toUpperCase()}`,      value: formatCop(kpiSpend),                                                              Icon: DollarSign,    iconColor: '#06b6d4', iconBg: 'rgba(6,182,212,0.15)',   sparkKey: 'spend', sparkColor: '#06b6d4' },
+    { label: `VENTAS · ${activePeriodLabel.toUpperCase()}`,         value: kpiSalesTotal > 0 ? formatCop(kpiSalesTotal) : '—',                              Icon: Banknote,      iconColor: '#22c55e', iconBg: 'rgba(34,197,94,0.15)',   sparkKey: 'sales', sparkColor: '#22c55e' },
+    { label: `CONVERSACIONES · ${activePeriodLabel.toUpperCase()}`, value: kpiMessages > 0 ? kpiMessages.toLocaleString('es-CO') : '—',                    Icon: MessageCircle, iconColor: '#8b5cf6', iconBg: 'rgba(139,92,246,0.15)', sparkKey: 'msgs', sparkColor: '#8b5cf6' },
   ];
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -350,8 +443,9 @@ export function DashboardPage() {
           <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>
             {portalClientName ? `Resultados · ${portalClientName}` : 'Dashboard General'}
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.06em' }}>
-            Resumen · {currentMonthLabelUpper}
+          <p style={{ margin: '5px 0 0', fontSize: '0.67rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.04em' }}>
+            {currentMonthLabelUpper} · {todayPulse.activeClients} clientes activos
+            {kpiSalesTotal > 0 && <> · <strong style={{ color: 'var(--color-text-secondary)' }}>{formatCop(kpiSalesTotal)}</strong> en ventas</>}
           </p>
         </div>
 
@@ -370,11 +464,7 @@ export function DashboardPage() {
           )}
           {campaignByMonth.length > 0 && (
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-              <select
-                className="dash-period-select"
-                value={activePeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-              >
+              <select className="dash-period-select" value={activePeriod} onChange={(e) => setSelectedPeriod(e.target.value)}>
                 {campaignByMonth.map((m) => (
                   <option key={m.month} value={m.month}>{getMonthLabel(m.month)}</option>
                 ))}
@@ -383,6 +473,21 @@ export function DashboardPage() {
               <ChevronDown size={12} style={{ position: 'absolute', right: 10, pointerEvents: 'none', color: 'var(--color-text-muted)' }} />
             </div>
           )}
+          <Link
+            to="/ai-tools"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+              background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.25)',
+              color: '#06b6d4', fontSize: '0.72rem', fontWeight: 700,
+              fontFamily: 'JetBrains Mono', textDecoration: 'none', letterSpacing: '0.04em',
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={(e) => { const el = e.currentTarget; el.style.background = 'rgba(6,182,212,0.18)'; el.style.borderColor = 'rgba(6,182,212,0.5)'; }}
+            onMouseLeave={(e) => { const el = e.currentTarget; el.style.background = 'rgba(6,182,212,0.1)'; el.style.borderColor = 'rgba(6,182,212,0.25)'; }}
+          >
+            <Zap size={12} />
+            Área de Trabajo
+          </Link>
         </div>
       </motion.div>
 
@@ -391,142 +496,199 @@ export function DashboardPage() {
         {primaryKpis.map((kpi, i) => (
           <motion.div
             key={kpi.label}
-            className="card-glass"
-            style={{ padding: '18px 20px', borderRadius: 12 }}
+            style={{
+              padding: '20px 22px', borderRadius: 16, overflow: 'hidden',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06, duration: 0.35, ease: 'easeOut' } as Transition}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-              <span style={{ fontSize: '0.65rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
                 {kpi.label}
               </span>
-              <div className="dash-kpi-icon" style={{ background: kpi.iconBg }}>
-                <kpi.Icon size={15} style={{ color: kpi.iconColor }} />
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: kpi.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <kpi.Icon size={14} style={{ color: kpi.iconColor }} />
               </div>
             </div>
-            <div style={{ fontSize: '1.9rem', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', lineHeight: 1, fontFamily: 'JetBrains Mono, monospace', marginBottom: 10 }}>
+            <div style={{ fontSize: '1.85rem', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', lineHeight: 1, fontFamily: 'JetBrains Mono, monospace' }}>
               {kpi.value}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
               <TrendingUp size={10} style={{ color: 'var(--color-text-muted)' }} />
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.6rem', color: 'var(--color-text-muted)', letterSpacing: '0.04em' }}>
-                mes actual
-              </span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', color: 'var(--color-text-muted)', letterSpacing: '0.04em' }}>mes actual</span>
             </div>
+            <SparkLine data={monthlyChartData} dataKey={kpi.sparkKey} color={kpi.sparkColor} height={44} />
           </motion.div>
         ))}
       </div>
 
-      {/* ── Secondary KPIs (clientes en objetivo / en riesgo) ── */}
-      <motion.div
-        {...fadeUp(0.18)}
-        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 24px' }}
-      >
-        {/* Clientes en objetivo */}
-        <div className="card-glass" style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'hsl(145 100% 45% / 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      {/* ── Secondary KPIs ── */}
+      <motion.div {...fadeUp(0.18)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 24px' }}>
+        <div style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CheckCircle size={17} style={{ color: '#22c55e' }} />
           </div>
           <div>
-            <p style={{ margin: '0 0 2px', fontSize: '0.6rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
               Clientes en objetivo
             </p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '1.5rem', fontWeight: 700, color: '#22c55e', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                {goalStats.onTarget}
-              </span>
-              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>
-                ≥ 80% de meta
-              </span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '1.5rem', fontWeight: 700, color: '#22c55e', letterSpacing: '-0.02em', lineHeight: 1 }}>{goalStats.onTarget}</span>
+              <span style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>≥ 80% de meta</span>
             </div>
           </div>
         </div>
-
-        {/* Clientes en riesgo */}
-        <div className="card-glass" style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'hsl(0 84% 60% / 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <AlertCircle size={17} style={{ color: '#ef4444' }} />
           </div>
           <div>
-            <p style={{ margin: '0 0 2px', fontSize: '0.6rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
               Clientes en riesgo
             </p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '1.5rem', fontWeight: 700, color: '#ef4444', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                {goalStats.atRisk}
-              </span>
-              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>
-                {'< 50% de meta'}
-              </span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '1.5rem', fontWeight: 700, color: '#ef4444', letterSpacing: '-0.02em', lineHeight: 1 }}>{goalStats.atRisk}</span>
+              <span style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>{'< 50% de meta'}</span>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* ── Monthly Charts Row ── */}
-      <motion.div
-        {...fadeUp(0.24)}
-        style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: 16, padding: '0 24px' }}
-      >
-        {/* BarChart — ventas mensuales */}
-        <div className="card-glass" style={{ padding: '16px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-            <div>
-              <p style={{ margin: '0 0 3px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                Últimos 6 meses
-              </p>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-                Ventas de la agencia
-              </h3>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: '#06b6d4' }} />
-              <span style={{ fontSize: '0.6rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>Ventas</span>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyChartData} barGap={4}>
+      {/* ── Area Charts Row ── */}
+      <motion.div {...fadeUp(0.24)} style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: 16, padding: '0 24px' }}>
+
+        {/* AreaChart — ventas mensuales */}
+        <div style={{ padding: '20px 22px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          {(() => {
+            const cur = monthlyChartData[monthlyChartData.length - 1]?.sales ?? 0;
+            const prev = monthlyChartData[monthlyChartData.length - 2]?.sales ?? 0;
+            const delta = prev > 0 ? ((cur - prev) / prev) * 100 : null;
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                  <div>
+                    <p style={{ margin: '0 0 6px', fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>VENTAS TOTALES</p>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                      <span style={{ fontSize: '1.7rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'JetBrains Mono', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                        {cur > 0 ? formatCop(cur) : '—'}
+                      </span>
+                      {delta !== null && (
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: delta >= 0 ? '#22c55e' : '#ef4444' }}>
+                          {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#06b6d4' }} />
+                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'rgba(255,255,255,0.35)' }}>Ventas</span>
+                  </div>
+                </div>
+                <p style={{ margin: '4px 0 14px', fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>vs mes anterior · Últimos 6 meses</p>
+              </>
+            );
+          })()}
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={monthlyChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
-                <linearGradient id="dashSalesGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.9} />
-                  <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.3} />
+                <linearGradient id="salesAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#06b6d4" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCop(v)} />
-              <Tooltip content={<WeeklyTooltip />} />
-              <Bar dataKey="sales" name="Ventas" fill="url(#dashSalesGrad)" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`} width={42} />
+              <Tooltip content={<AreaTooltip />} />
+              <Area type="monotone" dataKey="sales" name="Ventas" stroke="#06b6d4" strokeWidth={2} fill="url(#salesAreaGrad)" dot={{ r: 3, fill: '#06b6d4', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#06b6d4' }} />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        {/* LineChart — inversión mensual en ads */}
-        <div className="card-glass" style={{ padding: '16px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-            <div>
-              <p style={{ margin: '0 0 3px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                Últimos 6 meses
-              </p>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-                Inversión en ads
-              </h3>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#8b5cf6' }} />
-              <span style={{ fontSize: '0.6rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>Spend</span>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={monthlyChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCop(v)} />
-              <Tooltip content={<WeeklyTooltip />} />
-              <Line type="monotone" dataKey="spend" name="Inversión" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#8b5cf6', strokeWidth: 0 }} />
-            </LineChart>
+        {/* AreaChart — inversión mensual */}
+        <div style={{ padding: '20px 22px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          {(() => {
+            const cur = monthlyChartData[monthlyChartData.length - 1]?.spend ?? 0;
+            const prev = monthlyChartData[monthlyChartData.length - 2]?.spend ?? 0;
+            const delta = prev > 0 ? ((cur - prev) / prev) * 100 : null;
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                  <div>
+                    <p style={{ margin: '0 0 6px', fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>INVERSIÓN EN ADS</p>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                      <span style={{ fontSize: '1.7rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'JetBrains Mono', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                        {cur > 0 ? formatCop(cur) : '—'}
+                      </span>
+                      {delta !== null && (
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: delta >= 0 ? '#22c55e' : '#ef4444' }}>
+                          {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6' }} />
+                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'rgba(255,255,255,0.35)' }}>Spend</span>
+                  </div>
+                </div>
+                <p style={{ margin: '4px 0 14px', fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>vs mes anterior · Últimos 6 meses</p>
+              </>
+            );
+          })()}
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={monthlyChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="spendAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`} width={42} />
+              <Tooltip content={<AreaTooltip />} />
+              <Area type="monotone" dataKey="spend" name="Inversión" stroke="#8b5cf6" strokeWidth={2} fill="url(#spendAreaGrad)" dot={{ r: 3, fill: '#8b5cf6', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#8b5cf6' }} />
+            </AreaChart>
           </ResponsiveContainer>
+        </div>
+      </motion.div>
+
+      {/* ── Activity Pulse ── */}
+      <motion.div {...fadeUp(0.28)} style={{ padding: '0 24px' }}>
+        <div style={{
+          padding: '10px 16px', borderRadius: 8, flexWrap: 'wrap',
+          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <motion.span
+              style={{ width: 6, height: 6, borderRadius: '50%', background: '#06b6d4', display: 'inline-block', flexShrink: 0 }}
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' } as Transition}
+            />
+            <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>
+              ACTIVIDAD DE HOY
+            </span>
+          </div>
+          {([
+            todayPulse.todaySpend > 0
+              ? `${formatCop(todayPulse.todaySpend)} invertidos hoy`
+              : todayPulse.weekSpendTotal > 0
+              ? `${formatCop(todayPulse.weekSpendTotal)} invertidos esta semana`
+              : null,
+            `${todayPulse.activeClients} clientes activos`,
+            `${goalStats.onTarget} en objetivo`,
+            todayPulse.bestCtrName ? `Mejor CTR: ${todayPulse.bestCtrName} ${todayPulse.bestCtr.toFixed(2)}%` : null,
+          ] as (string | null)[]).filter(Boolean).map((text, i) => (
+            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.8rem' }}>·</span>
+              <span style={{ fontSize: '0.63rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>{text}</span>
+            </span>
+          ))}
         </div>
       </motion.div>
 
@@ -535,13 +697,11 @@ export function DashboardPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Users size={13} style={{ color: 'var(--color-text-muted)' }} />
-            <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.6rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
               Clientes · {getMonthLabel(currentMonthKey)}
             </span>
           </div>
-          <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>
-            {clientGridRows.length} clientes
-          </span>
+          <span style={{ fontSize: '0.6rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>{clientGridRows.length} clientes</span>
         </div>
 
         {clientGridRows.length === 0 ? (
@@ -549,131 +709,154 @@ export function DashboardPage() {
             No hay clientes activos.
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-            gap: 14,
-          }}>
-            {clientGridRows.map(({ client, monthlySales, weekSales, weekSpend, ctr, cpm, badge, goalPct }) => {
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            {clientGridRows.map(({ client, daySales, weekSales, weekDelta, monthlySales, monthDelta, weekSpend, ctr, cpm, badge, goalPct, sparkData }) => {
               const color = clientAvatarColor(client.name);
               const initials = clientInitials(client.name);
               const bdg = BADGE_CFG[badge];
+              const sparkColor = badge === 'objetivo' ? '#22c55e' : badge === 'riesgo' ? '#f59e0b' : badge === 'accion' ? '#ef4444' : '#64748b';
               return (
                 <div
                   key={client.id}
                   style={{
-                    background: 'var(--color-bg-card)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 14,
-                    padding: '18px 18px 16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 14,
-                    transition: 'border-color 0.15s',
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 16, padding: '18px', display: 'flex', flexDirection: 'column', gap: 14,
+                    transition: 'all 0.2s ease',
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = color + '60'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--color-border)'; }}
+                  onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'rgba(6,182,212,0.3)'; el.style.background = 'rgba(6,182,212,0.03)'; el.style.boxShadow = '0 0 20px rgba(6,182,212,0.08)'; }}
+                  onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = 'rgba(255,255,255,0.08)'; el.style.background = 'rgba(255,255,255,0.03)'; el.style.boxShadow = 'none'; }}
                 >
                   {/* Avatar + name + badge */}
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                     <div style={{
-                      width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                      background: color + '22',
-                      border: `2px solid ${color}55`,
+                      width: 48, height: 48, borderRadius: 12, flexShrink: 0,
+                      background: color + '22', border: `2px solid ${color}55`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.88rem', fontWeight: 800, color, fontFamily: 'Outfit, sans-serif',
+                      fontSize: '1rem', fontWeight: 800, color, fontFamily: 'Outfit, sans-serif',
                     }}>
                       {initials}
                     </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-                        <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>
                           {client.name}
                         </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <span style={{
-                          fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.06em',
-                          padding: '2px 8px', borderRadius: 20,
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: '0.56rem', fontWeight: 700, letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 20,
                           background: bdg.bg, color: bdg.color, border: `1px solid ${bdg.border}`,
                         }}>
+                          {badge === 'accion' && (
+                            <motion.span
+                              style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }}
+                              animate={{ opacity: [1, 0.2, 1] }}
+                              transition={{ duration: 0.8, repeat: Infinity } as Transition}
+                            />
+                          )}
                           {bdg.text}
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.67rem', color: 'var(--color-text-muted)', marginTop: 4 }}>
+                      <div style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>
                         {client.niche ?? '—'} · {STATUS_ETAPA[client.status] ?? ''}
                       </div>
                     </div>
                   </div>
 
-                  {/* Goal progress bar */}
+                  {/* Rendimiento: día / semana / mes */}
+                  <div>
+                    <p style={{ margin: '0 0 6px', fontSize: '0.54rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>
+                      Rendimiento
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                      {([
+                        { period: 'DÍA',    value: daySales,    delta: null },
+                        { period: 'SEMANA', value: weekSales,   delta: weekDelta },
+                        { period: 'MES',    value: monthlySales, delta: monthDelta },
+                      ] as { period: string; value: number; delta: number | null }[]).map(({ period, value, delta }) => (
+                        <div key={period} style={{ padding: '8px 6px', borderRadius: 8, background: 'rgba(0,0,0,0.2)', textAlign: 'center' }}>
+                          <p style={{ margin: '0 0 3px', fontSize: '0.48rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>
+                            {period}
+                          </p>
+                          <p style={{ margin: '0 0 2px', fontSize: '0.68rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
+                            {value > 0 ? formatCop(value) : '—'}
+                          </p>
+                          {delta !== null && (
+                            <p style={{ margin: 0, fontSize: '0.54rem', fontFamily: 'JetBrains Mono', color: delta >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                              {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Meta mensual */}
                   {goalPct !== null && client.monthly_goal && client.monthly_goal > 0 && (
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>Meta mensual</span>
-                        <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--color-text-secondary)', fontFamily: 'JetBrains Mono' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span style={{ fontSize: '0.56rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'JetBrains Mono', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Meta mensual</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: goalPct >= 80 ? '#22c55e' : goalPct >= 50 ? '#f59e0b' : '#ef4444' }}>
                           {goalPct}%
                         </span>
                       </div>
-                      <div style={{ height: 4, background: 'var(--color-border)', borderRadius: 2 }}>
+                      <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
                         <div style={{
-                          height: '100%',
-                          width: `${goalPct}%`,
-                          borderRadius: 2,
-                          background: goalPct >= 80 ? '#22c55e' : goalPct >= 50 ? '#f59e0b' : '#ef4444',
-                          transition: 'width 0.5s ease',
+                          height: '100%', width: `${goalPct}%`, borderRadius: 999, transition: 'width 0.5s ease',
+                          background: goalPct >= 80
+                            ? 'linear-gradient(90deg,#22c55e,#16a34a)'
+                            : goalPct >= 50
+                            ? 'linear-gradient(90deg,#f59e0b,#d97706)'
+                            : 'linear-gradient(90deg,#ef4444,#dc2626)',
                         }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                        <span style={{ fontSize: '0.58rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>
-                          {formatCop(monthlySales)}
-                        </span>
-                        <span style={{ fontSize: '0.58rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>
-                          Meta: {formatCop(client.monthly_goal)}
-                        </span>
+                        <span style={{ fontSize: '0.54rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>{formatCop(monthlySales)}</span>
+                        <span style={{ fontSize: '0.54rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>Meta: {formatCop(client.monthly_goal)}</span>
                       </div>
                     </div>
                   )}
 
-                  {/* Week stats */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {[
-                      { icon: '💰', label: 'Ventas sem.', value: weekSales > 0 ? formatCop(weekSales) : '—' },
-                      { icon: '📣', label: 'Inversión sem.', value: weekSpend > 0 ? formatCop(weekSpend) : '—' },
-                      ...(ctr !== null ? [{ icon: '📊', label: 'CTR mes', value: `${ctr.toFixed(2)}%` }] : []),
-                      ...(cpm !== null ? [{ icon: '💸', label: 'CPM mes', value: formatCop(cpm) }] : []),
-                    ].map(({ icon, label, value }) => (
-                      <div key={label}>
-                        <p style={{ margin: '0 0 3px', fontSize: '0.55rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                          {icon} {label}
-                        </p>
-                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                          {value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {/* Ads stats */}
+                  {(weekSpend > 0 || ctr !== null || cpm !== null) && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+                      {weekSpend > 0 && (
+                        <div>
+                          <p style={{ margin: '0 0 2px', fontSize: '0.5rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>💰 Inv.sem.</p>
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>{formatCop(weekSpend)}</span>
+                        </div>
+                      )}
+                      {ctr !== null && (
+                        <div>
+                          <p style={{ margin: '0 0 2px', fontSize: '0.5rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>📊 CTR</p>
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>{ctr.toFixed(2)}%</span>
+                        </div>
+                      )}
+                      {cpm !== null && (
+                        <div>
+                          <p style={{ margin: '0 0 2px', fontSize: '0.5rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>📈 CPM</p>
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>{formatCop(cpm)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 4-week sparkline */}
+                  {sparkData.some((d) => d.v > 0) && (
+                    <SparkLine data={sparkData} dataKey="v" color={sparkColor} height={38} />
+                  )}
 
                   {/* Ver detalle */}
                   <Link
                     to={`/dashboard/cliente/${client.id}`}
                     style={{
-                      display: 'block',
-                      textAlign: 'center',
-                      padding: '8px',
-                      borderRadius: 8,
-                      border: `1px solid ${color}40`,
-                      background: color + '10',
-                      color,
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      fontFamily: 'JetBrains Mono, monospace',
-                      textDecoration: 'none',
-                      letterSpacing: '0.04em',
-                      transition: 'background 0.15s, border-color 0.15s',
+                      display: 'block', textAlign: 'center', padding: '9px', borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.12)', background: 'transparent',
+                      color: 'var(--color-text-muted)', fontSize: '0.72rem', fontWeight: 700,
+                      fontFamily: 'JetBrains Mono, monospace', textDecoration: 'none',
+                      letterSpacing: '0.04em', transition: 'all 0.15s ease',
                     }}
-                    onMouseEnter={(e) => { const el = e.currentTarget; el.style.background = color + '22'; el.style.borderColor = color + '80'; }}
-                    onMouseLeave={(e) => { const el = e.currentTarget; el.style.background = color + '10'; el.style.borderColor = color + '40'; }}
+                    onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = '#06b6d4'; el.style.color = '#06b6d4'; el.style.background = 'rgba(6,182,212,0.08)'; }}
+                    onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = 'rgba(255,255,255,0.12)'; el.style.color = 'var(--color-text-muted)'; el.style.background = 'transparent'; }}
                   >
                     Ver detalle →
                   </Link>
@@ -689,13 +872,8 @@ export function DashboardPage() {
         <motion.div {...fadeUp(0.36)} style={{ padding: '0 24px 24px' }}>
           <Link to="/alerts" style={{ textDecoration: 'none' }}>
             <div style={{
-              background: 'hsl(0 84% 60% / 0.08)',
-              border: '1px solid hsl(0 84% 60% / 0.2)',
-              borderRadius: 10,
-              padding: '12px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
+              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+              borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
             }}>
               <AlertTriangle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', fontFamily: 'JetBrains Mono' }}>
