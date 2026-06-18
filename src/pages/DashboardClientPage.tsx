@@ -19,7 +19,7 @@ import { useCampaignSummary } from '../hooks/useData';
 import { aggregateCampaignMetricsByCampaign } from '../services/adCampaignMetrics';
 import { getBrandKitByClient, listToolOutputs, type BrandKit, type ToolOutput } from '../services/aiToolsService';
 import { formatCop, formatNumber } from '../lib/utils';
-import { getCurrentMonthKey, getWeekStart, getTodayStr } from '../utils/goalHelpers';
+import { getCurrentMonthKey } from '../utils/goalHelpers';
 import { getMonthLabel } from '../utils/monthLabel';
 
 function clientAvatarColor(name: string): string {
