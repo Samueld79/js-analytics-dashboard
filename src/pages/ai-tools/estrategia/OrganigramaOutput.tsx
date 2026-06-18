@@ -137,7 +137,7 @@ function buildCopyText(data: OrganigramaData): string {
 
 // ─── Print HTML builder from JSON ────────────────────────────────────────────
 
-function buildJsonPrintHtml(data: OrganigramaData, dateStr: string): string {
+function _buildJsonPrintHtml(data: OrganigramaData, dateStr: string): string {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const campaignsHtml = (data.campanas ?? []).map((c, ci) => {
@@ -245,7 +245,7 @@ ${campaignsHtml}${resHtml}${confirmarHtml}
 </body></html>`;
 }
 
-function buildTextPrintHtml(output: string, dateStr: string): string {
+function _buildTextPrintHtml(output: string, dateStr: string): string {
   let firstDivider = true;
   const htmlLines = output.split('\n').map((line) => {
     const esc = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

@@ -121,8 +121,6 @@ export function DashboardClientPage() {
   }, [clientId]);
 
   const currentMonthKey = getCurrentMonthKey();
-  const weekStart = getWeekStart();
-  const todayStr = getTodayStr();
 
   // ── Monthly KPIs ────────────────────────────────────────────────────────────
   const monthlySales = useMemo(

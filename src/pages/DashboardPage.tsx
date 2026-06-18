@@ -148,10 +148,6 @@ export function DashboardPage() {
     () => isInternal ? clients : clients.filter((c) => visibleClientIds.has(c.id)),
     [clients, isInternal, visibleClientIds],
   );
-  const scopedMonthlyKpis = useMemo(
-    () => isInternal ? monthlyKpis : monthlyKpis.filter((r) => visibleClientIds.has(r.client_id)),
-    [isInternal, monthlyKpis, visibleClientIds],
-  );
   const scopedAdMetrics = useMemo(
     () => isInternal ? rawAdMetrics : rawAdMetrics.filter((r) => visibleClientIds.has(r.client_id)),
     [isInternal, rawAdMetrics, visibleClientIds],
