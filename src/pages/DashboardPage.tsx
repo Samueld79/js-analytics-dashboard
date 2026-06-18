@@ -3,6 +3,9 @@ import {
   Area,
   LineChart,
   Line,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -36,7 +39,11 @@ import {
   useMonthlyOperatingKpis,
   useTasks,
 } from '../hooks/useData';
-import { sumCampaignMonthAggregates } from '../services/adCampaignMetrics';
+import {
+  sumCampaignMonthAggregates,
+  aggregateCampaignMetricsByCampaign,
+  aggregateCampaignMetricsByObjective,
+} from '../services/adCampaignMetrics';
 import type { AdMetric, DailySale } from '../lib/supabase';
 import {
   formatCop,
@@ -52,6 +59,17 @@ import {
 } from '../utils/goalHelpers';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
+
+const OBJECTIVE_COLORS: Record<string, string> = {
+  'Reconocimiento':     '#06b6d4',
+  'Tráfico':            '#8b5cf6',
+  'Interacción':        '#22c55e',
+  'Ventas':             '#f59e0b',
+  'Clientes Potenciales': '#3b82f6',
+  'Presentación':       '#ec4899',
+  'Evaluación':         '#10b981',
+  'Otro':               '#64748b',
+};
 
 const BADGE_CFG = {
   objetivo: { text: 'En objetivo',      bg: 'rgba(34,197,94,0.15)',   color: '#22c55e', border: 'rgba(34,197,94,0.3)' },
@@ -338,28 +356,60 @@ export function DashboardPage() {
     return map;
   }, [scopedSales, prevMonthKey]);
 
-  // ── NEW: 4-week sparkline data per client ────────────────────────────────────
-  const clientSparklines = useMemo(() => {
+  // ── Client campaign counts + objective split ─────────────────────────────────
+  const clientCampaignData = useMemo(() => {
+    const countMap   = new Map<string, number>();
+    const prevCountMap = new Map<string, number>();
+    const objectiveMap = new Map<string, { objective: string; spend: number }[]>();
+
+    const byCurrent = new Map<string, typeof campaignRows>();
+    const byPrev    = new Map<string, typeof campaignRows>();
+
+    campaignRows.forEach((r) => {
+      if (r.date.startsWith(currentMonthKey)) {
+        const arr = byCurrent.get(r.client_id) ?? [];
+        arr.push(r);
+        byCurrent.set(r.client_id, arr);
+      } else if (r.date.startsWith(prevMonthKey)) {
+        const arr = byPrev.get(r.client_id) ?? [];
+        arr.push(r);
+        byPrev.set(r.client_id, arr);
+      }
+    });
+
+    byCurrent.forEach((rows, cid) => {
+      countMap.set(cid, aggregateCampaignMetricsByCampaign(rows).length);
+      objectiveMap.set(cid, aggregateCampaignMetricsByObjective(rows).map((o) => ({ objective: o.objective, spend: o.spend })));
+    });
+    byPrev.forEach((rows, cid) => {
+      prevCountMap.set(cid, aggregateCampaignMetricsByCampaign(rows).length);
+    });
+
+    return { countMap, prevCountMap, objectiveMap };
+  }, [campaignRows, currentMonthKey, prevMonthKey]);
+
+  // ── 6-week spend sparkline per client ────────────────────────────────────────
+  const clientSpendSparklines = useMemo(() => {
     const map = new Map<string, { v: number }[]>();
     const today = new Date();
     const dow = today.getDay();
     const daysToMon = dow === 0 ? 6 : dow - 1;
     visibleClients.forEach((c) => {
-      const points = Array.from({ length: 4 }, (_, i) => {
-        const weeksAgo = 3 - i;
+      const points = Array.from({ length: 6 }, (_, i) => {
+        const weeksAgo = 5 - i;
         const wS = new Date(today); wS.setDate(today.getDate() - daysToMon - weeksAgo * 7);
         const wE = new Date(wS); wE.setDate(wS.getDate() + 6);
         const ws = wS.toISOString().slice(0, 10);
         const we = wE.toISOString().slice(0, 10);
-        const v = scopedSales
-          .filter((s) => s.client_id === c.id && s.date >= ws && s.date <= we)
-          .reduce((sum, s) => sum + s.total_sales, 0);
+        const v = campaignRows
+          .filter((r) => r.client_id === c.id && r.date >= ws && r.date <= we)
+          .reduce((sum, r) => sum + r.spend, 0);
         return { v };
       });
       map.set(c.id, points);
     });
     return map;
-  }, [visibleClients, scopedSales]);
+  }, [visibleClients, campaignRows]);
 
   // ── NEW: today's agency pulse ────────────────────────────────────────────────
   const todayPulse = useMemo(() => {
@@ -392,7 +442,10 @@ export function DashboardPage() {
         const monthSpend = monthCamp?.spend ?? 0;
         const ctr = monthCamp && monthCamp.impressions > 0 ? (monthCamp.clicks / monthCamp.impressions) * 100 : null;
         const cpm = monthCamp && monthCamp.impressions > 0 ? (monthCamp.spend / monthCamp.impressions) * 1000 : null;
-        const sparkData = clientSparklines.get(c.id) ?? [];
+        const campaignCount     = clientCampaignData.countMap.get(c.id) ?? 0;
+        const campaignCountPrev = clientCampaignData.prevCountMap.get(c.id) ?? 0;
+        const objectiveSplit    = clientCampaignData.objectiveMap.get(c.id) ?? [];
+        const spendSparkData    = clientSpendSparklines.get(c.id) ?? [];
 
         const hasData = monthlySales > 0 || monthSpend > 0;
         let badge: BadgeKey;
@@ -406,10 +459,10 @@ export function DashboardPage() {
           ? Math.min(100, Math.round((monthlySales / c.monthly_goal) * 100))
           : null;
 
-        return { client: c, daySales, weekSales, weekDelta, monthlySales, monthDelta, weekSpend, monthSpend, ctr, cpm, badge, goalPct, sparkData };
+        return { client: c, daySales, weekSales, weekDelta, monthlySales, monthDelta, weekSpend, monthSpend, ctr, cpm, badge, goalPct, campaignCount, campaignCountPrev, objectiveSplit, spendSparkData };
       })
       .sort((a, b) => b.monthlySales - a.monthlySales);
-  }, [visibleClients, monthSalesByClient, weekSalesByClient, todaySalesByClient, prevWeekSalesByClient, prevMonthSalesByClient, weekSpendByClient, monthCampaignByClient, clientSparklines]);
+  }, [visibleClients, monthSalesByClient, weekSalesByClient, todaySalesByClient, prevWeekSalesByClient, prevMonthSalesByClient, weekSpendByClient, monthCampaignByClient, clientCampaignData, clientSpendSparklines]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
   const isRefreshing = clientsLoading || kpisLoading || metricsLoading || salesLoading;
@@ -709,158 +762,223 @@ export function DashboardPage() {
             No hay clientes activos.
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-            {clientGridRows.map(({ client, daySales, weekSales, weekDelta, monthlySales, monthDelta, weekSpend, ctr, cpm, badge, goalPct, sparkData }) => {
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+            {clientGridRows.map(({ client, daySales, weekSales, weekDelta, monthlySales, weekSpend, monthSpend, ctr, cpm, badge, goalPct, campaignCount, campaignCountPrev, objectiveSplit, spendSparkData }) => {
               const color = clientAvatarColor(client.name);
               const initials = clientInitials(client.name);
               const bdg = BADGE_CFG[badge];
-              const sparkColor = badge === 'objetivo' ? '#22c55e' : badge === 'riesgo' ? '#f59e0b' : badge === 'accion' ? '#ef4444' : '#64748b';
-              return (
-                <div
-                  key={client.id}
-                  style={{
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 16, padding: '18px', display: 'flex', flexDirection: 'column', gap: 14,
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'rgba(6,182,212,0.3)'; el.style.background = 'rgba(6,182,212,0.03)'; el.style.boxShadow = '0 0 20px rgba(6,182,212,0.08)'; }}
-                  onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = 'rgba(255,255,255,0.08)'; el.style.background = 'rgba(255,255,255,0.03)'; el.style.boxShadow = 'none'; }}
-                >
-                  {/* Avatar + name + badge */}
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 12, flexShrink: 0,
-                      background: color + '22', border: `2px solid ${color}55`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '1rem', fontWeight: 800, color, fontFamily: 'Outfit, sans-serif',
-                    }}>
-                      {initials}
-                    </div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>
-                          {client.name}
-                        </span>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          fontSize: '0.56rem', fontWeight: 700, letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 20,
-                          background: bdg.bg, color: bdg.color, border: `1px solid ${bdg.border}`,
-                        }}>
-                          {badge === 'accion' && (
-                            <motion.span
-                              style={{ width: 5, height: 5, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }}
-                              animate={{ opacity: [1, 0.2, 1] }}
-                              transition={{ duration: 0.8, repeat: Infinity } as Transition}
-                            />
-                          )}
-                          {bdg.text}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>
-                        {client.niche ?? '—'} · {STATUS_ETAPA[client.status] ?? ''}
-                      </div>
-                    </div>
-                  </div>
+              const campaignDelta = campaignCountPrev > 0 ? campaignCount - campaignCountPrev : null;
+              const hasAds = monthSpend > 0 || campaignCount > 0;
 
-                  {/* Rendimiento: día / semana / mes */}
-                  <div>
-                    <p style={{ margin: '0 0 6px', fontSize: '0.54rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>
-                      Rendimiento
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-                      {([
-                        { period: 'DÍA',    value: daySales,    delta: null },
-                        { period: 'SEMANA', value: weekSales,   delta: weekDelta },
-                        { period: 'MES',    value: monthlySales, delta: monthDelta },
-                      ] as { period: string; value: number; delta: number | null }[]).map(({ period, value, delta }) => (
-                        <div key={period} style={{ padding: '8px 6px', borderRadius: 8, background: 'rgba(0,0,0,0.2)', textAlign: 'center' }}>
-                          <p style={{ margin: '0 0 3px', fontSize: '0.48rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>
-                            {period}
-                          </p>
-                          <p style={{ margin: '0 0 2px', fontSize: '0.68rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
-                            {value > 0 ? formatCop(value) : '—'}
-                          </p>
-                          {delta !== null && (
-                            <p style={{ margin: 0, fontSize: '0.54rem', fontFamily: 'JetBrains Mono', color: delta >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
-                              {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
+              return (
+                <Link
+                  key={client.id}
+                  to={`/dashboard/cliente/${client.id}`}
+                  style={{ textDecoration: 'none', display: 'block' }}
+                >
+                  <div
+                    style={{
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                      transition: 'all 0.2s ease', height: '100%',
+                    }}
+                    onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'rgba(6,182,212,0.28)'; el.style.background = 'rgba(6,182,212,0.025)'; el.style.boxShadow = '0 0 24px rgba(6,182,212,0.07)'; }}
+                    onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = 'rgba(255,255,255,0.08)'; el.style.background = 'rgba(255,255,255,0.03)'; el.style.boxShadow = 'none'; }}
+                  >
+                    {/* ── S1: Header ── */}
+                    <div style={{ padding: '16px 18px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                        background: color + '22', border: `2px solid ${color}55`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.95rem', fontWeight: 800, color, fontFamily: 'Outfit, sans-serif',
+                      }}>
+                        {initials}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>
+                            {client.name}
+                          </span>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            fontSize: '0.54rem', fontWeight: 700, letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 20,
+                            background: bdg.bg, color: bdg.color, border: `1px solid ${bdg.border}`,
+                          }}>
+                            {badge === 'accion' && (
+                              <motion.span
+                                style={{ width: 4, height: 4, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }}
+                                animate={{ opacity: [1, 0.2, 1] }}
+                                transition={{ duration: 0.8, repeat: Infinity } as Transition}
+                              />
+                            )}
+                            {bdg.text}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>
+                          {client.niche ?? '—'} · {STATUS_ETAPA[client.status] ?? ''}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+
+                    {/* ── S2: Campañas activas ── */}
+                    <div style={{ padding: '12px 18px' }}>
+                      <p style={{ margin: '0 0 6px', fontSize: '0.52rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>
+                        Campañas activas
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
+                        <div>
+                          <span style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'var(--color-text-primary)', lineHeight: 1, letterSpacing: '-0.04em' }}>
+                            {campaignCount > 0 ? campaignCount : '—'}
+                          </span>
+                          {campaignDelta !== null && (
+                            <p style={{ margin: '3px 0 0', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', fontWeight: 600, color: campaignDelta >= 0 ? '#22c55e' : '#ef4444' }}>
+                              {campaignDelta >= 0 ? '↑' : '↓'} {Math.abs(campaignDelta)} {Math.abs(campaignDelta) === 1 ? 'campaña' : 'campañas'} vs mes anterior
                             </p>
                           )}
                         </div>
+                        {spendSparkData.some((d) => d.v > 0) && (
+                          <div style={{ flex: 1, maxWidth: 120 }}>
+                            <SparkLine data={spendSparkData} dataKey="v" color="#06b6d4" height={50} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+
+                    {/* ── S3: Rendimiento ventas ── */}
+                    <div style={{ padding: '12px 18px' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: '0.52rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>
+                        Rendimiento ventas
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        {([
+                          { period: 'DÍA',    value: daySales,  delta: null },
+                          { period: 'SEMANA', value: weekSales, delta: weekDelta },
+                        ] as { period: string; value: number; delta: number | null }[]).map(({ period, value, delta }) => (
+                          <div key={period} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.18)' }}>
+                            <p style={{ margin: '0 0 3px', fontSize: '0.48rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>
+                              {period}
+                            </p>
+                            <p style={{ margin: '0 0 2px', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
+                              {value > 0 ? formatCop(value) : '—'}
+                            </p>
+                            {delta !== null && (
+                              <p style={{ margin: 0, fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: delta >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                                {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+
+                    {/* ── S4: Meta mensual ── */}
+                    {goalPct !== null && client.monthly_goal && client.monthly_goal > 0 ? (
+                      <div style={{ padding: '12px 18px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <span style={{ fontSize: '0.52rem', color: 'rgba(255,255,255,0.28)', fontFamily: 'JetBrains Mono', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Meta mensual</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: goalPct >= 80 ? '#22c55e' : goalPct >= 50 ? '#f59e0b' : '#ef4444' }}>
+                            {goalPct}%
+                          </span>
+                        </div>
+                        <div style={{ height: 5, background: 'rgba(255,255,255,0.08)', borderRadius: 999, marginBottom: 5 }}>
+                          <div style={{
+                            height: '100%', width: `${goalPct}%`, borderRadius: 999, transition: 'width 0.6s ease',
+                            background: goalPct >= 80
+                              ? 'linear-gradient(90deg,#22c55e,#16a34a)'
+                              : goalPct >= 50
+                              ? 'linear-gradient(90deg,#f59e0b,#d97706)'
+                              : 'linear-gradient(90deg,#ef4444,#dc2626)',
+                          }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.54rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>{formatCop(monthlySales)}</span>
+                          <span style={{ fontSize: '0.54rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>Meta: {formatCop(client.monthly_goal)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '10px 18px' }}>
+                        <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'JetBrains Mono' }}>Sin meta definida</span>
+                      </div>
+                    )}
+
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+
+                    {/* ── S5: Mix de inversión (donut) ── */}
+                    <div style={{ padding: '12px 18px' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: '0.52rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>
+                        Mix de inversión
+                      </p>
+                      {hasAds && objectiveSplit.length > 0 ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <PieChart width={80} height={80}>
+                            <Pie
+                              data={objectiveSplit}
+                              dataKey="spend"
+                              nameKey="objective"
+                              innerRadius={25}
+                              outerRadius={38}
+                              paddingAngle={2}
+                              isAnimationActive={false}
+                            >
+                              {objectiveSplit.map((entry) => (
+                                <Cell key={entry.objective} fill={OBJECTIVE_COLORS[entry.objective] ?? '#64748b'} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
+                            {objectiveSplit.map((entry) => (
+                              <div key={entry.objective} style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                                <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: OBJECTIVE_COLORS[entry.objective] ?? '#64748b' }} />
+                                <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {entry.objective}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'JetBrains Mono' }}>Sin actividad en ads</span>
+                      )}
+                    </div>
+
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+
+                    {/* ── S6: Stats de ads en línea ── */}
+                    <div style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap' }}>
+                      {[
+                        weekSpend > 0  ? `💰 ${formatCop(weekSpend)}` : null,
+                        ctr !== null   ? `📊 CTR ${ctr.toFixed(2)}%` : null,
+                        cpm !== null   ? `📈 CPM ${formatCop(cpm)}` : null,
+                      ].filter(Boolean).map((stat, i, arr) => (
+                        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                          <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>{stat}</span>
+                          {i < arr.length - 1 && <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.15)', margin: '0 6px' }}>·</span>}
+                        </span>
                       ))}
+                      {weekSpend === 0 && ctr === null && cpm === null && (
+                        <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.2)', fontFamily: 'JetBrains Mono' }}>Sin datos de ads esta semana</span>
+                      )}
+                    </div>
+
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+
+                    {/* ── S7: Ver detalle ── */}
+                    <div style={{
+                      padding: '10px 18px', textAlign: 'center',
+                      fontSize: '0.7rem', fontWeight: 700, fontFamily: 'JetBrains Mono',
+                      color: 'rgba(255,255,255,0.25)', letterSpacing: '0.05em',
+                    }}>
+                      Ver detalle →
                     </div>
                   </div>
-
-                  {/* Meta mensual */}
-                  {goalPct !== null && client.monthly_goal && client.monthly_goal > 0 && (
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontSize: '0.56rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'JetBrains Mono', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Meta mensual</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: goalPct >= 80 ? '#22c55e' : goalPct >= 50 ? '#f59e0b' : '#ef4444' }}>
-                          {goalPct}%
-                        </span>
-                      </div>
-                      <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
-                        <div style={{
-                          height: '100%', width: `${goalPct}%`, borderRadius: 999, transition: 'width 0.5s ease',
-                          background: goalPct >= 80
-                            ? 'linear-gradient(90deg,#22c55e,#16a34a)'
-                            : goalPct >= 50
-                            ? 'linear-gradient(90deg,#f59e0b,#d97706)'
-                            : 'linear-gradient(90deg,#ef4444,#dc2626)',
-                        }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                        <span style={{ fontSize: '0.54rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>{formatCop(monthlySales)}</span>
-                        <span style={{ fontSize: '0.54rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>Meta: {formatCop(client.monthly_goal)}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Ads stats */}
-                  {(weekSpend > 0 || ctr !== null || cpm !== null) && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
-                      {weekSpend > 0 && (
-                        <div>
-                          <p style={{ margin: '0 0 2px', fontSize: '0.5rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>💰 Inv.sem.</p>
-                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>{formatCop(weekSpend)}</span>
-                        </div>
-                      )}
-                      {ctr !== null && (
-                        <div>
-                          <p style={{ margin: '0 0 2px', fontSize: '0.5rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>📊 CTR</p>
-                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>{ctr.toFixed(2)}%</span>
-                        </div>
-                      )}
-                      {cpm !== null && (
-                        <div>
-                          <p style={{ margin: '0 0 2px', fontSize: '0.5rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase' }}>📈 CPM</p>
-                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>{formatCop(cpm)}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 4-week sparkline */}
-                  {sparkData.some((d) => d.v > 0) && (
-                    <SparkLine data={sparkData} dataKey="v" color={sparkColor} height={38} />
-                  )}
-
-                  {/* Ver detalle */}
-                  <Link
-                    to={`/dashboard/cliente/${client.id}`}
-                    style={{
-                      display: 'block', textAlign: 'center', padding: '9px', borderRadius: 8,
-                      border: '1px solid rgba(255,255,255,0.12)', background: 'transparent',
-                      color: 'var(--color-text-muted)', fontSize: '0.72rem', fontWeight: 700,
-                      fontFamily: 'JetBrains Mono, monospace', textDecoration: 'none',
-                      letterSpacing: '0.04em', transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = '#06b6d4'; el.style.color = '#06b6d4'; el.style.background = 'rgba(6,182,212,0.08)'; }}
-                    onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = 'rgba(255,255,255,0.12)'; el.style.color = 'var(--color-text-muted)'; el.style.background = 'transparent'; }}
-                  >
-                    Ver detalle →
-                  </Link>
-                </div>
+                </Link>
               );
             })}
           </div>
