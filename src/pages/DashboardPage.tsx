@@ -264,27 +264,22 @@ export function DashboardPage() {
     return { onTarget, atRisk };
   }, [visibleClients, monthSalesByClient]);
 
-  // ── NEW: weekly chart data (last 8 weeks) ─────────────────────────────────────
-  const weeklyChartData = useMemo(() => {
+  // ── Monthly chart data (last 6 months) ───────────────────────────────────────
+  const monthlyChartData = useMemo(() => {
     const today = new Date();
-    const dayOfWeek = today.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    return Array.from({ length: 8 }, (_, i) => {
-      const weeksAgo = 7 - i;
-      const wStart = new Date(today);
-      wStart.setDate(today.getDate() - daysToMonday - weeksAgo * 7);
-      const wEnd = new Date(wStart);
-      wEnd.setDate(wStart.getDate() + 6);
-      const ws = wStart.toISOString().slice(0, 10);
-      const we = wEnd.toISOString().slice(0, 10);
-      const weeklySales = scopedSales
-        .filter((s) => s.date >= ws && s.date <= we)
-        .reduce((acc, s) => acc + s.total_sales, 0);
-      const weeklySpend = campaignRows
-        .filter((r) => r.date >= ws && r.date <= we)
-        .reduce((acc, r) => acc + r.spend, 0);
-      const label = wStart.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
-      return { label, sales: Math.round(weeklySales), spend: Math.round(weeklySpend) };
+    return Array.from({ length: 6 }, (_, i) => {
+      const monthsAgo = 5 - i;
+      const d = new Date(today.getFullYear(), today.getMonth() - monthsAgo, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const raw = d.toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
+      const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+      const sales = scopedSales
+        .filter((s) => s.date.startsWith(key))
+        .reduce((sum, s) => sum + s.total_sales, 0);
+      const spend = campaignRows
+        .filter((r) => r.date.startsWith(key))
+        .reduce((sum, r) => sum + r.spend, 0);
+      return { label, sales: Math.round(sales), spend: Math.round(spend) };
     });
   }, [scopedSales, campaignRows]);
 
@@ -469,17 +464,17 @@ export function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* ── Weekly Charts Row ── */}
+      {/* ── Monthly Charts Row ── */}
       <motion.div
         {...fadeUp(0.24)}
         style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: 16, padding: '0 24px' }}
       >
-        {/* BarChart — ventas semanales */}
+        {/* BarChart — ventas mensuales */}
         <div className="card-glass" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
             <div>
               <p style={{ margin: '0 0 3px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                Últimas 8 semanas
+                Últimos 6 meses
               </p>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
                 Ventas de la agencia
@@ -491,7 +486,7 @@ export function DashboardPage() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={weeklyChartData} barGap={4}>
+            <BarChart data={monthlyChartData} barGap={4}>
               <defs>
                 <linearGradient id="dashSalesGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.9} />
@@ -507,12 +502,12 @@ export function DashboardPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* LineChart — inversión semanal en ads */}
+        {/* LineChart — inversión mensual en ads */}
         <div className="card-glass" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
             <div>
               <p style={{ margin: '0 0 3px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                Últimas 8 semanas
+                Últimos 6 meses
               </p>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
                 Inversión en ads
@@ -524,7 +519,7 @@ export function DashboardPage() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={weeklyChartData}>
+            <LineChart data={monthlyChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCop(v)} />
