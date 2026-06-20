@@ -1,0 +1,55 @@
+/* Competitor Analysis — design tokens
+   Scoped to .ca-root to avoid collisions with the app's CSS variables */
+
+.ca-root {
+  --ca-bg:     #0B1220;
+  --ca-panel:  #0F172A;
+  --ca-panel2: #131C2E;
+
+  --ca-border:       rgba(255, 255, 255, 0.06);
+  --ca-border-hover: rgba(255, 255, 255, 0.12);
+
+  --ca-accent:              #22D3EE;
+  --ca-accent-subtle:       rgba(34, 211, 238, 0.10);
+  --ca-accent-subtle-ring:  rgba(34, 211, 238, 0.22);
+
+  --ca-violet:        #A78BFA;
+  --ca-violet-subtle: rgba(167, 139, 250, 0.12);
+
+  --ca-success: #10B981;
+  --ca-warning: #F59E0B;
+  --ca-danger:  #EF4444;
+
+  --ca-muted: #8A95A8;
+  --ca-fg:    #E6EDF7;
+
+  --ca-gradient-primary: linear-gradient(135deg, #A78BFA 0%, #22D3EE 100%);
+
+  --ca-shadow-card: 0 8px 32px rgba(0, 0, 0, 0.40);
+  --ca-shadow-glow: 0 0 20px rgba(34, 211, 238, 0.14);
+
+  --ca-r-sm:   6px;
+  --ca-r-md:   10px;
+  --ca-r-lg:   16px;
+  --ca-r-full: 9999px;
+
+  font-family: Geist Sans, Inter, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hide scrollbar while keeping scroll behaviour */
+.ca-carousel {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ca-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+/* Responsive card width */
+@media (max-width: 640px) {
+  .ca-card {
+    width: 88vw !important;
+    min-width: 88vw !important;
+  }
+}
