@@ -79,7 +79,7 @@ function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: C
       boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
       color: '#fff',
     }}>
-      <p style={{ margin: '0 0 6px', fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+      <p style={{ margin: '0 0 6px', fontSize: '0.62rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
         {label}
       </p>
       {payload.map((entry) => (
@@ -345,7 +345,7 @@ export function DashboardPage() {
             key={kpi.label}
             style={{
               padding: '20px 22px', borderRadius: 16, overflow: 'hidden',
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+              background: 'var(--surface)', border: '1px solid var(--border)',
               display: 'flex', flexDirection: 'column', gap: 4,
             }}
             initial={{ opacity: 0, y: 12 }}
@@ -353,7 +353,7 @@ export function DashboardPage() {
             transition={{ delay: i * 0.06, duration: 0.35, ease: 'easeOut' } as Transition}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                 {kpi.label}
               </span>
               <div style={{ width: 30, height: 30, borderRadius: 8, background: kpi.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -374,12 +374,12 @@ export function DashboardPage() {
 
       {/* ── Secondary KPIs ── */}
       <motion.div {...fadeUp(0.18)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 24px' }}>
-        <div style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <CheckCircle size={17} style={{ color: '#22c55e' }} />
           </div>
           <div>
-            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
+            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Clientes en objetivo
             </p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -388,12 +388,12 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
-        <div style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <AlertCircle size={17} style={{ color: '#ef4444' }} />
           </div>
           <div>
-            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
+            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Clientes en riesgo
             </p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -408,7 +408,7 @@ export function DashboardPage() {
       <motion.div {...fadeUp(0.24)} style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: 16, padding: '0 24px' }}>
 
         {/* AreaChart — ventas mensuales */}
-        <div style={{ padding: '20px 22px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ padding: '20px 22px', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--border)' }}>
           {(() => {
             const cur = monthlyChartData[monthlyChartData.length - 1]?.sales ?? 0;
             const prev = monthlyChartData[monthlyChartData.length - 2]?.sales ?? 0;
@@ -417,7 +417,7 @@ export function DashboardPage() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                   <div>
-                    <p style={{ margin: '0 0 6px', fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>VENTAS TOTALES</p>
+                    <p style={{ margin: '0 0 6px', fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>VENTAS TOTALES</p>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                       <span style={{ fontSize: '1.7rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'JetBrains Mono', letterSpacing: '-0.03em', lineHeight: 1 }}>
                         {cur > 0 ? formatCop(cur) : '—'}
@@ -431,7 +431,7 @@ export function DashboardPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#06b6d4' }} />
-                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'rgba(255,255,255,0.35)' }}>Ventas</span>
+                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'var(--text-muted)' }}>Ventas</span>
                   </div>
                 </div>
                 <p style={{ margin: '4px 0 14px', fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>vs mes anterior · Últimos 6 meses</p>
@@ -446,9 +446,9 @@ export function DashboardPage() {
                   <stop offset="100%" stopColor="#06b6d4" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`} width={42} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`} width={42} />
               <Tooltip content={<AreaTooltip />} />
               <Area type="monotone" dataKey="sales" name="Ventas" stroke="#06b6d4" strokeWidth={2} fill="url(#salesAreaGrad)" dot={{ r: 3, fill: '#06b6d4', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#06b6d4' }} />
             </AreaChart>
@@ -456,7 +456,7 @@ export function DashboardPage() {
         </div>
 
         {/* AreaChart — inversión mensual */}
-        <div style={{ padding: '20px 22px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ padding: '20px 22px', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--border)' }}>
           {(() => {
             const cur = monthlyChartData[monthlyChartData.length - 1]?.spend ?? 0;
             const prev = monthlyChartData[monthlyChartData.length - 2]?.spend ?? 0;
@@ -465,7 +465,7 @@ export function DashboardPage() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                   <div>
-                    <p style={{ margin: '0 0 6px', fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>INVERSIÓN EN ADS</p>
+                    <p style={{ margin: '0 0 6px', fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>INVERSIÓN EN ADS</p>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                       <span style={{ fontSize: '1.7rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'JetBrains Mono', letterSpacing: '-0.03em', lineHeight: 1 }}>
                         {cur > 0 ? formatCop(cur) : '—'}
@@ -479,7 +479,7 @@ export function DashboardPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6' }} />
-                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'rgba(255,255,255,0.35)' }}>Spend</span>
+                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'var(--text-muted)' }}>Spend</span>
                   </div>
                 </div>
                 <p style={{ margin: '4px 0 14px', fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>vs mes anterior · Últimos 6 meses</p>
@@ -494,9 +494,9 @@ export function DashboardPage() {
                   <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`} width={42} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`} width={42} />
               <Tooltip content={<AreaTooltip />} />
               <Area type="monotone" dataKey="spend" name="Inversión" stroke="#8b5cf6" strokeWidth={2} fill="url(#spendAreaGrad)" dot={{ r: 3, fill: '#8b5cf6', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#8b5cf6' }} />
             </AreaChart>
@@ -508,7 +508,7 @@ export function DashboardPage() {
       <motion.div {...fadeUp(0.28)} style={{ padding: '0 24px' }}>
         <div style={{
           padding: '10px 16px', borderRadius: 8, flexWrap: 'wrap',
-          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+          background: 'var(--surface)', border: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -517,7 +517,7 @@ export function DashboardPage() {
               animate={{ opacity: [1, 0.3, 1] }}
               transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' } as Transition}
             />
-            <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               ACTIVIDAD DE HOY
             </span>
           </div>
@@ -532,7 +532,7 @@ export function DashboardPage() {
             todayPulse.bestCtrName ? `Mejor CTR: ${todayPulse.bestCtrName} ${todayPulse.bestCtr.toFixed(2)}%` : null,
           ] as (string | null)[]).filter(Boolean).map((text, i) => (
             <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.8rem' }}>·</span>
+              <span style={{ color: 'var(--border)', fontSize: '0.8rem' }}>·</span>
               <span style={{ fontSize: '0.63rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>{text}</span>
             </span>
           ))}

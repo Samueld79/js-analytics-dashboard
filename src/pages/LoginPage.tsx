@@ -10,12 +10,12 @@ const CARD: CSSProperties = {
   width: 420,
   maxWidth: 'calc(100vw - 32px)',
   padding: '48px',
-  background: 'rgba(3,7,18,0.85)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(6,182,212,0.2)',
-  borderRadius: 16,
-  boxShadow: '0 0 40px rgba(6,182,212,0.08)',
+  background: 'oklch(0.14 0.03 250 / 88%)',
+  backdropFilter: 'blur(24px)',
+  WebkitBackdropFilter: 'blur(24px)',
+  border: '1px solid oklch(0.78 0.16 200 / 22%)',
+  borderRadius: 20,
+  boxShadow: '0 0 60px oklch(0.78 0.16 200 / 10%), 0 24px 64px oklch(0 0 0 / 40%)',
 };
 
 type FocusState = { email: boolean; password: boolean };
@@ -29,7 +29,7 @@ function floatingLabel(value: string, focused: boolean): CSSProperties {
     transform: up ? 'none' : 'translateY(-50%)',
     transition: 'top 0.18s ease, transform 0.18s ease, font-size 0.18s ease, color 0.18s ease',
     fontSize: up ? '0.6rem' : '0.88rem',
-    color: focused ? 'hsl(180,100%,55%)' : 'rgba(255,255,255,0.35)',
+    color: focused ? 'oklch(0.78 0.16 200)' : 'oklch(1 0 0 / 38%)',
     pointerEvents: 'none',
     letterSpacing: up ? '0.08em' : 'normal',
     fontFamily: up ? 'JetBrains Mono, monospace' : 'inherit',
@@ -42,10 +42,10 @@ function inputWrap(focused: boolean): CSSProperties {
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
-    background: 'rgba(255,255,255,0.03)',
-    border: `1px solid ${focused ? 'rgba(6,182,212,0.5)' : 'rgba(255,255,255,0.08)'}`,
-    borderRadius: 8,
-    boxShadow: focused ? '0 0 0 3px rgba(6,182,212,0.07)' : 'none',
+    background: 'oklch(1 0 0 / 4%)',
+    border: `1px solid ${focused ? 'oklch(0.78 0.16 200 / 55%)' : 'oklch(1 0 0 / 10%)'}`,
+    borderRadius: 10,
+    boxShadow: focused ? '0 0 0 3px oklch(0.78 0.16 200 / 10%)' : 'none',
     transition: 'border-color 0.15s, box-shadow 0.15s',
     height: 54,
     overflow: 'hidden',
@@ -87,7 +87,7 @@ export function LoginPage() {
   const iconColor = (f: boolean) => ({
     position: 'absolute' as const,
     left: 16,
-    color: f ? 'hsl(180,100%,55%)' : 'rgba(255,255,255,0.28)',
+    color: f ? 'oklch(0.78 0.16 200)' : 'oklch(1 0 0 / 30%)',
     transition: 'color 0.15s',
     pointerEvents: 'none' as const,
     flexShrink: 0,
@@ -101,7 +101,7 @@ export function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#030712',
+        background: 'oklch(0.10 0.025 250)',
       }}
     >
       <StardustCanvas />
@@ -130,12 +130,12 @@ export function LoginPage() {
               letterSpacing: '-0.01em',
             }}
           >
-            Growth Strategy<span style={{ color: '#06b6d4' }}>.</span>
+            Growth Strategy<span style={{ color: 'oklch(0.78 0.16 200)' }}>.</span>
           </div>
           <div
             style={{
               fontSize: '0.62rem',
-              color: 'rgba(6,182,212,0.55)',
+              color: 'oklch(0.78 0.16 200 / 60%)',
               letterSpacing: '0.2em',
               marginTop: 6,
               fontFamily: 'JetBrains Mono, monospace',
@@ -214,20 +214,20 @@ export function LoginPage() {
               marginTop: 8,
               width: '100%',
               height: 48,
-              background: loading ? 'rgba(6,182,212,0.5)' : '#06b6d4',
+              background: loading ? 'oklch(0.78 0.16 200 / 50%)' : 'oklch(0.78 0.16 200)',
               border: 'none',
-              borderRadius: 8,
-              color: '#030712',
+              borderRadius: 10,
+              color: 'oklch(0.12 0.03 250)',
               fontWeight: 700,
               fontSize: '0.8rem',
-              letterSpacing: '0.1em',
+              letterSpacing: '0.08em',
               fontFamily: 'JetBrains Mono, monospace',
               cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              boxShadow: loading ? 'none' : '0 0 20px rgba(6,182,212,0.25)',
+              boxShadow: loading ? 'none' : '0 0 24px oklch(0.78 0.16 200 / 40%)',
               transition: 'background 0.2s, box-shadow 0.2s, filter 0.15s',
             }}
             onMouseEnter={(e) => {
