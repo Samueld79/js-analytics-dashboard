@@ -30,6 +30,18 @@
   --color-badge-bg:          hsl(0 0% 100% / 0.08);
   --color-badge-text:        hsl(215, 15%, 55%);
 
+  /* ── Client card tokens ── */
+  --cc-bg:           rgba(255,255,255,0.03);
+  --cc-border:       rgba(255,255,255,0.08);
+  --cc-hover-border: rgba(6,182,212,0.35);
+  --cc-hover-bg:     rgba(6,182,212,0.02);
+  --cc-hover-shadow: 0 0 24px rgba(6,182,212,0.08);
+  --cc-divider:      rgba(255,255,255,0.05);
+  --cc-tab-bg:       rgba(255,255,255,0.06);
+  --cc-tab-active:   rgba(6,182,212,0.15);
+  --cc-period-bg:    rgba(0,0,0,0.18);
+  --cc-accent:       #06b6d4;
+
   font-family: "Manrope", "Segoe UI", sans-serif;
   line-height: 1.45;
   font-weight: 400;
@@ -67,6 +79,18 @@
   --color-tooltip-text:      #0f172a;
   --color-badge-bg:          #f1f5f9;
   --color-badge-text:        #475569;
+
+  /* ── Client card tokens ── */
+  --cc-bg:           #ffffff;
+  --cc-border:       rgba(0,0,0,0.08);
+  --cc-hover-border: rgba(0,0,0,0.12);
+  --cc-hover-bg:     #f8fafc;
+  --cc-hover-shadow: 0 4px 20px rgba(0,0,0,0.10);
+  --cc-divider:      rgba(0,0,0,0.06);
+  --cc-tab-bg:       rgba(0,0,0,0.05);
+  --cc-tab-active:   rgba(37,99,235,0.10);
+  --cc-period-bg:    rgba(0,0,0,0.04);
+  --cc-accent:       #2563eb;
 }
 
 *,
@@ -89,6 +113,49 @@ html {
 
 #root {
   min-height: 100vh;
+}
+
+/* ── Client Cards ─────────────────────────────────────────── */
+.client-card {
+  background: var(--cc-bg);
+  border: 1px solid var(--cc-border);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  height: 100%;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.client-card:hover {
+  border-color: var(--cc-hover-border);
+  background: var(--cc-hover-bg);
+  box-shadow: var(--cc-hover-shadow);
+}
+.client-card:focus-within {
+  outline: 2px solid var(--cc-accent);
+  outline-offset: 2px;
+}
+.client-card-divider {
+  height: 1px;
+  background: var(--cc-divider);
+  flex-shrink: 0;
+}
+
+/* ── Skeleton loaders ─────────────────────────────────────── */
+@keyframes cc-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+.sk-pulse {
+  animation: cc-pulse 1.5s ease-in-out infinite;
+  background: var(--cc-divider);
+  border-radius: 4px;
+}
+.sk-pulse-slow {
+  animation: cc-pulse 2s ease-in-out infinite;
+  background: var(--cc-divider);
+  border-radius: 4px;
 }
 
 .page-shell {
