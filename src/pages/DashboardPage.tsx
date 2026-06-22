@@ -1,8 +1,6 @@
 import {
   AreaChart,
   Area,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -39,6 +37,7 @@ import {
 import { sumCampaignMonthAggregates } from '../services/adCampaignMetrics';
 import type { AdMetric, DailySale } from '../lib/supabase';
 import { ClientCard, ClientCardSkeleton } from '../components/dashboard/ClientCard';
+import { SparklineChart } from '../components/dashboard/SparklineChart';
 import { useClientDashboardData } from '../hooks/useClientDashboardData';
 import {
   formatCop,
@@ -368,7 +367,7 @@ export function DashboardPage() {
               <TrendingUp size={10} style={{ color: 'var(--color-text-muted)' }} />
               <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.58rem', color: 'var(--color-text-muted)', letterSpacing: '0.04em' }}>mes actual</span>
             </div>
-            <SparkLine data={monthlyChartData} dataKey={kpi.sparkKey} color={kpi.sparkColor} height={44} />
+            <SparklineChart data={monthlyChartData.map((d) => d[kpi.sparkKey])} color={kpi.sparkColor} height={44} filled={false} />
           </motion.div>
         ))}
       </div>
