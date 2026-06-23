@@ -57,7 +57,7 @@ const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 function RefreshIndicator() {
   return (
     <motion.span
-      style={{ width: 7, height: 7, borderRadius: '50%', background: 'hsl(180,100%,50%)', display: 'inline-block', flexShrink: 0 }}
+      style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--cyan)', display: 'inline-block', flexShrink: 0 }}
       animate={{ opacity: [1, 0.25, 1] }}
       transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' } as Transition}
     />
@@ -70,16 +70,16 @@ function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: C
   if (!active || !payload?.length) return null;
   return (
     <div style={{
-      background: 'rgba(0,0,0,0.88)',
-      border: '1px solid rgba(6,182,212,0.3)',
+      background: 'var(--surface-2)',
+      border: '1px solid var(--border)',
       borderRadius: 8,
       padding: '10px 14px',
       fontFamily: 'JetBrains Mono, monospace',
       fontSize: 11,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-      color: '#fff',
+      boxShadow: 'var(--shadow-card)',
+      color: 'var(--fg)',
     }}>
-      <p style={{ margin: '0 0 6px', fontSize: '0.62rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+      <p style={{ margin: '0 0 6px', fontSize: '0.62rem', color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
         {label}
       </p>
       {payload.map((entry) => (
@@ -275,9 +275,9 @@ export function DashboardPage() {
   // ── Primary KPIs ──────────────────────────────────────────────────────────────
   type PrimaryKpi = { label: string; value: string; Icon: LucideIcon; iconColor: string; iconBg: string; sparkKey: 'spend' | 'sales' | 'msgs'; sparkColor: string };
   const primaryKpis: PrimaryKpi[] = [
-    { label: `INVERSIÓN · ${activePeriodLabel.toUpperCase()}`,      value: formatCop(kpiSpend),                                                              Icon: DollarSign,    iconColor: '#06b6d4', iconBg: 'rgba(6,182,212,0.15)',   sparkKey: 'spend', sparkColor: '#06b6d4' },
-    { label: `VENTAS · ${activePeriodLabel.toUpperCase()}`,         value: kpiSalesTotal > 0 ? formatCop(kpiSalesTotal) : '—',                              Icon: Banknote,      iconColor: '#22c55e', iconBg: 'rgba(34,197,94,0.15)',   sparkKey: 'sales', sparkColor: '#22c55e' },
-    { label: `CONVERSACIONES · ${activePeriodLabel.toUpperCase()}`, value: kpiMessages > 0 ? kpiMessages.toLocaleString('es-CO') : '—',                    Icon: MessageCircle, iconColor: '#8b5cf6', iconBg: 'rgba(139,92,246,0.15)', sparkKey: 'msgs', sparkColor: '#8b5cf6' },
+    { label: `INVERSIÓN · ${activePeriodLabel.toUpperCase()}`,      value: formatCop(kpiSpend),                                                              Icon: DollarSign,    iconColor: 'var(--cyan)',              iconBg: 'var(--cyan-dim)',                 sparkKey: 'spend', sparkColor: 'var(--cyan)' },
+    { label: `VENTAS · ${activePeriodLabel.toUpperCase()}`,         value: kpiSalesTotal > 0 ? formatCop(kpiSalesTotal) : '—',                              Icon: Banknote,      iconColor: 'var(--success)',           iconBg: 'var(--success-dim)',              sparkKey: 'sales', sparkColor: 'var(--success)' },
+    { label: `CONVERSACIONES · ${activePeriodLabel.toUpperCase()}`, value: kpiMessages > 0 ? kpiMessages.toLocaleString('es-CO') : '—',                    Icon: MessageCircle, iconColor: 'oklch(0.72 0.22 290)',    iconBg: 'oklch(0.72 0.22 290 / 0.12)',    sparkKey: 'msgs', sparkColor: 'oklch(0.72 0.22 290)' },
   ];
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -322,15 +322,8 @@ export function DashboardPage() {
           )}
           <Link
             to="/ai-tools"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-              background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.25)',
-              color: '#06b6d4', fontSize: '0.72rem', fontWeight: 700,
-              fontFamily: 'JetBrains Mono', textDecoration: 'none', letterSpacing: '0.04em',
-              transition: 'background 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={(e) => { const el = e.currentTarget; el.style.background = 'rgba(6,182,212,0.18)'; el.style.borderColor = 'rgba(6,182,212,0.5)'; }}
-            onMouseLeave={(e) => { const el = e.currentTarget; el.style.background = 'rgba(6,182,212,0.1)'; el.style.borderColor = 'rgba(6,182,212,0.25)'; }}
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem' }}
           >
             <Zap size={12} />
             Área de Trabajo
@@ -375,30 +368,30 @@ export function DashboardPage() {
       {/* ── Secondary KPIs ── */}
       <motion.div {...fadeUp(0.18)} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 24px' }}>
         <div style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(34,197,94,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <CheckCircle size={17} style={{ color: '#22c55e' }} />
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--success-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <CheckCircle size={17} style={{ color: 'var(--success)' }} />
           </div>
           <div>
-            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--fg-muted)', textTransform: 'uppercase' }}>
               Clientes en objetivo
             </p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '1.5rem', fontWeight: 700, color: '#22c55e', letterSpacing: '-0.02em', lineHeight: 1 }}>{goalStats.onTarget}</span>
-              <span style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>≥ 80% de meta</span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '1.5rem', fontWeight: 700, color: 'var(--success)', letterSpacing: '-0.02em', lineHeight: 1 }}>{goalStats.onTarget}</span>
+              <span style={{ fontSize: '0.63rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>≥ 80% de meta</span>
             </div>
           </div>
         </div>
         <div style={{ padding: '14px 18px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14, background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <AlertCircle size={17} style={{ color: '#ef4444' }} />
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--danger-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <AlertCircle size={17} style={{ color: 'var(--danger)' }} />
           </div>
           <div>
-            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <p style={{ margin: '0 0 2px', fontSize: '0.58rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.12em', color: 'var(--fg-muted)', textTransform: 'uppercase' }}>
               Clientes en riesgo
             </p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '1.5rem', fontWeight: 700, color: '#ef4444', letterSpacing: '-0.02em', lineHeight: 1 }}>{goalStats.atRisk}</span>
-              <span style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>{'< 50% de meta'}</span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '1.5rem', fontWeight: 700, color: 'var(--danger)', letterSpacing: '-0.02em', lineHeight: 1 }}>{goalStats.atRisk}</span>
+              <span style={{ fontSize: '0.63rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>{'< 50% de meta'}</span>
             </div>
           </div>
         </div>
@@ -423,15 +416,15 @@ export function DashboardPage() {
                         {cur > 0 ? formatCop(cur) : '—'}
                       </span>
                       {delta !== null && (
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: delta >= 0 ? '#22c55e' : '#ef4444' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: delta >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                           {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
                         </span>
                       )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#06b6d4' }} />
-                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'var(--text-muted)' }}>Ventas</span>
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--cyan)' }} />
+                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'var(--fg-muted)' }}>Ventas</span>
                   </div>
                 </div>
                 <p style={{ margin: '4px 0 14px', fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>vs mes anterior · Últimos 6 meses</p>
@@ -442,15 +435,15 @@ export function DashboardPage() {
             <AreaChart data={monthlyChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="salesAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#06b6d4" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--cyan)" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="var(--cyan)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`} width={42} />
               <Tooltip content={<AreaTooltip />} />
-              <Area type="monotone" dataKey="sales" name="Ventas" stroke="#06b6d4" strokeWidth={2} fill="url(#salesAreaGrad)" dot={{ r: 3, fill: '#06b6d4', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#06b6d4' }} />
+              <Area type="monotone" dataKey="sales" name="Ventas" stroke="var(--cyan)" strokeWidth={2} fill="url(#salesAreaGrad)" dot={{ r: 3, fill: 'var(--cyan)', strokeWidth: 0 }} activeDot={{ r: 5, fill: 'var(--cyan)' }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -471,15 +464,15 @@ export function DashboardPage() {
                         {cur > 0 ? formatCop(cur) : '—'}
                       </span>
                       {delta !== null && (
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: delta >= 0 ? '#22c55e' : '#ef4444' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'JetBrains Mono', color: delta >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                           {delta >= 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}%
                         </span>
                       )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#8b5cf6' }} />
-                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'var(--text-muted)' }}>Spend</span>
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'oklch(0.72 0.22 290)' }} />
+                    <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', color: 'var(--fg-muted)' }}>Spend</span>
                   </div>
                 </div>
                 <p style={{ margin: '4px 0 14px', fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>vs mes anterior · Últimos 6 meses</p>
@@ -490,15 +483,15 @@ export function DashboardPage() {
             <AreaChart data={monthlyChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="spendAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <stop offset="0%" stopColor="oklch(0.72 0.22 290)" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="oklch(0.72 0.22 290)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--color-chart-text)', fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(0)}M`} width={42} />
               <Tooltip content={<AreaTooltip />} />
-              <Area type="monotone" dataKey="spend" name="Inversión" stroke="#8b5cf6" strokeWidth={2} fill="url(#spendAreaGrad)" dot={{ r: 3, fill: '#8b5cf6', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#8b5cf6' }} />
+              <Area type="monotone" dataKey="spend" name="Inversión" stroke="oklch(0.72 0.22 290)" strokeWidth={2} fill="url(#spendAreaGrad)" dot={{ r: 3, fill: 'oklch(0.72 0.22 290)', strokeWidth: 0 }} activeDot={{ r: 5, fill: 'oklch(0.72 0.22 290)' }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -513,11 +506,11 @@ export function DashboardPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <motion.span
-              style={{ width: 6, height: 6, borderRadius: '50%', background: '#06b6d4', display: 'inline-block', flexShrink: 0 }}
+              style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cyan)', display: 'inline-block', flexShrink: 0 }}
               animate={{ opacity: [1, 0.3, 1] }}
               transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' } as Transition}
             />
-            <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.56rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.1em', color: 'var(--fg-muted)', textTransform: 'uppercase' }}>
               ACTIVIDAD DE HOY
             </span>
           </div>
@@ -573,12 +566,12 @@ export function DashboardPage() {
         <motion.div {...fadeUp(0.36)} style={{ padding: '0 24px 24px' }}>
           <Link to="/alerts" style={{ textDecoration: 'none' }}>
             <div style={{
-              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+              background: 'var(--danger-dim)', border: '1px solid var(--danger)',
               borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
             }}>
-              <AlertTriangle size={14} style={{ color: '#ef4444', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', fontFamily: 'JetBrains Mono' }}>
-                <strong style={{ color: '#ef4444' }}>{visibleOpenAlerts.length}</strong> {visibleOpenAlerts.length === 1 ? 'alerta abierta' : 'alertas abiertas'} — revisar
+              <AlertTriangle size={14} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.78rem', color: 'var(--fg-2)', fontFamily: 'JetBrains Mono' }}>
+                <strong style={{ color: 'var(--danger)' }}>{visibleOpenAlerts.length}</strong> {visibleOpenAlerts.length === 1 ? 'alerta abierta' : 'alertas abiertas'} — revisar
               </span>
               <BarChart3 size={12} style={{ color: 'var(--color-text-muted)', marginLeft: 'auto', flexShrink: 0 }} />
             </div>

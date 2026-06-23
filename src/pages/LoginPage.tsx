@@ -1,7 +1,6 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
-import { Loader2, Lock, Mail } from 'lucide-react';
+import { Loader2, Lock, Mail, TrendingUp } from 'lucide-react';
 import { StardustCanvas } from '../components/StardustCanvas';
-import brandLogo from '../assets/brand-logo.png';
 import { useAuth } from '../hooks/useAuth';
 
 const CARD: CSSProperties = {
@@ -116,11 +115,15 @@ export function LoginPage() {
       >
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <img
-            src={brandLogo}
-            alt="Growth Strategy"
-            style={{ width: 42, height: 42, objectFit: 'contain', marginBottom: 14 }}
-          />
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'linear-gradient(135deg, var(--cyan), var(--cyan-glow))',
+            boxShadow: 'var(--shadow-glow)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 20px',
+          }}>
+            <TrendingUp size={28} color="oklch(0.12 0.03 250)" />
+          </div>
           <div
             style={{
               fontSize: '1.2rem',
