@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClientCreateModal } from '../components/ClientCreateModal';
+import { ClientAvatar } from '../components/ClientAvatar';
 import { useClients } from '../hooks/useClients';
 import { useCampaignSummary, useAlerts, useAdMetrics } from '../hooks/useData';
 import {
@@ -14,7 +15,7 @@ import { formatCop, formatNumber } from '../lib/utils';
 type StatusFilter = 'all' | 'active' | 'paused';
 
 export function ClientsPage() {
-  const { clients, loading, saving, error, createClient } = useClients();
+  const { clients, loading, saving, error, createClient, reload } = useClients();
   // Unified campaign source — same hook as DashboardPage
   const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary();
   const { metrics: adMetrics } = useAdMetrics(undefined, 180);
@@ -309,22 +310,15 @@ export function ClientsPage() {
                       {/* Cliente + Nicho */}
                       <td style={{ padding: '9px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
-                          <div
-                            style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '4px',
-                              background: clientGradient(client.id),
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.68rem', color: '#fff' }}>
-                              {client.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
+                          <ClientAvatar
+                            clientId={client.id}
+                            name={client.name}
+                            logoUrl={client.logo_url}
+                            size={32}
+                            borderRadius={6}
+                            editable
+                            onLogoChange={() => void reload()}
+                          />
                           <div style={{ minWidth: 0, overflow: 'hidden' }}>
                             <Link
                               to={`/clients/${client.id}`}
@@ -475,16 +469,3 @@ function formatShortDate(dateStr: string): string {
   return `${parseInt(dd, 10)} ${month}`;
 }
 
-function clientGradient(id: string): string {
-  const gradients = [
-    'linear-gradient(135deg,#2979ff,#00b0ff)',
-    'linear-gradient(135deg,#00e676,#00bcd4)',
-    'linear-gradient(135deg,#ff5252,#e040fb)',
-    'linear-gradient(135deg,#ffc107,#ff5722)',
-    'linear-gradient(135deg,#e040fb,#2979ff)',
-    'linear-gradient(135deg,#00bcd4,#00e676)',
-  ];
-  let hash = 0;
-  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) & 0xffff;
-  return gradients[hash % gradients.length];
-}

@@ -76,6 +76,46 @@ function toClientPayload(input: ClientInput, createdBy: string | null) {
   };
 }
 
+export async function updateClientLogo(
+  clientId: string,
+  file: File,
+): Promise<ServiceMutationResult<{ logo_url: string }>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const path = `${clientId}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('client-logos')
+    .upload(path, file, { upsert: true, contentType: file.type });
+
+  if (uploadError) {
+    console.error('[clients] updateClientLogo upload', uploadError);
+    return { data: null, error: uploadError.message };
+  }
+
+  const { data: urlData } = supabase.storage
+    .from('client-logos')
+    .getPublicUrl(path);
+
+  // Add cache-bust so the browser shows the new image immediately
+  const logo_url = `${urlData.publicUrl}?t=${Date.now()}`;
+
+  const { error: dbError } = await supabase
+    .from('clients')
+    .update({ logo_url })
+    .eq('id', clientId);
+
+  if (dbError) {
+    console.error('[clients] updateClientLogo db update', dbError);
+    return { data: null, error: dbError.message };
+  }
+
+  return { data: { logo_url }, error: null };
+}
+
 export async function listClients(): Promise<Client[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 

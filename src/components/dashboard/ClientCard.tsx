@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Client } from '../../lib/supabase';
 import { formatCop, formatNumber } from '../../lib/utils';
+import { ClientAvatar } from '../ClientAvatar';
 import { StatBadge, type BadgeStatus } from './StatBadge';
 import { SparklineChart } from './SparklineChart';
 import { ProgressBar } from './ProgressBar';
@@ -31,20 +32,6 @@ export interface ClientCardData {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function clientAvatarColor(name: string): string {
-  const COLORS = ['#06b6d4','#8b5cf6','#22c55e','#f59e0b','#ef4444','#ec4899','#3b82f6','#10b981'];
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return COLORS[Math.abs(h) % COLORS.length];
-}
-
-function clientInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts.length >= 2
-    ? (parts[0][0] + parts[1][0]).toUpperCase()
-    : name.slice(0, 2).toUpperCase();
-}
 
 const STATUS_LABEL: Record<string, string> = { active: 'Activo', paused: 'Pausado', churned: 'Inactivo' };
 
@@ -79,8 +66,6 @@ export function ClientCardSkeleton() {
 
 export function ClientCard({ data: d }: { data: ClientCardData }) {
   const { client: c } = d;
-  const color    = clientAvatarColor(c.name);
-  const initials = clientInitials(c.name);
 
   const campaignDelta  = d.campaignCountPrev > 0 ? d.campaignCount - d.campaignCountPrev : null;
   const hasGoal        = c.monthly_goal != null && c.monthly_goal > 0;
@@ -96,18 +81,13 @@ export function ClientCard({ data: d }: { data: ClientCardData }) {
 
         {/* ── Header ── */}
         <div style={{ padding: '16px 18px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <div
-            aria-hidden="true"
-            style={{
-              width: 48, height: 48, borderRadius: 12, flexShrink: 0,
-              background: color + '22', border: `2px solid ${color}55`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '1rem', fontWeight: 800, color,
-              fontFamily: 'Outfit, sans-serif',
-            }}
-          >
-            {initials}
-          </div>
+          <ClientAvatar
+            clientId={c.id}
+            name={c.name}
+            logoUrl={c.logo_url}
+            size={48}
+            borderRadius={12}
+          />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'Outfit, sans-serif', lineHeight: 1.2 }}>

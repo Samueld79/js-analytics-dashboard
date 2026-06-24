@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { ClientAvatar } from '../components/ClientAvatar';
 import {
   ComposedChart,
   Bar,
@@ -21,20 +22,6 @@ import { getBrandKitByClient, listToolOutputs, type BrandKit, type ToolOutput } 
 import { formatCop, formatNumber } from '../lib/utils';
 import { getCurrentMonthKey } from '../utils/goalHelpers';
 import { getMonthLabel } from '../utils/monthLabel';
-
-function clientAvatarColor(name: string): string {
-  const COLORS = ['#06b6d4', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#3b82f6', '#10b981'];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return COLORS[Math.abs(hash) % COLORS.length];
-}
-
-function clientInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts.length >= 2
-    ? (parts[0][0] + parts[1][0]).toUpperCase()
-    : name.slice(0, 2).toUpperCase();
-}
 
 const BADGE_CFG = {
   objetivo: { text: 'En objetivo',      bg: 'hsl(145 100% 45% / 0.12)', color: '#22c55e', border: 'hsl(145 100% 45% / 0.25)' },
@@ -217,8 +204,6 @@ export function DashboardClientPage() {
     );
   }
 
-  const color = clientAvatarColor(client.name);
-  const initials = clientInitials(client.name);
   const bdg = BADGE_CFG[badge];
 
   return (
@@ -239,14 +224,13 @@ export function DashboardClientPage() {
         {/* Client identity row */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
           {/* Avatar */}
-          <div style={{
-            width: 52, height: 52, borderRadius: 12, flexShrink: 0,
-            background: color + '22', border: `2px solid ${color}55`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1.1rem', fontWeight: 800, color, fontFamily: 'Outfit, sans-serif',
-          }}>
-            {initials}
-          </div>
+          <ClientAvatar
+            clientId={client.id}
+            name={client.name}
+            logoUrl={client.logo_url}
+            size={52}
+            borderRadius={12}
+          />
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
