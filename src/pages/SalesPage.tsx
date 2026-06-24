@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AreaChart,
   Area,
@@ -126,6 +126,15 @@ export function SalesPage() {
   const [quickAdding, setQuickAdding] = useState(false);
   const [deletingSaleId, setDeletingSaleId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ msg: string; isError: boolean } | null>(null);
+
+  // Auto-seleccionar cliente en formulario cuando cambia el filtro principal
+  useEffect(() => {
+    if (selectedClient !== 'all') {
+      setQuickClientId(selectedClient);
+    } else {
+      setQuickClientId('');
+    }
+  }, [selectedClient]);
 
   // ── data: single query scoped by access control (not UI selection) ─────────
   // For internal users accessQueryId=undefined loads ALL clients at once.
@@ -384,26 +393,41 @@ export function SalesPage() {
       <div className="metrics-kpi-grid">
         {salesLoading && periodSales.length === 0 ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="skeleton-card" style={{ height: 90, borderRadius: 12 }} />
+            <div key={i} className="skeleton" style={{ height: 90 }} />
           ))
         ) : kpiCards.map((card, i) => (
           <motion.div
             key={card.label}
-            className="card-glass metrics-kpi-card"
+            style={{
+              padding: '16px 18px',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
+              boxShadow: 'var(--shadow-card)',
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.06 } as Transition}
           >
-            <div className="metrics-kpi-header">
-              <span className={`metrics-kpi-icon ${card.muted ? 'is-muted' : ''}`}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ color: card.muted ? 'var(--fg-muted)' : 'var(--cyan)', display: 'flex', flexShrink: 0 }}>
                 {card.icon}
               </span>
-              <span className="number-label">{card.label}</span>
+              <span style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
+                {card.label}
+              </span>
             </div>
-            <strong className={`font-display metrics-kpi-value ${card.muted ? 'is-muted' : ''}`}>
+            <strong style={{
+              fontSize: '1.5rem', fontWeight: 700, color: card.muted ? 'var(--fg-muted)' : 'var(--fg)',
+              fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-0.02em', lineHeight: 1,
+            }}>
               {card.value}
             </strong>
-            <span className="metrics-kpi-sub">{card.sub}</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--fg-muted)', marginTop: 2 }}>
+              {card.sub}
+            </span>
           </motion.div>
         ))}
       </div>

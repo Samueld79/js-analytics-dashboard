@@ -188,10 +188,14 @@ export function Sidebar() {
       />
       <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-brand">
-          <BrandSignature
-            subtitle="AGENCIA / META ADS"
-            className="sidebar-brand-signature"
-          />
+          <div className="sidebar-logo-wrap">
+            <div className="sidebar-logo-icon">
+              <TrendingUp size={18} color="oklch(0.12 0.03 250)" />
+            </div>
+            <span className="sidebar-logo-text">
+              Growth <span style={{ color: 'var(--cyan)' }}>Strategy</span>
+            </span>
+          </div>
           <button
             className="sidebar-toggle"
             onClick={toggleSidebar}
