@@ -1517,3 +1517,264 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(12px);
 }
+
+/* ============================================================
+   SECTION 23: Client Portal (ClientDetailPage)
+   ============================================================ */
+
+/* Portal shell logo */
+.portal-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.portal-logo-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-glow);
+}
+.portal-logo-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  font-family: 'Inter', 'Outfit', sans-serif;
+  letter-spacing: -0.01em;
+}
+.portal-logo-sub {
+  font-size: 0.6rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+/* Header row */
+.portal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.portal-title-block {
+  flex: 1;
+  min-width: 0;
+}
+.portal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* Status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.status-pill-active  { background: var(--cyan-dim);    color: var(--cyan);    border-color: var(--cyan-border); }
+.status-pill-paused  { background: var(--warning-dim); color: var(--warning); border-color: var(--warning);     }
+.status-pill-churned { background: var(--danger-dim);  color: var(--danger);  border-color: var(--danger);      }
+
+/* Meta chips */
+.meta-chip {
+  font-size: 0.72rem;
+  color: var(--fg-muted);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+}
+
+/* Back link */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  color: var(--fg-muted);
+  text-decoration: none;
+  transition: color 150ms;
+}
+.back-link:hover { color: var(--fg); }
+
+/* Period pill selector */
+.portal-period-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.portal-period-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  padding: 5px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg-muted);
+  transition: all 150ms;
+}
+.portal-period-pill:hover { border-color: var(--cyan-border); color: var(--cyan); }
+.portal-period-pill.active {
+  border-color: var(--cyan-border);
+  background: var(--cyan-dim);
+  color: var(--cyan);
+}
+
+/* KPI grid — responsive auto-fit */
+.portal-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* KPI card inner content */
+.portal-kpi-card { padding: 20px; }
+.portal-kpi-label {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.portal-kpi-value {
+  margin: 8px 0 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-family: 'JetBrains Mono', monospace;
+}
+.portal-kpi-sub {
+  margin: 6px 0 0;
+  font-size: 0.68rem;
+  color: var(--fg-muted);
+  opacity: 0.7;
+}
+
+/* Charts 2-col grid */
+.portal-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (max-width: 800px) { .portal-charts-grid { grid-template-columns: 1fr; } }
+
+/* Card with padding utility */
+.card-padded { padding: 16px 20px; }
+
+/* Pie legend */
+.portal-pie-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.portal-pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.portal-pie-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Campaign table */
+.portal-table-toggle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  user-select: none;
+}
+.portal-table-chevron { font-size: 0.6rem; opacity: 0.6; }
+
+.portal-campaign-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.portal-campaign-table th {
+  padding: 8px 12px;
+  color: var(--fg-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 0.7rem;
+}
+.portal-campaign-table th.num-col { text-align: right; }
+.portal-campaign-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  vertical-align: middle;
+}
+.portal-campaign-table tbody tr:last-child td { border-bottom: none; }
+.portal-campaign-table tbody tr:hover td { background: var(--surface-2); }
+.portal-campaign-table td.num-col {
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+.portal-campaign-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.portal-objective-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.portal-status-active {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--success-dim);
+  color: var(--success);
+  font-size: 11px;
+}
+.portal-status-inactive {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--fg-muted);
+  font-size: 11px;
+}

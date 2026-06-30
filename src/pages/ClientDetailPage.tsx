@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { motion, type Transition } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
+import { ClientAvatar } from '../components/ClientAvatar';
 import { ClientFileModal } from '../components/ClientFileModal';
 import { HistoricalMonthlyModal } from '../components/HistoricalMonthlyModal';
 import { SalesModal } from '../components/SalesModal';
@@ -197,13 +198,6 @@ export function ClientDetailPage() {
     );
   }
 
-  const avatarInitial = client.name.charAt(0).toUpperCase();
-  const statusColor =
-    client.status === 'active'
-      ? 'hsl(180,100%,50%)'
-      : client.status === 'paused'
-        ? 'hsl(40,90%,55%)'
-        : 'hsl(0,70%,60%)';
   const statusText =
     client.status === 'active' ? 'Activo' : client.status === 'paused' ? 'Pausado' : 'Inactivo';
 
@@ -211,12 +205,13 @@ export function ClientDetailPage() {
     <div className="page-content">
       {/* ── Header ── */}
       <div className="portal-header">
-        <div
-          className="portal-avatar"
-          style={{ background: `${statusColor}22`, border: `2px solid ${statusColor}` }}
-        >
-          {avatarInitial}
-        </div>
+        <ClientAvatar
+          clientId={client.id}
+          name={client.name}
+          logoUrl={client.logo_url}
+          size={52}
+          borderRadius={14}
+        />
 
         <div className="portal-title-block">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -228,14 +223,7 @@ export function ClientDetailPage() {
             <h1 className="page-title" style={{ margin: 0 }}>
               {client.name}
             </h1>
-            <span
-              className="status-pill"
-              style={{
-                background: `${statusColor}22`,
-                color: statusColor,
-                borderColor: statusColor,
-              }}
-            >
+            <span className={`status-pill status-pill-${client.status}`}>
               {statusText}
             </span>
           </div>
@@ -248,51 +236,19 @@ export function ClientDetailPage() {
         {/* Period selector */}
         <div className="portal-header-actions">
           {campaignByMonth.length > 0 && (
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div className="portal-period-pills">
               {campaignByMonth.map((m) => (
                 <button
                   key={m.month}
                   onClick={() => setSelectedPeriod(m.month)}
-                  style={{
-                    fontFamily: 'JetBrains Mono',
-                    fontSize: '0.65rem',
-                    letterSpacing: '0.08em',
-                    padding: '5px 12px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    border: activePeriod === m.month
-                      ? '1px solid hsl(180,100%,50%)'
-                      : '1px solid var(--color-border)',
-                    background: activePeriod === m.month
-                      ? 'hsl(180 100% 50% / 0.1)'
-                      : 'transparent',
-                    color: activePeriod === m.month
-                      ? 'hsl(180,100%,50%)'
-                      : 'hsl(215,15%,55%)',
-                  }}
+                  className={`portal-period-pill${activePeriod === m.month ? ' active' : ''}`}
                 >
                   {getMonthLabel(m.month)}
                 </button>
               ))}
               <button
                 onClick={() => setSelectedPeriod('all')}
-                style={{
-                  fontFamily: 'JetBrains Mono',
-                  fontSize: '0.65rem',
-                  letterSpacing: '0.08em',
-                  padding: '5px 12px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  border: activePeriod === 'all'
-                    ? '1px solid hsl(180,100%,50%)'
-                    : '1px solid var(--color-border)',
-                  background: activePeriod === 'all'
-                    ? 'hsl(180 100% 50% / 0.1)'
-                    : 'transparent',
-                  color: activePeriod === 'all'
-                    ? 'hsl(180,100%,50%)'
-                    : 'hsl(215,15%,55%)',
-                }}
+                className={`portal-period-pill${activePeriod === 'all' ? ' active' : ''}`}
               >
                 Total año
               </button>
@@ -334,13 +290,9 @@ export function ClientDetailPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...FADE, delay: i * 0.06 } as Transition}
           >
-            <div className="number-label" style={{ marginBottom: 6 }}>
-              {card.label}
-            </div>
-            <div className="font-display portal-kpi-value">{card.value}</div>
-            <div className="number-label" style={{ marginTop: 8, opacity: 0.5 }}>
-              {card.sub}
-            </div>
+            <p className="portal-kpi-label">{card.label}</p>
+            <p className="portal-kpi-value">{card.value}</p>
+            <p className="portal-kpi-sub">{card.sub}</p>
           </motion.div>
         ))}
       </div>
@@ -348,7 +300,7 @@ export function ClientDetailPage() {
       {/* ── Charts Row ── */}
       <div className="portal-charts-grid">
         {/* Area chart: spend + messages over all historical months */}
-        <div className="card-glass" style={{ padding: '16px 20px' }}>
+        <div className="card-glass card-padded">
           <div className="number-label" style={{ marginBottom: 16 }}>
             Inversión mensual {new Date().getFullYear()}
           </div>
@@ -416,8 +368,8 @@ export function ClientDetailPage() {
           )}
         </div>
 
-        {/* BUG 3 FIX: Pie chart uses objectiveInfo for labels + colors */}
-        <div className="card-glass" style={{ padding: '16px 20px' }}>
+        {/* Pie chart: campaign mix by objective */}
+        <div className="card-glass card-padded">
           <div className="number-label" style={{ marginBottom: 16 }}>
             Mix de campañas — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
           </div>
@@ -451,30 +403,12 @@ export function ClientDetailPage() {
                   />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              <div className="portal-pie-legend">
                 {campaignsByObjective.map((o) => {
                   const info = objectiveInfo(o.objective);
                   return (
-                    <span
-                      key={o.objective}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 5,
-                        fontSize: 11,
-                        color: '#aaa',
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          background: info.color,
-                          display: 'inline-block',
-                          flexShrink: 0,
-                        }}
-                      />
+                    <span key={o.objective} className="portal-pie-legend-item">
+                      <span className="portal-pie-dot" style={{ background: info.color }} />
                       {info.label} ({(o.shareOfSpend * 100).toFixed(0)}%)
                     </span>
                   );
@@ -489,118 +423,69 @@ export function ClientDetailPage() {
 
       {/* ── Campaign Table (collapsible) ── */}
       {campaignsByCampaign.length > 0 && (
-        <div className="card-glass" style={{ padding: '16px 20px' }}>
+        <div className="card-glass card-padded">
           <div
-            className="number-label"
+            className="portal-table-toggle"
             onClick={() => setTableOpen((o) => !o)}
-            style={{
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: tableOpen ? 16 : 0,
-              userSelect: 'none',
-            }}
           >
             <span>
               Campañas — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
               {' '}({campaignsByCampaign.length})
             </span>
-            <span style={{ fontSize: '0.6rem', opacity: 0.6 }}>{tableOpen ? '▲' : '▼'}</span>
+            <span className="portal-table-chevron">{tableOpen ? '▲' : '▼'}</span>
           </div>
-          {tableOpen && <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left' }}>
-                {['Campaña', 'Objetivo', 'Inversión', 'Resultados', 'Estado'].map((h, i) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: '8px 12px',
-                      color: '#888',
-                      fontWeight: 500,
-                      textAlign: i >= 2 && i <= 3 ? 'right' : 'left',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {campaignsByCampaign.map((c) => {
-                const obj = objectiveInfo(inferObjectiveFromName(c.campaignName));
-                const results =
-                  c.messages > 0
-                    ? `${formatNumber(c.messages)} msgs`
-                    : c.leads > 0
-                      ? `${formatNumber(c.leads)} leads`
-                      : c.purchases > 0
-                        ? `${formatNumber(c.purchases)} compras`
-                        : `${formatNumber(c.clicks)} clics`;
-                return (
-                  <tr
-                    key={c.campaignId}
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                  >
-                    <td
-                      style={{
-                        padding: '10px 12px',
-                        maxWidth: 260,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {c.campaignName}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          background: `${obj.color}22`,
-                          color: obj.color,
-                          fontSize: 11,
-                        }}
-                      >
-                        {obj.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right' }}>
-                      {formatCop(c.spend)}
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', color: '#aaa' }}>
-                      {results}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          background:
-                            c.effectiveStatus === 'ACTIVE'
-                              ? 'rgba(0,255,0,0.1)'
-                              : 'rgba(255,255,255,0.06)',
-                          color: c.effectiveStatus === 'ACTIVE' ? '#4ade80' : '#888',
-                          fontSize: 11,
-                        }}
-                      >
-                        {c.effectiveStatus ?? '—'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>}
+          {tableOpen && (
+            <table className="portal-campaign-table">
+              <thead>
+                <tr>
+                  {['Campaña', 'Objetivo', 'Inversión', 'Resultados', 'Estado'].map((h, i) => (
+                    <th key={h} className={i >= 2 && i <= 3 ? 'num-col' : ''}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {campaignsByCampaign.map((c) => {
+                  const obj = objectiveInfo(inferObjectiveFromName(c.campaignName));
+                  const results =
+                    c.messages > 0
+                      ? `${formatNumber(c.messages)} msgs`
+                      : c.leads > 0
+                        ? `${formatNumber(c.leads)} leads`
+                        : c.purchases > 0
+                          ? `${formatNumber(c.purchases)} compras`
+                          : `${formatNumber(c.clicks)} clics`;
+                  return (
+                    <tr key={c.campaignId}>
+                      <td className="portal-campaign-name">{c.campaignName}</td>
+                      <td>
+                        <span
+                          className="portal-objective-badge"
+                          style={{ background: `${obj.color}22`, color: obj.color }}
+                        >
+                          {obj.label}
+                        </span>
+                      </td>
+                      <td className="num-col">{formatCop(c.spend)}</td>
+                      <td className="num-col" style={{ color: 'var(--fg-muted)' }}>{results}</td>
+                      <td>
+                        <span className={c.effectiveStatus === 'ACTIVE' ? 'portal-status-active' : 'portal-status-inactive'}>
+                          {c.effectiveStatus ?? '—'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
       {/* ── Year Line Chart: Inversión vs Ventas ── */}
       {yearBarData.length > 0 && (
-        <div className="card-glass" style={{ padding: '16px 20px' }}>
+        <div className="card-glass card-padded">
           <div className="number-label" style={{ marginBottom: 16 }}>
             Inversión vs Ventas — {new Date().getFullYear()}
           </div>

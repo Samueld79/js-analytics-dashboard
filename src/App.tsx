@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { TrendingUp } from 'lucide-react';
 import { BrandSignature } from './components/BrandSignature';
 import { Sidebar } from './components/Sidebar';
 import { useMetaSyncRows } from './hooks/useData';
@@ -110,11 +111,15 @@ function AppContent() {
         <div className="portal-shell">
           <div className="page-bg" />
           <header className="portal-shell-header">
-            <BrandSignature
-              compact
-              subtitle="Reporte cliente"
-              className="portal-brand-signature"
-            />
+            <div className="portal-logo-wrap">
+              <div className="portal-logo-icon">
+                <TrendingUp size={20} color="oklch(0.12 0.03 250)" />
+              </div>
+              <span className="portal-logo-text">
+                Growth <span style={{ color: 'var(--cyan)' }}>Strategy</span>
+              </span>
+              <span className="portal-logo-sub">Reporte de cliente</span>
+            </div>
           </header>
           <main className="app-main portal-main">{appRoutes}</main>
         </div>
