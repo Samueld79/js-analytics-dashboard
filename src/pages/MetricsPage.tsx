@@ -790,7 +790,7 @@ export function MetricsPage() {
                     })();
                     return campaignsByCampaign.map((c) => {
                       const tipo = inferObjectiveFromName(c.campaignName);
-                      const tipoColors: Record<string, string> = { Interacción: CHART.violet, Tráfico: CHART.cyan, Ventas: CHART.green, Reconocimiento: CHART.amber, Presentación: '#38bdf8', Evaluación: CHART.orange, 'Clientes Potenciales': '#6366f1', 'Generación de leads': '#6366f1', Mensajes: '#6366f1' };
+                      const tipoColors: Record<string, string> = { Interacción: CHART.violet, Tráfico: CHART.cyan, Ventas: CHART.green, Reconocimiento: '#8b5cf6', Presentación: '#38bdf8', Evaluación: CHART.orange, 'Clientes Potenciales': '#f59e0b', 'Generación de leads': '#6366f1', Mensajes: '#6366f1' };
                       const tipoColor = tipoColors[tipo] ?? '#94a3b8';
                       const isActive = c.effectiveStatus === 'ACTIVE';
                       const costPerMsg = c.messages > 0 ? c.spend / c.messages : null;
