@@ -106,7 +106,7 @@ export function DashboardPage() {
 
   const { monthlyKpis, loading: kpisLoading } = useMonthlyOperatingKpis(scopedClientId, 6);
   const { metrics: rawAdMetrics, loading: metricsLoading } = useAdMetrics(scopedClientId, 180);
-  const { sales, loading: salesLoading } = useDailySales({ clientId: scopedClientId, days: 365 });
+  const { sales, loading: salesLoading } = useDailySales({ clientId: scopedClientId, days: scopedClientId === undefined ? 200 : 365 });
   const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(scopedClientId);
 
   // ── Period selector ───────────────────────────────────────────────────────────

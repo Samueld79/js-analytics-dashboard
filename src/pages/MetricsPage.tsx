@@ -32,6 +32,7 @@ import {
 import { formatCop, formatNumber } from '../lib/utils';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
+import { RangeSelector } from '../components/RangeSelector';
 
 const EMPTY_CLIENT_SCOPE = '00000000-0000-0000-0000-000000000000';
 
@@ -299,6 +300,7 @@ export function MetricsPage() {
     !isInternal && defaultClientId ? defaultClientId : 'all',
   );
   const [selectedPeriod, setSelectedPeriod] = useState<string | 'all' | null>(null);
+  const [days, setDays] = useState(200);
   const [chartsRef, chartsVisible] = useIntersection();
 
   const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;
@@ -307,13 +309,14 @@ export function MetricsPage() {
     !isInternal && !canSelectAllClients
       ? defaultClientId ?? EMPTY_CLIENT_SCOPE
       : selectedClientId;
+  const effectiveDays = queryClientId === undefined ? days : 730;
 
   // Primary data source: ad_campaign_metrics
-  const { rows: campaignRows, byMonth: campaignByMonth, loading: campaignLoading } = useCampaignSummary(queryClientId, 730);
+  const { rows: campaignRows, byMonth: campaignByMonth, loading: campaignLoading } = useCampaignSummary(queryClientId, effectiveDays);
   // Authoritative spend source: ad_metrics (windsor_ai)
-  const { metrics: adMetrics } = useAdMetrics(queryClientId, 730);
+  const { metrics: adMetrics } = useAdMetrics(queryClientId, effectiveDays);
 
-  const { sales } = useDailySales({ clientId: queryClientId, days: 730 });
+  const { sales } = useDailySales({ clientId: queryClientId, days: effectiveDays });
 
   const scopedSales = useMemo(
     () => (isInternal ? sales : sales.filter((row) => visibleClientIds.has(row.client_id))),
@@ -538,6 +541,10 @@ export function MetricsPage() {
           <span className="metrics-client-label">
             {visibleClients[0]?.name ?? 'Sin empresa'}
           </span>
+        )}
+
+        {queryClientId === undefined && (
+          <RangeSelector days={days} onChange={setDays} className="page-period-select" />
         )}
 
         {/* Period selector — same dropdown as Dashboard */}
