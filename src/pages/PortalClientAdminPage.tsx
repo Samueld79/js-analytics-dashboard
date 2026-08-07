@@ -9,11 +9,13 @@ import {
   listClientPortalSettings,
   listDistinctCampaignNames,
   listPortalCreativeAssets,
+  listPortalDailyEntries,
+  PORTAL_NOTE_CAMPAIGN_ID,
   upsertClientPortalSettings,
   upsertPortalCreativeAsset,
   uploadPortalCreativeFile,
 } from '../services/portal';
-import type { ClientPortalSettings, PortalCreativeAsset } from '../lib/supabase';
+import type { ClientPortalSettings, PortalCreativeAsset, PortalDailyEntry } from '../lib/supabase';
 
 function CreativeAssetRow({
   clientId,
@@ -129,6 +131,9 @@ export function PortalClientAdminPage() {
   const [assets, setAssets] = useState<PortalCreativeAsset[]>([]);
   const [loadingCreatives, setLoadingCreatives] = useState(false);
 
+  const [notes, setNotes] = useState<PortalDailyEntry[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+
   const reloadSettings = async () => {
     setLoadingSettings(true);
     const rows = await listClientPortalSettings();
@@ -172,6 +177,18 @@ export function PortalClientAdminPage() {
       setCampaignNames(names);
       setAssets(rows);
       setLoadingCreatives(false);
+    });
+  }, [selectedClientId]);
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setNotes([]);
+      return;
+    }
+    setLoadingNotes(true);
+    listPortalDailyEntries(selectedClientId).then((rows) => {
+      setNotes(rows.filter((r) => r.campaign_id === PORTAL_NOTE_CAMPAIGN_ID && r.nota?.trim()));
+      setLoadingNotes(false);
     });
   }, [selectedClientId]);
 
@@ -366,6 +383,35 @@ export function PortalClientAdminPage() {
             <p style={{ marginTop: 12, fontSize: '0.68rem', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Upload size={11} /> Clic en la miniatura para subir imagen o video de referencia — se guarda una vez por creativo.
             </p>
+          </GlassCard>
+        )}
+
+        {selectedClientId && (
+          <GlassCard style={{ padding: 22 }}>
+            <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'var(--fg-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 14 }}>
+              Notas del día
+            </span>
+
+            {loadingNotes ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
+                <Loader2 size={16} className="spin" />
+              </div>
+            ) : notes.length === 0 ? (
+              <p style={{ color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
+                Todavía no hay notas registradas desde el portal público.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {notes.map((n) => (
+                  <div key={n.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', color: 'var(--fg-muted)', display: 'block', marginBottom: 4 }}>
+                      {new Date(`${n.date}T00:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg)', whiteSpace: 'pre-wrap' }}>{n.nota}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </GlassCard>
         )}
       </div>

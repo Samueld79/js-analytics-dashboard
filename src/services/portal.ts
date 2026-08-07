@@ -12,6 +12,11 @@ import {
   type ServiceMutationResult,
 } from '../lib/supabase';
 
+// Sentinel campaign_id for the day-level "Nota del día" row in
+// portal_daily_entries — must match the constant of the same name in
+// api/portal/_lib.ts.
+export const PORTAL_NOTE_CAMPAIGN_ID = '__nota_general__';
+
 function slugifyName(value: string): string {
   return value
     .normalize('NFD')
@@ -109,6 +114,23 @@ export async function listPortalCreativeAssets(clientId: string): Promise<Portal
   }
 
   return (data ?? []) as PortalCreativeAsset[];
+}
+
+export async function listPortalDailyEntries(clientId: string): Promise<PortalDailyEntry[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('portal_daily_entries')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('date', { ascending: false });
+
+  if (error) {
+    console.error('[portal] listPortalDailyEntries', error);
+    return [];
+  }
+
+  return (data ?? []) as PortalDailyEntry[];
 }
 
 export async function listDistinctCampaignNames(clientId: string): Promise<string[]> {
@@ -277,6 +299,16 @@ export async function savePortalDailyEntry(input: {
   visita_punto_fisico: PortalVisitStatus | null;
 }): Promise<PortalApiResult<PortalDailyEntry>> {
   return portalApi<PortalDailyEntry>('save-daily-entry', input);
+}
+
+export async function savePortalDailyNote(input: {
+  slug: string;
+  pin: string;
+  client_id: string;
+  date: string;
+  nota: string;
+}): Promise<PortalApiResult<PortalDailyEntry>> {
+  return portalApi<PortalDailyEntry>('save-daily-note', input);
 }
 
 export async function savePortalSale(input: {

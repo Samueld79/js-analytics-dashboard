@@ -435,6 +435,7 @@ export type PortalDailyEntry = {
   compras: number;
   objecion: PortalObjection | null;
   visita_punto_fisico: PortalVisitStatus | null;
+  nota: string | null;
   updated_at: string;
 };
 
@@ -446,6 +447,7 @@ export type PortalDailyEntryInput = {
   compras: number;
   objecion: PortalObjection | null;
   visita_punto_fisico: PortalVisitStatus | null;
+  nota: string | null;
 };
 
 export type HistoricalMonthlyAdMetricInput = {

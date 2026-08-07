@@ -7,8 +7,10 @@ import { listAdCampaignMetrics } from '../services/adCampaignMetrics';
 import {
   listPublicPortalCreativeAssets,
   listPublicPortalDailyEntries,
+  PORTAL_NOTE_CAMPAIGN_ID,
   resolvePortalSlug,
   savePortalDailyEntry,
+  savePortalDailyNote,
   savePortalSale,
   validatePortalPin,
   type PortalResolveResult,
@@ -91,6 +93,8 @@ export function ClientPortalPublicPage() {
   const [entriesState, setEntriesState] = useState<Record<string, EntryState>>({});
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  const [notaText, setNotaText] = useState('');
+
   // ── Load portal + data ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!slug) return;
@@ -159,6 +163,11 @@ export function ClientPortalPublicPage() {
     setEntriesState(next);
   }, [selectedDate, dayRows, dailyEntries]);
 
+  useEffect(() => {
+    const note = dailyEntries.find((e) => e.date === selectedDate && e.campaign_id === PORTAL_NOTE_CAMPAIGN_ID);
+    setNotaText(note?.nota ?? '');
+  }, [selectedDate, dailyEntries]);
+
   const unlockedRegistro = pinRegistro.length === 4;
   const unlockedVentas = pinVentas.length === 4;
 
@@ -220,6 +229,32 @@ export function ClientPortalPublicPage() {
     });
   };
 
+  const scheduleNoteSave = (value: string) => {
+    if (!slug || !portal) return;
+    if (debounceTimers.current[PORTAL_NOTE_CAMPAIGN_ID]) clearTimeout(debounceTimers.current[PORTAL_NOTE_CAMPAIGN_ID]);
+    debounceTimers.current[PORTAL_NOTE_CAMPAIGN_ID] = setTimeout(() => {
+      void savePortalDailyNote({
+        slug,
+        pin: pinRegistro,
+        client_id: portal.client_id,
+        date: selectedDate,
+        nota: value,
+      }).then((result) => {
+        if (result.data) {
+          setDailyEntries((prev) => [
+            ...prev.filter((e) => !(e.date === selectedDate && e.campaign_id === PORTAL_NOTE_CAMPAIGN_ID)),
+            result.data as PortalDailyEntry,
+          ]);
+        }
+      });
+    }, 800);
+  };
+
+  const handleNotaChange = (value: string) => {
+    setNotaText(value);
+    scheduleNoteSave(value);
+  };
+
   const handleRegisterSale = async () => {
     if (!slug || !portal) return;
     const amount = Number(saleAmount);
@@ -263,13 +298,15 @@ export function ClientPortalPublicPage() {
       getRow(conjunto).mensajes += r.messages ?? 0;
     });
 
-    dailyEntries.forEach((e) => {
-      const name = campaignIdToName.get(e.campaign_id);
-      const conjunto = (name && campaignNameToConjunto.get(name)) ?? 'Sin conjunto asignado';
-      const row = getRow(conjunto);
-      row.citas += e.citas;
-      row.compras += e.compras;
-    });
+    dailyEntries
+      .filter((e) => e.campaign_id !== PORTAL_NOTE_CAMPAIGN_ID) // day-level note, not a per-campaign row
+      .forEach((e) => {
+        const name = campaignIdToName.get(e.campaign_id);
+        const conjunto = (name && campaignNameToConjunto.get(name)) ?? 'Sin conjunto asignado';
+        const row = getRow(conjunto);
+        row.citas += e.citas;
+        row.compras += e.compras;
+      });
 
     return [...map.values()].sort((a, b) => b.mensajes - a.mensajes);
   }, [campaignRows, dailyEntries, creativeAssets]);
@@ -503,6 +540,26 @@ export function ClientPortalPublicPage() {
               })}
             </div>
           )}
+        </GlassCard>
+
+        {/* ── Nota del día ── */}
+        <GlassCard style={{ padding: 20 }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)', display: 'block', marginBottom: 10 }}>
+            Nota del día
+          </span>
+          <textarea
+            className="form-input"
+            rows={3}
+            disabled={!unlockedRegistro}
+            placeholder={
+              unlockedRegistro
+                ? 'Ej. Cliente pidió pensarlo, seguimiento mañana...'
+                : 'Ingresa el PIN de registro arriba para editar'
+            }
+            value={notaText}
+            onChange={(e) => handleNotaChange(e.target.value)}
+            style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.82rem', padding: '10px 12px' }}
+          />
         </GlassCard>
 
         {/* ── 4. Resumen de efectividad ── */}

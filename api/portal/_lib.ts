@@ -25,3 +25,9 @@ const PIN_PATTERN = /^[0-9]{4}$/;
 export function isValidPin(pin: unknown): pin is string {
   return typeof pin === 'string' && PIN_PATTERN.test(pin);
 }
+
+// Sentinel campaign_id for the day-level "Nota del día" row in
+// portal_daily_entries — a note isn't tied to any single campaign, but the
+// table's grain is (client_id, date, campaign_id). Must match the constant
+// of the same name in src/services/portal.ts.
+export const PORTAL_NOTE_CAMPAIGN_ID = '__nota_general__';
