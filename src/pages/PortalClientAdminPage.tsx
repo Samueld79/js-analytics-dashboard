@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, ImageIcon, Loader2, Share2, Upload, Video } from 'lucide-react';
+import { Check, Copy, ExternalLink, ImageIcon, Loader2, Share2, Upload, Video } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
@@ -284,6 +284,16 @@ export function PortalClientAdminPage() {
                       {copied ? <Check size={14} /> : <Copy size={14} />}
                       {copied ? 'Copiado' : 'Copiar link'}
                     </PrimaryButton>
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-primary"
+                      style={{ padding: '7px 14px', fontSize: '0.78rem' }}
+                    >
+                      <ExternalLink size={14} />
+                      Abrir
+                    </a>
                   </div>
                 </div>
 
