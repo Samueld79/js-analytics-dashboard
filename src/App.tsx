@@ -19,6 +19,8 @@ import { StrategiesPage } from './pages/StrategiesPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { AIToolsPage } from './pages/ai-tools/AIToolsPage';
 import { DashboardClientPage } from './pages/DashboardClientPage';
+import { PortalClientAdminPage } from './pages/PortalClientAdminPage';
+import { ClientPortalPublicPage } from './pages/ClientPortalPublicPage';
 import { SplashScreen } from './components/SplashScreen';
 import { WelcomeOverlay } from './components/WelcomeOverlay';
 
@@ -47,6 +49,8 @@ function AppContent() {
   const { authEnabled, initialized, session, profile } = useAuth();
   const location = useLocation();
   const isPortalRoute = location.pathname.startsWith('/portal/');
+  const isClientPortalRoute = location.pathname.startsWith('/cliente/');
+  const isPublicRoute = isPortalRoute || isClientPortalRoute;
   const hadNullSession = useRef(false);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
 
@@ -65,7 +69,7 @@ function AppContent() {
   }, [initialized, session, profile]);
 
   // Portal routes are fully public — skip the auth gate entirely
-  if (!isPortalRoute) {
+  if (!isPublicRoute) {
     if (authEnabled && !initialized) {
       return (
         <div className="auth-shell">
@@ -93,10 +97,12 @@ function AppContent() {
       <Route path="/clients/:id" element={<RequireClientAccess><ClientDetailPage /></RequireClientAccess>} />
       <Route path="/dashboard/cliente/:clientId" element={<RequireInternal><DashboardClientPage /></RequireInternal>} />
       <Route path="/portal/:id" element={<ClientDetailPage />} />
+      <Route path="/cliente/:slug" element={<ClientPortalPublicPage />} />
       <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
       <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />
       <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
       <Route path="/calendar" element={<RequireInternal><CalendarPage /></RequireInternal>} />
+      <Route path="/portal-cliente" element={<RequireInternal><PortalClientAdminPage /></RequireInternal>} />
       <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} />
       <Route path="/ai-tools/*" element={<RequireInternal><AIToolsPage /></RequireInternal>} />
       <Route path="/settings" element={<RequireSignedIn><SettingsPage /></RequireSignedIn>} />
@@ -124,6 +130,16 @@ function AppContent() {
           <main className="app-main portal-main">{appRoutes}</main>
         </div>
       </>
+    );
+  }
+
+  // /cliente/:slug builds its own header/layout — bare wrapper, no sidebar, no auth gate
+  if (isClientPortalRoute) {
+    return (
+      <div className="client-portal-shell">
+        <div className="page-bg" />
+        {appRoutes}
+      </div>
     );
   }
 

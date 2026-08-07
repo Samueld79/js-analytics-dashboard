@@ -384,6 +384,70 @@ export type DailySale = {
 
 export type DailySaleInput = Omit<DailySale, 'id' | 'created_at' | 'updated_at'>;
 
+// ── Portal Cliente ────────────────────────────────────────────────────────────
+
+export type ClientPortalSettings = {
+  id: string;
+  client_id: string;
+  enabled: boolean;
+  public_slug: string;
+  pin_registro: string;
+  pin_ventas: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PortalAssetType = 'image' | 'video';
+
+export type PortalCreativeAsset = {
+  id: string;
+  client_id: string;
+  campaign_name: string;
+  conjunto_label: string | null;
+  asset_url: string;
+  asset_type: PortalAssetType;
+  uploaded_at: string;
+};
+
+export const PORTAL_OBJECTION_OPTIONS = [
+  'Sin objecion',
+  'Precio',
+  'Disponibilidad de cita',
+  'No respondio',
+  'Indeciso',
+  'Otro',
+] as const;
+export type PortalObjection = (typeof PORTAL_OBJECTION_OPTIONS)[number];
+
+export const PORTAL_VISIT_OPTIONS = [
+  'Va a visitar',
+  'No va a visitar',
+  'Tal vez',
+] as const;
+export type PortalVisitStatus = (typeof PORTAL_VISIT_OPTIONS)[number];
+
+export type PortalDailyEntry = {
+  id: string;
+  client_id: string;
+  date: string;
+  campaign_id: string;
+  citas: number;
+  compras: number;
+  objecion: PortalObjection | null;
+  visita_punto_fisico: PortalVisitStatus | null;
+  updated_at: string;
+};
+
+export type PortalDailyEntryInput = {
+  client_id: string;
+  date: string;
+  campaign_id: string;
+  citas: number;
+  compras: number;
+  objecion: PortalObjection | null;
+  visita_punto_fisico: PortalVisitStatus | null;
+};
+
 export type HistoricalMonthlyAdMetricInput = {
   client_id: string;
   month: string;
