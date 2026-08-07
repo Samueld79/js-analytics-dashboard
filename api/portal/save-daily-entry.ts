@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSupabaseAdmin, isValidPin, setCors } from './_lib';
+import { getSupabaseAdmin, isValidPin, setCors } from './_lib.js';
 
 const OBJECTION_VALUES = ['Sin objecion', 'Precio', 'Disponibilidad de cita', 'No respondio', 'Indeciso', 'Otro'];
 const VISIT_VALUES = ['Va a visitar', 'No va a visitar', 'Tal vez'];

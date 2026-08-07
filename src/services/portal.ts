@@ -234,7 +234,9 @@ export type PortalResolveResult = {
   enabled: boolean;
 };
 
-async function portalApi<T>(path: string, body: Record<string, unknown>): Promise<ServiceMutationResult<T>> {
+export type PortalApiResult<T> = { data: T | null; error: string | null; status: number };
+
+async function portalApi<T>(path: string, body: Record<string, unknown>): Promise<PortalApiResult<T>> {
   try {
     const res = await fetch(`/api/portal/${path}`, {
       method: 'POST',
@@ -243,15 +245,15 @@ async function portalApi<T>(path: string, body: Record<string, unknown>): Promis
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { data: null, error: json.error ?? `Error ${res.status}` };
+      return { data: null, error: json.error ?? `Error ${res.status}`, status: res.status };
     }
-    return { data: json as T, error: null };
+    return { data: json as T, error: null, status: res.status };
   } catch (err) {
-    return { data: null, error: err instanceof Error ? err.message : 'Error de red.' };
+    return { data: null, error: err instanceof Error ? err.message : 'Error de red.', status: 0 };
   }
 }
 
-export async function resolvePortalSlug(slug: string): Promise<ServiceMutationResult<PortalResolveResult>> {
+export async function resolvePortalSlug(slug: string): Promise<PortalApiResult<PortalResolveResult>> {
   return portalApi<PortalResolveResult>('resolve', { slug });
 }
 
@@ -259,7 +261,7 @@ export async function validatePortalPin(
   slug: string,
   pin: string,
   kind: 'registro' | 'ventas',
-): Promise<ServiceMutationResult<{ valid: boolean }>> {
+): Promise<PortalApiResult<{ valid: boolean }>> {
   return portalApi<{ valid: boolean }>('validate-pin', { slug, pin, kind });
 }
 
@@ -273,7 +275,7 @@ export async function savePortalDailyEntry(input: {
   compras: number;
   objecion: PortalObjection | null;
   visita_punto_fisico: PortalVisitStatus | null;
-}): Promise<ServiceMutationResult<PortalDailyEntry>> {
+}): Promise<PortalApiResult<PortalDailyEntry>> {
   return portalApi<PortalDailyEntry>('save-daily-entry', input);
 }
 
@@ -283,6 +285,6 @@ export async function savePortalSale(input: {
   client_id: string;
   date: string;
   total_sales: number;
-}): Promise<ServiceMutationResult<{ id: string }>> {
+}): Promise<PortalApiResult<{ id: string }>> {
   return portalApi<{ id: string }>('save-sale', input);
 }

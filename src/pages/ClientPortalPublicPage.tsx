@@ -69,7 +69,7 @@ function entryStateFrom(entry: PortalDailyEntry | undefined): EntryState {
 export function ClientPortalPublicPage() {
   const { slug } = useParams<{ slug: string }>();
 
-  const [status, setStatus] = useState<'loading' | 'invalid' | 'ready'>('loading');
+  const [status, setStatus] = useState<'loading' | 'invalid' | 'error' | 'ready'>('loading');
   const [portal, setPortal] = useState<PortalResolveResult | null>(null);
   const [campaignRows, setCampaignRows] = useState<AdCampaignMetric[]>([]);
   const [creativeAssets, setCreativeAssets] = useState<PortalCreativeAsset[]>([]);
@@ -99,7 +99,10 @@ export function ClientPortalPublicPage() {
 
     resolvePortalSlug(slug).then(async (result) => {
       if (result.error || !result.data) {
-        setStatus('invalid');
+        // A 404 means the slug genuinely doesn't exist or the portal is disabled.
+        // Anything else (500, network failure, etc.) is a real bug, not a bad link —
+        // must not look the same to the visitor.
+        setStatus(result.status === 404 ? 'invalid' : 'error');
         return;
       }
       setPortal(result.data);
@@ -281,6 +284,19 @@ export function ClientPortalPublicPage() {
     return (
       <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
         <p style={{ color: 'var(--fg-muted)', fontSize: '0.85rem' }}>Cargando…</p>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <GlassCard style={{ padding: 32, textAlign: 'center', maxWidth: 380 }}>
+          <h2 style={{ margin: '0 0 8px', fontSize: '1.1rem', color: 'var(--fg)' }}>Hubo un problema cargando esta página</h2>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--fg-muted)' }}>
+            Intenta de nuevo en unos minutos. Si el problema sigue, avisa a tu agencia.
+          </p>
+        </GlassCard>
       </div>
     );
   }

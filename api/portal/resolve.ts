@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSupabaseAdmin, setCors } from './_lib';
+import { getSupabaseAdmin, setCors } from './_lib.js';
 
 // Resolves a public slug to the client it belongs to. Never returns the PINs —
 // client_portal_settings has zero anon access, so this is the only way the
