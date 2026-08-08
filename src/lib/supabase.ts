@@ -483,6 +483,11 @@ export type PortalAdDailyMetric = {
   campaign_name: string | null;
   messages: number;
   effective_status: string | null;
+  // Real spend for this ad on this date. effective_status='ACTIVE' alone is
+  // not a reliable "active today" signal — Meta keeps old promoted posts in
+  // ACTIVE status indefinitely with no budget running. "Active today" =
+  // effective_status === 'ACTIVE' AND spend > 0.
+  spend: number;
   created_at: string;
   updated_at: string;
 };

@@ -296,8 +296,14 @@ export function ClientPortalPublicPage() {
     });
   }, [slug]);
 
-  // ── Calendar — colored by count of ACTIVE ads that day ───────────────────────
-  const activeAdRows = useMemo(() => adRows.filter((r) => r.effective_status === 'ACTIVE'), [adRows]);
+  // ── Calendar — colored by count of ads truly active that day ─────────────────
+  // effective_status='ACTIVE' alone isn't enough (Meta leaves old promoted
+  // posts ACTIVE indefinitely with no budget) — also require real spend > 0
+  // on that specific date.
+  const activeAdRows = useMemo(
+    () => adRows.filter((r) => r.effective_status === 'ACTIVE' && r.spend > 0),
+    [adRows],
+  );
 
   const adCountByDate = useMemo(() => {
     const map = new Map<string, Set<string>>();
