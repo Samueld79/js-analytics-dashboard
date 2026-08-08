@@ -6,28 +6,39 @@ import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
 import {
   generatePortalPin,
   generatePortalSlug,
-  listCampaignIdNameMap,
+  listAdIdNameMap,
   listClientPortalSettings,
-  listDistinctCampaignNames,
+  listDistinctAdsForClient,
   listPortalCreativeAssets,
   listPortalDailyEntries,
   listPortalLeads,
+  listPortalObjectionTally,
   PORTAL_NOTE_CAMPAIGN_ID,
   upsertClientPortalSettings,
   upsertPortalCreativeAsset,
   uploadPortalCreativeFile,
+  type DistinctPortalAd,
 } from '../services/portal';
-import type { ClientPortalSettings, PortalCreativeAsset, PortalDailyEntry, PortalLeadTipo, PortalLeadWithEntry } from '../lib/supabase';
+import {
+  PORTAL_OBJECTION_TALLY_CATEGORIES,
+  PORTAL_VISIT_TALLY_CATEGORIES,
+  type ClientPortalSettings,
+  type PortalCreativeAsset,
+  type PortalDailyEntry,
+  type PortalLeadTipo,
+  type PortalLeadWithEntry,
+  type PortalObjectionTally,
+} from '../lib/supabase';
 import { formatCop } from '../lib/utils';
 
 function CreativeAssetRow({
   clientId,
-  campaignName,
+  ad,
   asset,
   onSaved,
 }: {
   clientId: string;
-  campaignName: string;
+  ad: DistinctPortalAd;
   asset: PortalCreativeAsset | undefined;
   onSaved: (asset: PortalCreativeAsset) => void;
 }) {
@@ -42,7 +53,7 @@ function CreativeAssetRow({
     if (!file) return;
 
     setUploading(true);
-    const uploadResult = await uploadPortalCreativeFile(clientId, campaignName, file);
+    const uploadResult = await uploadPortalCreativeFile(clientId, ad.ad_id, file);
     if (uploadResult.error || !uploadResult.data) {
       setUploading(false);
       alert(uploadResult.error ?? 'No se pudo subir el archivo.');
@@ -51,7 +62,7 @@ function CreativeAssetRow({
 
     const saveResult = await upsertPortalCreativeAsset({
       client_id: clientId,
-      campaign_name: campaignName,
+      ad_id: ad.ad_id,
       conjunto_label: conjuntoLabel,
       asset_url: uploadResult.data.asset_url,
       asset_type: uploadResult.data.asset_type,
@@ -66,7 +77,7 @@ function CreativeAssetRow({
     setSavingLabel(true);
     const result = await upsertPortalCreativeAsset({
       client_id: clientId,
-      campaign_name: campaignName,
+      ad_id: ad.ad_id,
       conjunto_label: conjuntoLabel,
       asset_url: asset?.asset_url ?? '',
       asset_type: asset?.asset_type ?? 'image',
@@ -100,15 +111,18 @@ function CreativeAssetRow({
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '0.8rem', color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {campaignName}
+          {ad.ad_name}
+        </div>
+        <div style={{ fontSize: '0.66rem', color: 'var(--fg-muted)', marginBottom: 4 }}>
+          Conjunto en Meta: {ad.adset_name}
         </div>
         <input
           className="form-input"
-          placeholder="Conjunto (ej. Conjunto 1 (Reseñas))"
+          placeholder={`Override manual (por defecto: ${ad.adset_name})`}
           value={conjuntoLabel}
           onChange={(e) => setConjuntoLabel(e.target.value)}
           onBlur={handleLabelBlur}
-          style={{ marginTop: 6, fontSize: '0.76rem', padding: '6px 10px' }}
+          style={{ fontSize: '0.76rem', padding: '6px 10px' }}
         />
       </div>
 
@@ -130,7 +144,7 @@ export function PortalClientAdminPage() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const [campaignNames, setCampaignNames] = useState<string[]>([]);
+  const [ads, setAds] = useState<DistinctPortalAd[]>([]);
   const [assets, setAssets] = useState<PortalCreativeAsset[]>([]);
   const [loadingCreatives, setLoadingCreatives] = useState(false);
 
@@ -138,11 +152,16 @@ export function PortalClientAdminPage() {
   const [loadingNotes, setLoadingNotes] = useState(false);
 
   const [leads, setLeads] = useState<PortalLeadWithEntry[]>([]);
-  const [campaignIdToName, setCampaignIdToName] = useState<Record<string, string>>({});
+  const [adIdToName, setAdIdToName] = useState<Record<string, string>>({});
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [leadDateFrom, setLeadDateFrom] = useState('');
   const [leadDateTo, setLeadDateTo] = useState('');
   const [leadTipoFilter, setLeadTipoFilter] = useState<PortalLeadTipo | 'all'>('all');
+
+  const [tally, setTally] = useState<PortalObjectionTally[]>([]);
+  const [loadingTally, setLoadingTally] = useState(false);
+  const [tallyDateFrom, setTallyDateFrom] = useState('');
+  const [tallyDateTo, setTallyDateTo] = useState('');
 
   const reloadSettings = async () => {
     setLoadingSettings(true);
@@ -181,10 +200,10 @@ export function PortalClientAdminPage() {
     if (!selectedClientId) return;
     setLoadingCreatives(true);
     Promise.all([
-      listDistinctCampaignNames(selectedClientId),
+      listDistinctAdsForClient(selectedClientId),
       listPortalCreativeAssets(selectedClientId),
-    ]).then(([names, rows]) => {
-      setCampaignNames(names);
+    ]).then(([adRows, rows]) => {
+      setAds(adRows);
       setAssets(rows);
       setLoadingCreatives(false);
     });
@@ -205,17 +224,29 @@ export function PortalClientAdminPage() {
   useEffect(() => {
     if (!selectedClientId) {
       setLeads([]);
-      setCampaignIdToName({});
+      setAdIdToName({});
       return;
     }
     setLoadingLeads(true);
     Promise.all([
       listPortalLeads(selectedClientId),
-      listCampaignIdNameMap(selectedClientId),
+      listAdIdNameMap(selectedClientId),
     ]).then(([rows, map]) => {
       setLeads(rows);
-      setCampaignIdToName(map);
+      setAdIdToName(map);
       setLoadingLeads(false);
+    });
+  }, [selectedClientId]);
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setTally([]);
+      return;
+    }
+    setLoadingTally(true);
+    listPortalObjectionTally(selectedClientId).then((rows) => {
+      setTally(rows);
+      setLoadingTally(false);
     });
   }, [selectedClientId]);
 
@@ -229,8 +260,26 @@ export function PortalClientAdminPage() {
     });
   }, [leads, leadTipoFilter, leadDateFrom, leadDateTo]);
 
-  const assetByCampaign = useMemo(
-    () => new Map(assets.map((a) => [a.campaign_name, a])),
+  const tallyBreakdown = useMemo(() => {
+    const filtered = tally.filter((t) => {
+      if (tallyDateFrom && t.date < tallyDateFrom) return false;
+      if (tallyDateTo && t.date > tallyDateTo) return false;
+      return t.count > 0;
+    });
+    const objecion = new Map<string, number>();
+    const visita = new Map<string, number>();
+    for (const t of filtered) {
+      const map = t.tipo === 'objecion' ? objecion : visita;
+      map.set(t.categoria, (map.get(t.categoria) ?? 0) + t.count);
+    }
+    return {
+      objecion: PORTAL_OBJECTION_TALLY_CATEGORIES.map((c) => ({ categoria: c, count: objecion.get(c) ?? 0 })),
+      visita: PORTAL_VISIT_TALLY_CATEGORIES.map((c) => ({ categoria: c, count: visita.get(c) ?? 0 })),
+    };
+  }, [tally, tallyDateFrom, tallyDateTo]);
+
+  const assetByAdId = useMemo(
+    () => new Map(assets.map((a) => [a.ad_id, a])),
     [assets],
   );
 
@@ -398,27 +447,27 @@ export function PortalClientAdminPage() {
               <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
                 <Loader2 size={16} className="spin" />
               </div>
-            ) : campaignNames.length === 0 ? (
+            ) : ads.length === 0 ? (
               <p style={{ color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
-                No hay campañas registradas en ad_campaign_metrics para este cliente todavía.
+                No hay anuncios registrados en portal_ad_daily_metrics para este cliente todavía.
               </p>
             ) : (
               <div>
-                {campaignNames.map((name) => (
+                {ads.map((ad) => (
                   <CreativeAssetRow
-                    key={name}
+                    key={ad.ad_id}
                     clientId={selectedClientId}
-                    campaignName={name}
-                    asset={assetByCampaign.get(name)}
+                    ad={ad}
+                    asset={assetByAdId.get(ad.ad_id)}
                     onSaved={(asset) =>
-                      setAssets((prev) => [...prev.filter((a) => a.campaign_name !== asset.campaign_name), asset])
+                      setAssets((prev) => [...prev.filter((a) => a.ad_id !== asset.ad_id), asset])
                     }
                   />
                 ))}
               </div>
             )}
             <p style={{ marginTop: 12, fontSize: '0.68rem', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Upload size={11} /> Clic en la miniatura para subir imagen o video de referencia — se guarda una vez por creativo.
+              <Upload size={11} /> Clic en la miniatura para subir imagen o video de referencia — se guarda una vez por creativo. El conjunto viene de Meta (adset_name); el campo de texto es solo para renombrarlo si querés algo distinto.
             </p>
           </GlassCard>
         )}
@@ -447,6 +496,58 @@ export function PortalClientAdminPage() {
                     <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg)', whiteSpace: 'pre-wrap' }}>{n.nota}</p>
                   </div>
                 ))}
+              </div>
+            )}
+          </GlassCard>
+        )}
+
+        {selectedClientId && (
+          <GlassCard style={{ padding: 22 }}>
+            <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'var(--fg-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 14 }}>
+              Desglose de objeciones / visitas
+            </span>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+              <input
+                className="form-input"
+                type="date"
+                value={tallyDateFrom}
+                onChange={(e) => setTallyDateFrom(e.target.value)}
+                style={{ width: 150, fontSize: '0.76rem' }}
+              />
+              <input
+                className="form-input"
+                type="date"
+                value={tallyDateTo}
+                onChange={(e) => setTallyDateTo(e.target.value)}
+                style={{ width: 150, fontSize: '0.76rem' }}
+              />
+            </div>
+
+            {loadingTally ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
+                <Loader2 size={16} className="spin" />
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div>
+                  <span style={{ fontSize: '0.66rem', color: 'var(--fg-muted)', fontWeight: 700, display: 'block', marginBottom: 8 }}>Objeción</span>
+                  {tallyBreakdown.objecion.map((row) => (
+                    <div key={row.categoria} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '0.78rem', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--fg-muted)' }}>{row.categoria}</span>
+                      <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{row.count}</span>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.66rem', color: 'var(--fg-muted)', fontWeight: 700, display: 'block', marginBottom: 8 }}>Visita punto físico</span>
+                  {tallyBreakdown.visita.map((row) => (
+                    <div key={row.categoria} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '0.78rem', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--fg-muted)' }}>{row.categoria}</span>
+                      <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{row.count}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </GlassCard>
@@ -514,7 +615,7 @@ export function PortalClientAdminPage() {
                             : '—'}
                         </td>
                         <td style={{ padding: '8px 10px', color: 'var(--fg)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {(lead.daily_entry?.campaign_id && campaignIdToName[lead.daily_entry.campaign_id]) ?? '—'}
+                          {(lead.daily_entry?.campaign_id && adIdToName[lead.daily_entry.campaign_id]) ?? '—'}
                         </td>
                         <td style={{ padding: '8px 10px', color: 'var(--fg)' }}>{lead.nombre_cliente}</td>
                         <td style={{ padding: '8px 10px', color: 'var(--fg)', fontFamily: 'JetBrains Mono', fontSize: '0.74rem' }}>{lead.numero_contacto}</td>

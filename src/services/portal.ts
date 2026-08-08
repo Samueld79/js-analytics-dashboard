@@ -4,13 +4,14 @@ import {
   SUPABASE_MISSING_MESSAGE,
   supabase,
   type ClientPortalSettings,
+  type PortalAdDailyMetric,
   type PortalAssetType,
   type PortalCreativeAsset,
   type PortalDailyEntry,
   type PortalLeadTipo,
   type PortalLeadWithEntry,
-  type PortalObjection,
-  type PortalVisitStatus,
+  type PortalObjectionTally,
+  type PortalTallyTipo,
   type ServiceMutationResult,
 } from '../lib/supabase';
 
@@ -108,7 +109,7 @@ export async function listPortalCreativeAssets(clientId: string): Promise<Portal
     .from('portal_creative_assets')
     .select('*')
     .eq('client_id', clientId)
-    .order('campaign_name', { ascending: true });
+    .order('ad_id', { ascending: true });
 
   if (error) {
     console.error('[portal] listPortalCreativeAssets', error);
@@ -152,45 +153,52 @@ export async function listPortalLeads(clientId: string): Promise<PortalLeadWithE
   return (data ?? []) as unknown as PortalLeadWithEntry[];
 }
 
-export async function listCampaignIdNameMap(clientId: string): Promise<Record<string, string>> {
+export async function listAdIdNameMap(clientId: string): Promise<Record<string, string>> {
   if (!isSupabaseConfigured || !supabase) return {};
 
   const { data, error } = await supabase
-    .from('ad_campaign_metrics')
-    .select('campaign_id, campaign_name')
+    .from('portal_ad_daily_metrics')
+    .select('ad_id, ad_name')
     .eq('client_id', clientId);
 
   if (error) {
-    console.error('[portal] listCampaignIdNameMap', error);
+    console.error('[portal] listAdIdNameMap', error);
     return {};
   }
 
   const map: Record<string, string> = {};
-  for (const row of (data ?? []) as { campaign_id: string | null; campaign_name: string }[]) {
-    if (row.campaign_id) map[row.campaign_id] = row.campaign_name;
+  for (const row of (data ?? []) as { ad_id: string; ad_name: string }[]) {
+    map[row.ad_id] = row.ad_name;
   }
   return map;
 }
 
-export async function listDistinctCampaignNames(clientId: string): Promise<string[]> {
+export type DistinctPortalAd = { ad_id: string; ad_name: string; adset_name: string };
+
+export async function listDistinctAdsForClient(clientId: string): Promise<DistinctPortalAd[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
   const { data, error } = await supabase
-    .from('ad_campaign_metrics')
-    .select('campaign_name')
-    .eq('client_id', clientId);
+    .from('portal_ad_daily_metrics')
+    .select('ad_id, ad_name, adset_name')
+    .eq('client_id', clientId)
+    .order('date', { ascending: false });
 
   if (error) {
-    console.error('[portal] listDistinctCampaignNames', error);
+    console.error('[portal] listDistinctAdsForClient', error);
     return [];
   }
 
-  return [...new Set((data ?? []).map((r) => (r as { campaign_name: string }).campaign_name).filter(Boolean))].sort();
+  const byId = new Map<string, DistinctPortalAd>();
+  for (const row of (data ?? []) as DistinctPortalAd[]) {
+    if (!byId.has(row.ad_id)) byId.set(row.ad_id, row);
+  }
+  return [...byId.values()].sort((a, b) => a.ad_name.localeCompare(b.ad_name));
 }
 
 export async function upsertPortalCreativeAsset(input: {
   client_id: string;
-  campaign_name: string;
+  ad_id: string;
   conjunto_label?: string | null;
   asset_url: string;
   asset_type: PortalAssetType;
@@ -204,13 +212,13 @@ export async function upsertPortalCreativeAsset(input: {
     .upsert(
       {
         client_id: input.client_id,
-        campaign_name: input.campaign_name,
+        ad_id: input.ad_id,
         conjunto_label: input.conjunto_label?.trim() || null,
         asset_url: input.asset_url,
         asset_type: input.asset_type,
         uploaded_at: new Date().toISOString(),
       },
-      { onConflict: 'client_id,campaign_name' },
+      { onConflict: 'client_id,ad_id' },
     )
     .select('*')
     .maybeSingle();
@@ -225,7 +233,7 @@ export async function upsertPortalCreativeAsset(input: {
 
 export async function uploadPortalCreativeFile(
   clientId: string,
-  campaignName: string,
+  adId: string,
   file: File,
 ): Promise<ServiceMutationResult<{ asset_url: string; asset_type: PortalAssetType }>> {
   if (!isSupabaseConfigured || !supabase) {
@@ -233,7 +241,7 @@ export async function uploadPortalCreativeFile(
   }
 
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const path = `${clientId}/${slugifyName(campaignName) || 'creativo'}.${ext}`;
+  const path = `${clientId}/${slugifyName(adId) || 'creativo'}.${ext}`;
   const asset_type: PortalAssetType = file.type.startsWith('video/') ? 'video' : 'image';
 
   const { error: uploadError } = await supabase.storage
@@ -285,6 +293,57 @@ export async function listPublicPortalDailyEntries(clientId: string): Promise<Po
   return (data ?? []) as PortalDailyEntry[];
 }
 
+export async function listPublicPortalAdDailyMetrics(clientId: string): Promise<PortalAdDailyMetric[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('portal_ad_daily_metrics')
+    .select('*')
+    .eq('client_id', clientId);
+
+  if (error) {
+    console.error('[portal] listPublicPortalAdDailyMetrics', error);
+    return [];
+  }
+
+  return (data ?? []) as PortalAdDailyMetric[];
+}
+
+export async function listPublicPortalObjectionTally(clientId: string): Promise<PortalObjectionTally[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('portal_objection_tally')
+    .select('*')
+    .eq('client_id', clientId);
+
+  if (error) {
+    console.error('[portal] listPublicPortalObjectionTally', error);
+    return [];
+  }
+
+  return (data ?? []) as PortalObjectionTally[];
+}
+
+// ── Admin: objection/visit tally breakdown (internal, authenticated) ──────────
+
+export async function listPortalObjectionTally(clientId: string): Promise<PortalObjectionTally[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('portal_objection_tally')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('date', { ascending: false });
+
+  if (error) {
+    console.error('[portal] listPortalObjectionTally', error);
+    return [];
+  }
+
+  return (data ?? []) as PortalObjectionTally[];
+}
+
 // ── Public page writes — always via server-side API routes (PIN revalidated
 // on every write; the anon key never has INSERT/UPDATE rights on these tables) ─
 
@@ -326,16 +385,28 @@ export async function validatePortalPin(
   return portalApi<{ valid: boolean }>('validate-pin', { slug, pin, kind });
 }
 
-export async function savePortalDailyEntry(input: {
+export async function incrementPortalTally(input: {
   slug: string;
   pin: string;
   client_id: string;
   date: string;
-  campaign_id: string;
-  objecion: PortalObjection | null;
-  visita_punto_fisico: PortalVisitStatus | null;
-}): Promise<PortalApiResult<PortalDailyEntry>> {
-  return portalApi<PortalDailyEntry>('save-daily-entry', input);
+  ad_id: string;
+  tipo: PortalTallyTipo;
+  categoria: string;
+}): Promise<PortalApiResult<PortalObjectionTally>> {
+  return portalApi<PortalObjectionTally>('increment-tally', input);
+}
+
+export async function decrementPortalTally(input: {
+  slug: string;
+  pin: string;
+  client_id: string;
+  date: string;
+  ad_id: string;
+  tipo: PortalTallyTipo;
+  categoria: string;
+}): Promise<PortalApiResult<PortalObjectionTally>> {
+  return portalApi<PortalObjectionTally>('decrement-tally', input);
 }
 
 export async function addPortalLead(input: {

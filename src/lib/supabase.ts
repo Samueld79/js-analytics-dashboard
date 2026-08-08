@@ -402,7 +402,7 @@ export type PortalAssetType = 'image' | 'video';
 export type PortalCreativeAsset = {
   id: string;
   client_id: string;
-  campaign_name: string;
+  ad_id: string;
   conjunto_label: string | null;
   asset_url: string;
   asset_type: PortalAssetType;
@@ -464,7 +464,56 @@ export type PortalLead = {
 };
 
 export type PortalLeadWithEntry = PortalLead & {
+  // daily_entry.campaign_id: the underlying portal_daily_entries column is
+  // still named campaign_id, but as of the ad-level migration new rows store
+  // an ad_id in it (not a campaign_id) — see portal_ad_daily_metrics.
   daily_entry: { date: string; campaign_id: string } | null;
+};
+
+// ── Portal Cliente — ad-level metrics (separate from ad_campaign_metrics,
+// which stays campaign-level for the rest of the app) ─────────────────────────
+
+export type PortalAdDailyMetric = {
+  id: string;
+  client_id: string;
+  date: string;
+  ad_id: string;
+  ad_name: string;
+  adset_name: string;
+  campaign_name: string | null;
+  messages: number;
+  effective_status: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const PORTAL_OBJECTION_TALLY_CATEGORIES = [
+  'Precio',
+  'Disponibilidad de cita',
+  'No respondio',
+  'Indeciso',
+  'Otro',
+] as const;
+export type PortalObjectionCategory = (typeof PORTAL_OBJECTION_TALLY_CATEGORIES)[number];
+
+export const PORTAL_VISIT_TALLY_CATEGORIES = [
+  'Va a visitar',
+  'No va a visitar',
+  'Tal vez',
+] as const;
+export type PortalVisitCategory = (typeof PORTAL_VISIT_TALLY_CATEGORIES)[number];
+
+export type PortalTallyTipo = 'objecion' | 'visita';
+
+export type PortalObjectionTally = {
+  id: string;
+  client_id: string;
+  date: string;
+  ad_id: string;
+  tipo: PortalTallyTipo;
+  categoria: string;
+  count: number;
+  updated_at: string;
 };
 
 export type HistoricalMonthlyAdMetricInput = {

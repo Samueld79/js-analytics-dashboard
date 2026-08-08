@@ -3,29 +3,31 @@ import { useParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ImageIcon, Lock, Minus, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
-import { listAdCampaignMetrics } from '../services/adCampaignMetrics';
 import {
   addPortalLead,
+  decrementPortalTally,
+  incrementPortalTally,
+  listPublicPortalAdDailyMetrics,
   listPublicPortalCreativeAssets,
   listPublicPortalDailyEntries,
+  listPublicPortalObjectionTally,
   PORTAL_NOTE_CAMPAIGN_ID,
   removePortalLead,
   resolvePortalSlug,
-  savePortalDailyEntry,
   savePortalDailyNote,
   savePortalSale,
   validatePortalPin,
   type PortalResolveResult,
 } from '../services/portal';
 import {
-  PORTAL_OBJECTION_OPTIONS,
-  PORTAL_VISIT_OPTIONS,
-  type AdCampaignMetric,
+  PORTAL_OBJECTION_TALLY_CATEGORIES,
+  PORTAL_VISIT_TALLY_CATEGORIES,
+  type PortalAdDailyMetric,
   type PortalCreativeAsset,
   type PortalDailyEntry,
   type PortalLeadTipo,
-  type PortalObjection,
-  type PortalVisitStatus,
+  type PortalObjectionTally,
+  type PortalTallyTipo,
 } from '../lib/supabase';
 import { formatCop } from '../lib/utils';
 
@@ -55,20 +57,10 @@ function buildMonthGrid(monthDate: Date): Array<{ key: string; day: number; inMo
   });
 }
 
-type EntryState = {
-  citas: number;
-  compras: number;
-  objecion: PortalObjection | null;
-  visita_punto_fisico: PortalVisitStatus | null;
-};
+type LeadEntryState = { citas: number; compras: number };
 
-function entryStateFrom(entry: PortalDailyEntry | undefined): EntryState {
-  return {
-    citas: entry?.citas ?? 0,
-    compras: entry?.compras ?? 0,
-    objecion: entry?.objecion ?? null,
-    visita_punto_fisico: entry?.visita_punto_fisico ?? null,
-  };
+function leadEntryStateFrom(entry: PortalDailyEntry | undefined): LeadEntryState {
+  return { citas: entry?.citas ?? 0, compras: entry?.compras ?? 0 };
 }
 
 // Citas/Compras only ever move by exactly one, via +/- — never free typing —
@@ -113,6 +105,53 @@ function LeadCounterStepper({
           style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <Plus size={12} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Compact single-line variant for the objeción/visita category lists — no
+// modal, no identity captured, just an aggregate count per category.
+function TallyStepperRow({
+  label,
+  value,
+  disabled,
+  busy,
+  onIncrement,
+  onDecrement,
+}: {
+  label: string;
+  value: number;
+  disabled: boolean;
+  busy: boolean;
+  onIncrement: () => void;
+  onDecrement: () => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '3px 0' }}>
+      <span style={{ fontSize: '0.68rem', color: 'var(--fg-muted)' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={disabled || busy || value <= 0}
+          onClick={onDecrement}
+          style={{ width: 20, height: 20, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Minus size={10} />
+        </button>
+        <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--fg)', minWidth: 14, textAlign: 'center' }}>
+          {value}
+        </span>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={disabled || busy}
+          onClick={onIncrement}
+          style={{ width: 20, height: 20, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Plus size={10} />
         </button>
       </div>
     </div>
@@ -193,9 +232,10 @@ export function ClientPortalPublicPage() {
 
   const [status, setStatus] = useState<'loading' | 'invalid' | 'error' | 'ready'>('loading');
   const [portal, setPortal] = useState<PortalResolveResult | null>(null);
-  const [campaignRows, setCampaignRows] = useState<AdCampaignMetric[]>([]);
+  const [adRows, setAdRows] = useState<PortalAdDailyMetric[]>([]);
   const [creativeAssets, setCreativeAssets] = useState<PortalCreativeAsset[]>([]);
   const [dailyEntries, setDailyEntries] = useState<PortalDailyEntry[]>([]);
+  const [tallyRows, setTallyRows] = useState<PortalObjectionTally[]>([]);
 
   const [monthDate, setMonthDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
@@ -210,15 +250,16 @@ export function ClientPortalPublicPage() {
   const [savingSale, setSavingSale] = useState(false);
   const [lastSavedAmount, setLastSavedAmount] = useState<number | null>(null);
 
-  const [entriesState, setEntriesState] = useState<Record<string, EntryState>>({});
+  const [leadEntriesState, setLeadEntriesState] = useState<Record<string, LeadEntryState>>({});
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const [notaText, setNotaText] = useState('');
 
-  const [leadModal, setLeadModal] = useState<{ campaignId: string; tipo: PortalLeadTipo } | null>(null);
+  const [leadModal, setLeadModal] = useState<{ adId: string; tipo: PortalLeadTipo } | null>(null);
   const [leadSaving, setLeadSaving] = useState(false);
   const [leadError, setLeadError] = useState('');
   const [leadBusy, setLeadBusy] = useState<Record<string, boolean>>({});
+  const [tallyBusy, setTallyBusy] = useState<Record<string, boolean>>({});
 
   // ── Load portal + data ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -235,16 +276,18 @@ export function ClientPortalPublicPage() {
         return;
       }
       setPortal(result.data);
-      const [campaigns, assets, entries] = await Promise.all([
-        listAdCampaignMetrics({ clientId: result.data.client_id, days: 180 }),
+      const [ads, assets, entries, tally] = await Promise.all([
+        listPublicPortalAdDailyMetrics(result.data.client_id),
         listPublicPortalCreativeAssets(result.data.client_id),
         listPublicPortalDailyEntries(result.data.client_id),
+        listPublicPortalObjectionTally(result.data.client_id),
       ]);
-      setCampaignRows(campaigns);
+      setAdRows(ads);
       setCreativeAssets(assets);
       setDailyEntries(entries);
+      setTallyRows(tally);
 
-      const lastDate = campaigns.length > 0 ? [...campaigns].sort((a, b) => b.date.localeCompare(a.date))[0].date : null;
+      const lastDate = ads.length > 0 ? [...ads].sort((a, b) => b.date.localeCompare(a.date))[0].date : null;
       if (lastDate) {
         setSelectedDate(lastDate);
         setMonthDate(new Date(`${lastDate}T00:00:00`));
@@ -253,45 +296,49 @@ export function ClientPortalPublicPage() {
     });
   }, [slug]);
 
-  // ── Calendar ─────────────────────────────────────────────────────────────────
-  const campaignCountByDate = useMemo(() => {
+  // ── Calendar — colored by count of ACTIVE ads that day ───────────────────────
+  const activeAdRows = useMemo(() => adRows.filter((r) => r.effective_status === 'ACTIVE'), [adRows]);
+
+  const adCountByDate = useMemo(() => {
     const map = new Map<string, Set<string>>();
-    campaignRows.forEach((r) => {
-      if (r.spend <= 0) return;
+    activeAdRows.forEach((r) => {
       const set = map.get(r.date) ?? new Set<string>();
-      set.add(r.campaign_id);
+      set.add(r.ad_id);
       map.set(r.date, set);
     });
     return new Map([...map.entries()].map(([k, v]) => [k, v.size]));
-  }, [campaignRows]);
+  }, [activeAdRows]);
 
-  const maxCampaignCount = Math.max(1, ...campaignCountByDate.values());
+  const maxAdCount = Math.max(1, ...adCountByDate.values());
   const gridDays = useMemo(() => buildMonthGrid(monthDate), [monthDate]);
 
-  // ── Selected day rows ────────────────────────────────────────────────────────
+  // ── Selected day rows — one per individual ad, active that day ───────────────
   const dayRows = useMemo(
-    () => campaignRows.filter((r) => r.date === selectedDate && r.spend > 0),
-    [campaignRows, selectedDate],
+    () => activeAdRows.filter((r) => r.date === selectedDate),
+    [activeAdRows, selectedDate],
   );
 
-  const assetByCampaignName = useMemo(
-    () => new Map(creativeAssets.map((a) => [a.campaign_name, a])),
+  const assetByAdId = useMemo(
+    () => new Map(creativeAssets.map((a) => [a.ad_id, a])),
     [creativeAssets],
   );
 
   useEffect(() => {
-    const next: Record<string, EntryState> = {};
+    const next: Record<string, LeadEntryState> = {};
     dayRows.forEach((row) => {
-      const entry = dailyEntries.find((e) => e.date === selectedDate && e.campaign_id === row.campaign_id);
-      next[row.campaign_id] = entryStateFrom(entry);
+      const entry = dailyEntries.find((e) => e.date === selectedDate && e.campaign_id === row.ad_id);
+      next[row.ad_id] = leadEntryStateFrom(entry);
     });
-    setEntriesState(next);
+    setLeadEntriesState(next);
   }, [selectedDate, dayRows, dailyEntries]);
 
   useEffect(() => {
     const note = dailyEntries.find((e) => e.date === selectedDate && e.campaign_id === PORTAL_NOTE_CAMPAIGN_ID);
     setNotaText(note?.nota ?? '');
   }, [selectedDate, dailyEntries]);
+
+  const getTallyCount = (adId: string, tipo: PortalTallyTipo, categoria: string): number =>
+    tallyRows.find((t) => t.date === selectedDate && t.ad_id === adId && t.tipo === tipo && t.categoria === categoria)?.count ?? 0;
 
   const unlockedRegistro = pinRegistro.length === 4;
   const unlockedVentas = pinVentas.length === 4;
@@ -320,58 +367,26 @@ export function ClientPortalPublicPage() {
     }
   };
 
-  const scheduleSave = (campaignId: string, next: EntryState) => {
-    if (!slug || !portal) return;
-    const timerKey = campaignId;
-    if (debounceTimers.current[timerKey]) clearTimeout(debounceTimers.current[timerKey]);
-    debounceTimers.current[timerKey] = setTimeout(() => {
-      void savePortalDailyEntry({
-        slug,
-        pin: pinRegistro,
-        client_id: portal.client_id,
-        date: selectedDate,
-        campaign_id: campaignId,
-        objecion: next.objecion,
-        visita_punto_fisico: next.visita_punto_fisico,
-      }).then((result) => {
-        if (result.data) {
-          setDailyEntries((prev) => [
-            ...prev.filter((e) => !(e.date === selectedDate && e.campaign_id === campaignId)),
-            result.data as PortalDailyEntry,
-          ]);
-        }
-      });
-    }, 800);
-  };
-
-  const updateEntry = (campaignId: string, patch: Partial<EntryState>) => {
-    setEntriesState((prev) => {
-      const next = { ...(prev[campaignId] ?? entryStateFrom(undefined)), ...patch };
-      scheduleSave(campaignId, next);
-      return { ...prev, [campaignId]: next };
-    });
-  };
-
-  const applyEntryUpdate = (campaignId: string, updated: PortalDailyEntry) => {
+  const applyEntryUpdate = (adId: string, updated: PortalDailyEntry) => {
     setDailyEntries((prev) => [
-      ...prev.filter((e) => !(e.date === selectedDate && e.campaign_id === campaignId)),
+      ...prev.filter((e) => !(e.date === selectedDate && e.campaign_id === adId)),
       updated,
     ]);
-    setEntriesState((prev) => ({ ...prev, [campaignId]: entryStateFrom(updated) }));
+    setLeadEntriesState((prev) => ({ ...prev, [adId]: leadEntryStateFrom(updated) }));
   };
 
   // The number never advances until the lead form is actually saved — so
   // closing the modal without filling it just leaves the count exactly
   // where it was, with nothing to "revert".
-  const handleLeadIncrementClick = (campaignId: string, tipo: PortalLeadTipo) => {
+  const handleLeadIncrementClick = (adId: string, tipo: PortalLeadTipo) => {
     if (!unlockedRegistro) return;
     setLeadError('');
-    setLeadModal({ campaignId, tipo });
+    setLeadModal({ adId, tipo });
   };
 
   const handleLeadModalSubmit = async (input: { nombre_cliente: string; numero_contacto: string; monto: number | null }) => {
     if (!slug || !portal || !leadModal) return;
-    const { campaignId, tipo } = leadModal;
+    const { adId, tipo } = leadModal;
     setLeadSaving(true);
     setLeadError('');
     const result = await addPortalLead({
@@ -379,7 +394,7 @@ export function ClientPortalPublicPage() {
       pin: pinRegistro,
       client_id: portal.client_id,
       date: selectedDate,
-      campaign_id: campaignId,
+      campaign_id: adId,
       tipo,
       nombre_cliente: input.nombre_cliente,
       numero_contacto: input.numero_contacto,
@@ -387,31 +402,62 @@ export function ClientPortalPublicPage() {
     });
     setLeadSaving(false);
     if (result.data) {
-      applyEntryUpdate(campaignId, result.data.daily_entry);
+      applyEntryUpdate(adId, result.data.daily_entry);
       setLeadModal(null);
     } else {
       setLeadError(result.error ?? 'No se pudo guardar el registro.');
     }
   };
 
-  const handleLeadDecrement = async (campaignId: string, tipo: PortalLeadTipo) => {
+  const handleLeadDecrement = async (adId: string, tipo: PortalLeadTipo) => {
     if (!slug || !portal || !unlockedRegistro) return;
-    const key = `${campaignId}:${tipo}`;
+    const key = `${adId}:${tipo}`;
     setLeadBusy((prev) => ({ ...prev, [key]: true }));
     const result = await removePortalLead({
       slug,
       pin: pinRegistro,
       client_id: portal.client_id,
       date: selectedDate,
-      campaign_id: campaignId,
+      campaign_id: adId,
       tipo,
     });
     setLeadBusy((prev) => ({ ...prev, [key]: false }));
     if (result.data) {
-      applyEntryUpdate(campaignId, result.data.daily_entry);
+      applyEntryUpdate(adId, result.data.daily_entry);
     } else if (result.error) {
       alert(result.error);
     }
+  };
+
+  const applyTallyUpdate = (row: PortalObjectionTally) => {
+    setTallyRows((prev) => [
+      ...prev.filter((t) => !(t.date === row.date && t.ad_id === row.ad_id && t.tipo === row.tipo && t.categoria === row.categoria)),
+      row,
+    ]);
+  };
+
+  const handleTallyIncrement = async (adId: string, tipo: PortalTallyTipo, categoria: string) => {
+    if (!slug || !portal || !unlockedRegistro) return;
+    const key = `${adId}:${tipo}:${categoria}`;
+    setTallyBusy((prev) => ({ ...prev, [key]: true }));
+    const result = await incrementPortalTally({
+      slug, pin: pinRegistro, client_id: portal.client_id, date: selectedDate, ad_id: adId, tipo, categoria,
+    });
+    setTallyBusy((prev) => ({ ...prev, [key]: false }));
+    if (result.data) applyTallyUpdate(result.data);
+    else if (result.error) alert(result.error);
+  };
+
+  const handleTallyDecrement = async (adId: string, tipo: PortalTallyTipo, categoria: string) => {
+    if (!slug || !portal || !unlockedRegistro) return;
+    const key = `${adId}:${tipo}:${categoria}`;
+    setTallyBusy((prev) => ({ ...prev, [key]: true }));
+    const result = await decrementPortalTally({
+      slug, pin: pinRegistro, client_id: portal.client_id, date: selectedDate, ad_id: adId, tipo, categoria,
+    });
+    setTallyBusy((prev) => ({ ...prev, [key]: false }));
+    if (result.data) applyTallyUpdate(result.data);
+    else if (result.error) alert(result.error);
   };
 
   const scheduleNoteSave = (value: string) => {
@@ -462,14 +508,11 @@ export function ClientPortalPublicPage() {
     }
   };
 
-  // ── Summary by conjunto_label — scoped to the month shown in the calendar ────
+  // ── Summary by adset_name (real Meta conjunto) — scoped to the calendar month ─
   const summaryMonthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
 
   const summaryRows = useMemo(() => {
-    const campaignNameToConjunto = new Map(
-      creativeAssets.map((a) => [a.campaign_name, a.conjunto_label?.trim() || 'Sin conjunto asignado']),
-    );
-    const campaignIdToName = new Map(campaignRows.map((r) => [r.campaign_id, r.campaign_name]));
+    const adIdToAdsetName = new Map(adRows.map((r) => [r.ad_id, r.adset_name]));
 
     const map = new Map<string, { conjunto: string; mensajes: number; citas: number; compras: number }>();
     const getRow = (conjunto: string) => {
@@ -480,25 +523,23 @@ export function ClientPortalPublicPage() {
       return created;
     };
 
-    campaignRows
+    adRows
       .filter((r) => r.date.startsWith(summaryMonthKey))
       .forEach((r) => {
-        const conjunto = campaignNameToConjunto.get(r.campaign_name) ?? 'Sin conjunto asignado';
-        getRow(conjunto).mensajes += r.messages ?? 0;
+        getRow(r.adset_name).mensajes += r.messages ?? 0;
       });
 
     dailyEntries
-      .filter((e) => e.campaign_id !== PORTAL_NOTE_CAMPAIGN_ID && e.date.startsWith(summaryMonthKey)) // day-level note, not a per-campaign row
+      .filter((e) => e.campaign_id !== PORTAL_NOTE_CAMPAIGN_ID && e.date.startsWith(summaryMonthKey)) // day-level note, not a per-ad row
       .forEach((e) => {
-        const name = campaignIdToName.get(e.campaign_id);
-        const conjunto = (name && campaignNameToConjunto.get(name)) ?? 'Sin conjunto asignado';
+        const conjunto = adIdToAdsetName.get(e.campaign_id) ?? 'Sin conjunto asignado';
         const row = getRow(conjunto);
         row.citas += e.citas;
         row.compras += e.compras;
       });
 
     return [...map.values()].sort((a, b) => b.mensajes - a.mensajes);
-  }, [campaignRows, dailyEntries, creativeAssets, summaryMonthKey]);
+  }, [adRows, dailyEntries, summaryMonthKey]);
 
   const summaryTotals = summaryRows.reduce(
     (acc, r) => ({ mensajes: acc.mensajes + r.mensajes, citas: acc.citas + r.citas, compras: acc.compras + r.compras }),
@@ -587,8 +628,8 @@ export function ClientPortalPublicPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {gridDays.map(({ key, day, inMonth }) => {
-              const count = campaignCountByDate.get(key) ?? 0;
-              const intensity = count > 0 ? 0.15 + 0.55 * (count / maxCampaignCount) : 0;
+              const count = adCountByDate.get(key) ?? 0;
+              const intensity = count > 0 ? 0.15 + 0.55 * (count / maxAdCount) : 0;
               const isSelected = key === selectedDate;
               return (
                 <button
@@ -610,7 +651,7 @@ export function ClientPortalPublicPage() {
           </div>
         </GlassCard>
 
-        {/* ── 3. Registro del día seleccionado ── */}
+        {/* ── 3. Registro del día seleccionado — uno por anuncio individual ── */}
         <GlassCard style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>
@@ -646,10 +687,10 @@ export function ClientPortalPublicPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {dayRows.map((row) => {
-                const asset = assetByCampaignName.get(row.campaign_name);
-                const entry = entriesState[row.campaign_id] ?? entryStateFrom(undefined);
+                const asset = assetByAdId.get(row.ad_id);
+                const entry = leadEntriesState[row.ad_id] ?? leadEntryStateFrom(undefined);
                 return (
-                  <div key={row.campaign_id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div key={row.ad_id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
                     <div style={{
                       width: 48, height: 48, borderRadius: 8, flexShrink: 0, overflow: 'hidden',
                       background: 'var(--surface-2)', border: '1px solid var(--border)',
@@ -667,13 +708,11 @@ export function ClientPortalPublicPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.78rem', color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {row.campaign_name}
+                          {row.ad_name}
                         </span>
-                        {asset?.conjunto_label && (
-                          <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--fg-muted)' }}>
-                            {asset.conjunto_label}
-                          </span>
-                        )}
+                        <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--fg-muted)' }}>
+                          {asset?.conjunto_label?.trim() || row.adset_name}
+                        </span>
                         <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: 4, background: 'var(--cyan-dim)', color: 'var(--cyan)' }}>
                           {row.messages} msgs
                         </span>
@@ -684,17 +723,17 @@ export function ClientPortalPublicPage() {
                           label="Citas"
                           value={entry.citas}
                           disabled={!unlockedRegistro}
-                          busy={leadBusy[`${row.campaign_id}:cita`] ?? false}
-                          onIncrement={() => handleLeadIncrementClick(row.campaign_id, 'cita')}
-                          onDecrement={() => void handleLeadDecrement(row.campaign_id, 'cita')}
+                          busy={leadBusy[`${row.ad_id}:cita`] ?? false}
+                          onIncrement={() => handleLeadIncrementClick(row.ad_id, 'cita')}
+                          onDecrement={() => void handleLeadDecrement(row.ad_id, 'cita')}
                         />
                         <LeadCounterStepper
                           label="Compras"
                           value={entry.compras}
                           disabled={!unlockedRegistro}
-                          busy={leadBusy[`${row.campaign_id}:compra`] ?? false}
-                          onIncrement={() => handleLeadIncrementClick(row.campaign_id, 'compra')}
-                          onDecrement={() => void handleLeadDecrement(row.campaign_id, 'compra')}
+                          busy={leadBusy[`${row.ad_id}:compra`] ?? false}
+                          onIncrement={() => handleLeadIncrementClick(row.ad_id, 'compra')}
+                          onDecrement={() => void handleLeadDecrement(row.ad_id, 'compra')}
                         />
                       </div>
 
@@ -702,30 +741,34 @@ export function ClientPortalPublicPage() {
                         <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 6 }}>
                           De los que no agendaron ni compraron hoy
                         </span>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(90px, 1fr))', gap: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(120px, 1fr))', gap: 16 }}>
                           <div>
-                            <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Objeción</span>
-                            <select
-                              className="form-input" disabled={!unlockedRegistro}
-                              value={entry.objecion ?? ''}
-                              onChange={(e) => updateEntry(row.campaign_id, { objecion: (e.target.value || null) as PortalObjection | null })}
-                              style={{ padding: '6px 8px', fontSize: '0.72rem' }}
-                            >
-                              <option value="">—</option>
-                              {PORTAL_OBJECTION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                            <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Objeción</span>
+                            {PORTAL_OBJECTION_TALLY_CATEGORIES.map((categoria) => (
+                              <TallyStepperRow
+                                key={categoria}
+                                label={categoria}
+                                value={getTallyCount(row.ad_id, 'objecion', categoria)}
+                                disabled={!unlockedRegistro}
+                                busy={tallyBusy[`${row.ad_id}:objecion:${categoria}`] ?? false}
+                                onIncrement={() => void handleTallyIncrement(row.ad_id, 'objecion', categoria)}
+                                onDecrement={() => void handleTallyDecrement(row.ad_id, 'objecion', categoria)}
+                              />
+                            ))}
                           </div>
                           <div>
-                            <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Visita punto físico</span>
-                            <select
-                              className="form-input" disabled={!unlockedRegistro}
-                              value={entry.visita_punto_fisico ?? ''}
-                              onChange={(e) => updateEntry(row.campaign_id, { visita_punto_fisico: (e.target.value || null) as PortalVisitStatus | null })}
-                              style={{ padding: '6px 8px', fontSize: '0.72rem' }}
-                            >
-                              <option value="">—</option>
-                              {PORTAL_VISIT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                            <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', fontWeight: 700, display: 'block', marginBottom: 4 }}>Visita punto físico</span>
+                            {PORTAL_VISIT_TALLY_CATEGORIES.map((categoria) => (
+                              <TallyStepperRow
+                                key={categoria}
+                                label={categoria}
+                                value={getTallyCount(row.ad_id, 'visita', categoria)}
+                                disabled={!unlockedRegistro}
+                                busy={tallyBusy[`${row.ad_id}:visita:${categoria}`] ?? false}
+                                onIncrement={() => void handleTallyIncrement(row.ad_id, 'visita', categoria)}
+                                onDecrement={() => void handleTallyDecrement(row.ad_id, 'visita', categoria)}
+                              />
+                            ))}
                           </div>
                         </div>
                       </div>
@@ -757,7 +800,7 @@ export function ClientPortalPublicPage() {
           />
         </GlassCard>
 
-        {/* ── 4. Resumen de efectividad ── */}
+        {/* ── 4. Resumen de efectividad — agrupado por conjunto real de Meta (adset_name) ── */}
         <GlassCard style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>
