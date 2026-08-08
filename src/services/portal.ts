@@ -7,6 +7,8 @@ import {
   type PortalAssetType,
   type PortalCreativeAsset,
   type PortalDailyEntry,
+  type PortalLeadTipo,
+  type PortalLeadWithEntry,
   type PortalObjection,
   type PortalVisitStatus,
   type ServiceMutationResult,
@@ -131,6 +133,43 @@ export async function listPortalDailyEntries(clientId: string): Promise<PortalDa
   }
 
   return (data ?? []) as PortalDailyEntry[];
+}
+
+export async function listPortalLeads(clientId: string): Promise<PortalLeadWithEntry[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('portal_leads')
+    .select('*, daily_entry:portal_daily_entries(date, campaign_id)')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[portal] listPortalLeads', error);
+    return [];
+  }
+
+  return (data ?? []) as unknown as PortalLeadWithEntry[];
+}
+
+export async function listCampaignIdNameMap(clientId: string): Promise<Record<string, string>> {
+  if (!isSupabaseConfigured || !supabase) return {};
+
+  const { data, error } = await supabase
+    .from('ad_campaign_metrics')
+    .select('campaign_id, campaign_name')
+    .eq('client_id', clientId);
+
+  if (error) {
+    console.error('[portal] listCampaignIdNameMap', error);
+    return {};
+  }
+
+  const map: Record<string, string> = {};
+  for (const row of (data ?? []) as { campaign_id: string | null; campaign_name: string }[]) {
+    if (row.campaign_id) map[row.campaign_id] = row.campaign_name;
+  }
+  return map;
 }
 
 export async function listDistinctCampaignNames(clientId: string): Promise<string[]> {
@@ -293,12 +332,35 @@ export async function savePortalDailyEntry(input: {
   client_id: string;
   date: string;
   campaign_id: string;
-  citas: number;
-  compras: number;
   objecion: PortalObjection | null;
   visita_punto_fisico: PortalVisitStatus | null;
 }): Promise<PortalApiResult<PortalDailyEntry>> {
   return portalApi<PortalDailyEntry>('save-daily-entry', input);
+}
+
+export async function addPortalLead(input: {
+  slug: string;
+  pin: string;
+  client_id: string;
+  date: string;
+  campaign_id: string;
+  tipo: PortalLeadTipo;
+  nombre_cliente: string;
+  numero_contacto: string;
+  monto: number | null;
+}): Promise<PortalApiResult<{ daily_entry: PortalDailyEntry; lead: unknown }>> {
+  return portalApi('add-lead', input);
+}
+
+export async function removePortalLead(input: {
+  slug: string;
+  pin: string;
+  client_id: string;
+  date: string;
+  campaign_id: string;
+  tipo: PortalLeadTipo;
+}): Promise<PortalApiResult<{ daily_entry: PortalDailyEntry; removed_lead_id: string | null }>> {
+  return portalApi('remove-last-lead', input);
 }
 
 export async function savePortalDailyNote(input: {

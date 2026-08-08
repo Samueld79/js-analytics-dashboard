@@ -13,13 +13,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return res.status(500).json({ error: 'Supabase no configurado en el servidor.' });
 
-  const { slug, pin, date, campaign_id, citas, compras, objecion, visita_punto_fisico } = req.body as {
+  // citas/compras are intentionally NOT accepted here — they can only change
+  // via /api/portal/add-lead and /api/portal/remove-last-lead, which keep
+  // the counters and the individual portal_leads rows in lockstep.
+  const { slug, pin, date, campaign_id, objecion, visita_punto_fisico } = req.body as {
     slug?: string;
     pin?: string;
     date?: string;
     campaign_id?: string;
-    citas?: number;
-    compras?: number;
     objecion?: string | null;
     visita_punto_fisico?: string | null;
   };
@@ -54,8 +55,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         client_id: settings.client_id,
         date,
         campaign_id,
-        citas: Number.isFinite(citas) ? Math.max(0, Math.round(citas as number)) : 0,
-        compras: Number.isFinite(compras) ? Math.max(0, Math.round(compras as number)) : 0,
         objecion: objecion ?? null,
         visita_punto_fisico: visita_punto_fisico ?? null,
         updated_at: new Date().toISOString(),

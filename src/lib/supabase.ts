@@ -450,6 +450,23 @@ export type PortalDailyEntryInput = {
   nota: string | null;
 };
 
+export type PortalLeadTipo = 'cita' | 'compra';
+
+export type PortalLead = {
+  id: string;
+  client_id: string;
+  daily_entry_id: string;
+  tipo: PortalLeadTipo;
+  nombre_cliente: string;
+  numero_contacto: string;
+  monto: number | null;
+  created_at: string;
+};
+
+export type PortalLeadWithEntry = PortalLead & {
+  daily_entry: { date: string; campaign_id: string } | null;
+};
+
 export type HistoricalMonthlyAdMetricInput = {
   client_id: string;
   month: string;

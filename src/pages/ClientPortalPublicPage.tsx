@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ImageIcon, Lock, ShoppingBag, Unlock, Video } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImageIcon, Lock, Minus, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
 import { listAdCampaignMetrics } from '../services/adCampaignMetrics';
 import {
+  addPortalLead,
   listPublicPortalCreativeAssets,
   listPublicPortalDailyEntries,
   PORTAL_NOTE_CAMPAIGN_ID,
+  removePortalLead,
   resolvePortalSlug,
   savePortalDailyEntry,
   savePortalDailyNote,
@@ -21,6 +23,7 @@ import {
   type AdCampaignMetric,
   type PortalCreativeAsset,
   type PortalDailyEntry,
+  type PortalLeadTipo,
   type PortalObjection,
   type PortalVisitStatus,
 } from '../lib/supabase';
@@ -68,6 +71,123 @@ function entryStateFrom(entry: PortalDailyEntry | undefined): EntryState {
   };
 }
 
+// Citas/Compras only ever move by exactly one, via +/- — never free typing —
+// so every increment maps to exactly one lead-capture modal, and the counter
+// can never show a number without a matching portal_leads row behind it.
+function LeadCounterStepper({
+  label,
+  value,
+  disabled,
+  busy,
+  onIncrement,
+  onDecrement,
+}: {
+  label: string;
+  value: number;
+  disabled: boolean;
+  busy: boolean;
+  onIncrement: () => void;
+  onDecrement: () => void;
+}) {
+  return (
+    <div>
+      <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={disabled || busy || value <= 0}
+          onClick={onDecrement}
+          style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Minus size={12} />
+        </button>
+        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--fg)', minWidth: 16, textAlign: 'center' }}>
+          {value}
+        </span>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={disabled || busy}
+          onClick={onIncrement}
+          style={{ width: 24, height: 24, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Plus size={12} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LeadModal({
+  tipo,
+  saving,
+  error,
+  onSubmit,
+  onClose,
+}: {
+  tipo: PortalLeadTipo;
+  saving: boolean;
+  error: string;
+  onSubmit: (input: { nombre_cliente: string; numero_contacto: string; monto: number | null }) => void;
+  onClose: () => void;
+}) {
+  const [nombre, setNombre] = useState('');
+  const [numero, setNumero] = useState('');
+  const [monto, setMonto] = useState('');
+
+  const isValid = nombre.trim().length > 0 && numero.trim().length > 0 && (tipo !== 'compra' || Number(monto) > 0);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h2 className="modal-title">{tipo === 'cita' ? 'Nueva cita' : 'Nueva compra'}</h2>
+            <p className="modal-subtitle">Datos de contacto para seguimiento</p>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          <label className="form-field required">
+            <span className="form-label">Nombre del cliente</span>
+            <input className="form-input" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
+          </label>
+          <label className="form-field required">
+            <span className="form-label">Número de contacto (WhatsApp)</span>
+            <input className="form-input" value={numero} onChange={(e) => setNumero(e.target.value)} />
+          </label>
+          {tipo === 'compra' && (
+            <label className="form-field required">
+              <span className="form-label">Monto</span>
+              <input className="form-input" type="number" min={0} value={monto} onChange={(e) => setMonto(e.target.value)} />
+            </label>
+          )}
+          {error && <p className="empty-note">{error}</p>}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-ghost" onClick={onClose}>Cancelar</button>
+          <button
+            className="btn-primary"
+            disabled={!isValid || saving}
+            onClick={() =>
+              onSubmit({
+                nombre_cliente: nombre.trim(),
+                numero_contacto: numero.trim(),
+                monto: tipo === 'compra' ? Number(monto) : null,
+              })
+            }
+          >
+            {saving ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ClientPortalPublicPage() {
   const { slug } = useParams<{ slug: string }>();
 
@@ -94,6 +214,11 @@ export function ClientPortalPublicPage() {
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const [notaText, setNotaText] = useState('');
+
+  const [leadModal, setLeadModal] = useState<{ campaignId: string; tipo: PortalLeadTipo } | null>(null);
+  const [leadSaving, setLeadSaving] = useState(false);
+  const [leadError, setLeadError] = useState('');
+  const [leadBusy, setLeadBusy] = useState<Record<string, boolean>>({});
 
   // ── Load portal + data ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -206,8 +331,6 @@ export function ClientPortalPublicPage() {
         client_id: portal.client_id,
         date: selectedDate,
         campaign_id: campaignId,
-        citas: next.citas,
-        compras: next.compras,
         objecion: next.objecion,
         visita_punto_fisico: next.visita_punto_fisico,
       }).then((result) => {
@@ -227,6 +350,68 @@ export function ClientPortalPublicPage() {
       scheduleSave(campaignId, next);
       return { ...prev, [campaignId]: next };
     });
+  };
+
+  const applyEntryUpdate = (campaignId: string, updated: PortalDailyEntry) => {
+    setDailyEntries((prev) => [
+      ...prev.filter((e) => !(e.date === selectedDate && e.campaign_id === campaignId)),
+      updated,
+    ]);
+    setEntriesState((prev) => ({ ...prev, [campaignId]: entryStateFrom(updated) }));
+  };
+
+  // The number never advances until the lead form is actually saved — so
+  // closing the modal without filling it just leaves the count exactly
+  // where it was, with nothing to "revert".
+  const handleLeadIncrementClick = (campaignId: string, tipo: PortalLeadTipo) => {
+    if (!unlockedRegistro) return;
+    setLeadError('');
+    setLeadModal({ campaignId, tipo });
+  };
+
+  const handleLeadModalSubmit = async (input: { nombre_cliente: string; numero_contacto: string; monto: number | null }) => {
+    if (!slug || !portal || !leadModal) return;
+    const { campaignId, tipo } = leadModal;
+    setLeadSaving(true);
+    setLeadError('');
+    const result = await addPortalLead({
+      slug,
+      pin: pinRegistro,
+      client_id: portal.client_id,
+      date: selectedDate,
+      campaign_id: campaignId,
+      tipo,
+      nombre_cliente: input.nombre_cliente,
+      numero_contacto: input.numero_contacto,
+      monto: input.monto,
+    });
+    setLeadSaving(false);
+    if (result.data) {
+      applyEntryUpdate(campaignId, result.data.daily_entry);
+      setLeadModal(null);
+    } else {
+      setLeadError(result.error ?? 'No se pudo guardar el registro.');
+    }
+  };
+
+  const handleLeadDecrement = async (campaignId: string, tipo: PortalLeadTipo) => {
+    if (!slug || !portal || !unlockedRegistro) return;
+    const key = `${campaignId}:${tipo}`;
+    setLeadBusy((prev) => ({ ...prev, [key]: true }));
+    const result = await removePortalLead({
+      slug,
+      pin: pinRegistro,
+      client_id: portal.client_id,
+      date: selectedDate,
+      campaign_id: campaignId,
+      tipo,
+    });
+    setLeadBusy((prev) => ({ ...prev, [key]: false }));
+    if (result.data) {
+      applyEntryUpdate(campaignId, result.data.daily_entry);
+    } else if (result.error) {
+      alert(result.error);
+    }
   };
 
   const scheduleNoteSave = (value: string) => {
@@ -491,24 +676,22 @@ export function ClientPortalPublicPage() {
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(90px, 1fr))', gap: 8, marginTop: 8 }}>
-                        <div>
-                          <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Citas</span>
-                          <input
-                            className="form-input" type="number" min={0} disabled={!unlockedRegistro}
-                            value={entry.citas}
-                            onChange={(e) => updateEntry(row.campaign_id, { citas: Math.max(0, Number(e.target.value) || 0) })}
-                            style={{ padding: '6px 8px', fontSize: '0.76rem' }}
-                          />
-                        </div>
-                        <div>
-                          <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Compras</span>
-                          <input
-                            className="form-input" type="number" min={0} disabled={!unlockedRegistro}
-                            value={entry.compras}
-                            onChange={(e) => updateEntry(row.campaign_id, { compras: Math.max(0, Number(e.target.value) || 0) })}
-                            style={{ padding: '6px 8px', fontSize: '0.76rem' }}
-                          />
-                        </div>
+                        <LeadCounterStepper
+                          label="Citas"
+                          value={entry.citas}
+                          disabled={!unlockedRegistro}
+                          busy={leadBusy[`${row.campaign_id}:cita`] ?? false}
+                          onIncrement={() => handleLeadIncrementClick(row.campaign_id, 'cita')}
+                          onDecrement={() => void handleLeadDecrement(row.campaign_id, 'cita')}
+                        />
+                        <LeadCounterStepper
+                          label="Compras"
+                          value={entry.compras}
+                          disabled={!unlockedRegistro}
+                          busy={leadBusy[`${row.campaign_id}:compra`] ?? false}
+                          onIncrement={() => handleLeadIncrementClick(row.campaign_id, 'compra')}
+                          onDecrement={() => void handleLeadDecrement(row.campaign_id, 'compra')}
+                        />
                         <div>
                           <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Objeción</span>
                           <select
@@ -652,6 +835,16 @@ export function ClientPortalPublicPage() {
           )}
         </GlassCard>
       </div>
+
+      {leadModal && (
+        <LeadModal
+          tipo={leadModal.tipo}
+          saving={leadSaving}
+          error={leadError}
+          onSubmit={(input) => void handleLeadModalSubmit(input)}
+          onClose={() => { setLeadModal(null); setLeadError(''); }}
+        />
+      )}
     </div>
   );
 }

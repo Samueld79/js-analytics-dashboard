@@ -6,16 +6,19 @@ import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
 import {
   generatePortalPin,
   generatePortalSlug,
+  listCampaignIdNameMap,
   listClientPortalSettings,
   listDistinctCampaignNames,
   listPortalCreativeAssets,
   listPortalDailyEntries,
+  listPortalLeads,
   PORTAL_NOTE_CAMPAIGN_ID,
   upsertClientPortalSettings,
   upsertPortalCreativeAsset,
   uploadPortalCreativeFile,
 } from '../services/portal';
-import type { ClientPortalSettings, PortalCreativeAsset, PortalDailyEntry } from '../lib/supabase';
+import type { ClientPortalSettings, PortalCreativeAsset, PortalDailyEntry, PortalLeadTipo, PortalLeadWithEntry } from '../lib/supabase';
+import { formatCop } from '../lib/utils';
 
 function CreativeAssetRow({
   clientId,
@@ -134,6 +137,13 @@ export function PortalClientAdminPage() {
   const [notes, setNotes] = useState<PortalDailyEntry[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
 
+  const [leads, setLeads] = useState<PortalLeadWithEntry[]>([]);
+  const [campaignIdToName, setCampaignIdToName] = useState<Record<string, string>>({});
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [leadDateFrom, setLeadDateFrom] = useState('');
+  const [leadDateTo, setLeadDateTo] = useState('');
+  const [leadTipoFilter, setLeadTipoFilter] = useState<PortalLeadTipo | 'all'>('all');
+
   const reloadSettings = async () => {
     setLoadingSettings(true);
     const rows = await listClientPortalSettings();
@@ -191,6 +201,33 @@ export function PortalClientAdminPage() {
       setLoadingNotes(false);
     });
   }, [selectedClientId]);
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setLeads([]);
+      setCampaignIdToName({});
+      return;
+    }
+    setLoadingLeads(true);
+    Promise.all([
+      listPortalLeads(selectedClientId),
+      listCampaignIdNameMap(selectedClientId),
+    ]).then(([rows, map]) => {
+      setLeads(rows);
+      setCampaignIdToName(map);
+      setLoadingLeads(false);
+    });
+  }, [selectedClientId]);
+
+  const filteredLeads = useMemo(() => {
+    return leads.filter((lead) => {
+      if (leadTipoFilter !== 'all' && lead.tipo !== leadTipoFilter) return false;
+      const date = lead.daily_entry?.date;
+      if (leadDateFrom && (!date || date < leadDateFrom)) return false;
+      if (leadDateTo && (!date || date > leadDateTo)) return false;
+      return true;
+    });
+  }, [leads, leadTipoFilter, leadDateFrom, leadDateTo]);
 
   const assetByCampaign = useMemo(
     () => new Map(assets.map((a) => [a.campaign_name, a])),
@@ -410,6 +447,93 @@ export function PortalClientAdminPage() {
                     <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg)', whiteSpace: 'pre-wrap' }}>{n.nota}</p>
                   </div>
                 ))}
+              </div>
+            )}
+          </GlassCard>
+        )}
+
+        {selectedClientId && (
+          <GlassCard style={{ padding: 22 }}>
+            <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'var(--fg-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 14 }}>
+              Seguimiento de clientes
+            </span>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+              <input
+                className="form-input"
+                type="date"
+                value={leadDateFrom}
+                onChange={(e) => setLeadDateFrom(e.target.value)}
+                style={{ width: 150, fontSize: '0.76rem' }}
+              />
+              <input
+                className="form-input"
+                type="date"
+                value={leadDateTo}
+                onChange={(e) => setLeadDateTo(e.target.value)}
+                style={{ width: 150, fontSize: '0.76rem' }}
+              />
+              <select
+                className="form-input"
+                value={leadTipoFilter}
+                onChange={(e) => setLeadTipoFilter(e.target.value as PortalLeadTipo | 'all')}
+                style={{ width: 140, fontSize: '0.76rem' }}
+              >
+                <option value="all">Todos</option>
+                <option value="cita">Citas</option>
+                <option value="compra">Compras</option>
+              </select>
+            </div>
+
+            {loadingLeads ? (
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
+                <Loader2 size={16} className="spin" />
+              </div>
+            ) : filteredLeads.length === 0 ? (
+              <p style={{ color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
+                No hay registros para este filtro.
+              </p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      {['Fecha', 'Anuncio de origen', 'Nombre', 'Número', 'Tipo', 'Monto'].map((h) => (
+                        <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--fg-muted)', fontWeight: 500, fontSize: '0.66rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLeads.map((lead) => (
+                      <tr key={lead.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '8px 10px', color: 'var(--fg)', whiteSpace: 'nowrap' }}>
+                          {lead.daily_entry?.date
+                            ? new Date(`${lead.daily_entry.date}T00:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : '—'}
+                        </td>
+                        <td style={{ padding: '8px 10px', color: 'var(--fg)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {(lead.daily_entry?.campaign_id && campaignIdToName[lead.daily_entry.campaign_id]) ?? '—'}
+                        </td>
+                        <td style={{ padding: '8px 10px', color: 'var(--fg)' }}>{lead.nombre_cliente}</td>
+                        <td style={{ padding: '8px 10px', color: 'var(--fg)', fontFamily: 'JetBrains Mono', fontSize: '0.74rem' }}>{lead.numero_contacto}</td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <span style={{
+                            fontSize: '0.62rem', padding: '2px 8px', borderRadius: 4,
+                            background: lead.tipo === 'compra' ? 'var(--success-dim)' : 'var(--cyan-dim)',
+                            color: lead.tipo === 'compra' ? 'var(--success)' : 'var(--cyan)',
+                          }}>
+                            {lead.tipo === 'compra' ? 'Compra' : 'Cita'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 10px', color: 'var(--fg)', fontFamily: 'JetBrains Mono', fontSize: '0.76rem' }}>
+                          {lead.monto != null ? formatCop(lead.monto) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </GlassCard>
