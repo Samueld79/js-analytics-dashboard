@@ -679,7 +679,7 @@ export function ClientPortalPublicPage() {
                         </span>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(90px, 1fr))', gap: 8, marginTop: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(90px, 1fr))', gap: 8, marginTop: 8 }}>
                         <LeadCounterStepper
                           label="Citas"
                           value={entry.citas}
@@ -696,29 +696,37 @@ export function ClientPortalPublicPage() {
                           onIncrement={() => handleLeadIncrementClick(row.campaign_id, 'compra')}
                           onDecrement={() => void handleLeadDecrement(row.campaign_id, 'compra')}
                         />
-                        <div>
-                          <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Objeción</span>
-                          <select
-                            className="form-input" disabled={!unlockedRegistro}
-                            value={entry.objecion ?? ''}
-                            onChange={(e) => updateEntry(row.campaign_id, { objecion: (e.target.value || null) as PortalObjection | null })}
-                            style={{ padding: '6px 8px', fontSize: '0.72rem' }}
-                          >
-                            <option value="">—</option>
-                            {PORTAL_OBJECTION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Visita punto físico</span>
-                          <select
-                            className="form-input" disabled={!unlockedRegistro}
-                            value={entry.visita_punto_fisico ?? ''}
-                            onChange={(e) => updateEntry(row.campaign_id, { visita_punto_fisico: (e.target.value || null) as PortalVisitStatus | null })}
-                            style={{ padding: '6px 8px', fontSize: '0.72rem' }}
-                          >
-                            <option value="">—</option>
-                            {PORTAL_VISIT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                          </select>
+                      </div>
+
+                      <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
+                        <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 6 }}>
+                          De los que no agendaron ni compraron hoy
+                        </span>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(90px, 1fr))', gap: 8 }}>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Objeción</span>
+                            <select
+                              className="form-input" disabled={!unlockedRegistro}
+                              value={entry.objecion ?? ''}
+                              onChange={(e) => updateEntry(row.campaign_id, { objecion: (e.target.value || null) as PortalObjection | null })}
+                              style={{ padding: '6px 8px', fontSize: '0.72rem' }}
+                            >
+                              <option value="">—</option>
+                              {PORTAL_OBJECTION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', display: 'block', marginBottom: 3 }}>Visita punto físico</span>
+                            <select
+                              className="form-input" disabled={!unlockedRegistro}
+                              value={entry.visita_punto_fisico ?? ''}
+                              onChange={(e) => updateEntry(row.campaign_id, { visita_punto_fisico: (e.target.value || null) as PortalVisitStatus | null })}
+                              style={{ padding: '6px 8px', fontSize: '0.72rem' }}
+                            >
+                              <option value="">—</option>
+                              {PORTAL_VISIT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>
