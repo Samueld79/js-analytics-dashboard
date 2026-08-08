@@ -169,9 +169,9 @@ function LeadModal({
 
         <div className="modal-footer">
           <button className="btn-ghost" onClick={onClose}>Cancelar</button>
-          <button
-            className="btn-primary"
+          <PrimaryButton
             disabled={!isValid || saving}
+            loading={saving}
             onClick={() =>
               onSubmit({
                 nombre_cliente: nombre.trim(),
@@ -180,8 +180,8 @@ function LeadModal({
               })
             }
           >
-            {saving ? 'Guardando…' : 'Guardar'}
-          </button>
+            Guardar
+          </PrimaryButton>
         </div>
       </div>
     </div>
@@ -462,7 +462,9 @@ export function ClientPortalPublicPage() {
     }
   };
 
-  // ── Summary by conjunto_label ────────────────────────────────────────────────
+  // ── Summary by conjunto_label — scoped to the month shown in the calendar ────
+  const summaryMonthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+
   const summaryRows = useMemo(() => {
     const campaignNameToConjunto = new Map(
       creativeAssets.map((a) => [a.campaign_name, a.conjunto_label?.trim() || 'Sin conjunto asignado']),
@@ -478,13 +480,15 @@ export function ClientPortalPublicPage() {
       return created;
     };
 
-    campaignRows.forEach((r) => {
-      const conjunto = campaignNameToConjunto.get(r.campaign_name) ?? 'Sin conjunto asignado';
-      getRow(conjunto).mensajes += r.messages ?? 0;
-    });
+    campaignRows
+      .filter((r) => r.date.startsWith(summaryMonthKey))
+      .forEach((r) => {
+        const conjunto = campaignNameToConjunto.get(r.campaign_name) ?? 'Sin conjunto asignado';
+        getRow(conjunto).mensajes += r.messages ?? 0;
+      });
 
     dailyEntries
-      .filter((e) => e.campaign_id !== PORTAL_NOTE_CAMPAIGN_ID) // day-level note, not a per-campaign row
+      .filter((e) => e.campaign_id !== PORTAL_NOTE_CAMPAIGN_ID && e.date.startsWith(summaryMonthKey)) // day-level note, not a per-campaign row
       .forEach((e) => {
         const name = campaignIdToName.get(e.campaign_id);
         const conjunto = (name && campaignNameToConjunto.get(name)) ?? 'Sin conjunto asignado';
@@ -494,7 +498,7 @@ export function ClientPortalPublicPage() {
       });
 
     return [...map.values()].sort((a, b) => b.mensajes - a.mensajes);
-  }, [campaignRows, dailyEntries, creativeAssets]);
+  }, [campaignRows, dailyEntries, creativeAssets, summaryMonthKey]);
 
   const summaryTotals = summaryRows.reduce(
     (acc, r) => ({ mensajes: acc.mensajes + r.mensajes, citas: acc.citas + r.citas, compras: acc.compras + r.compras }),
@@ -747,9 +751,12 @@ export function ClientPortalPublicPage() {
 
         {/* ── 4. Resumen de efectividad ── */}
         <GlassCard style={{ padding: 20 }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)', display: 'block', marginBottom: 14 }}>
-            Resumen de efectividad
-          </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>
+              Resumen de efectividad
+            </span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--fg-muted)' }}>{monthLabel(monthDate)}</span>
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
               <thead>
