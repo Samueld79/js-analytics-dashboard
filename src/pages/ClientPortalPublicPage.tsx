@@ -628,7 +628,7 @@ export function ClientPortalPublicPage() {
   const initial = portal.name.charAt(0).toUpperCase();
 
   return (
-    <div className="page-content" style={{ maxWidth: 920, margin: '0 auto', paddingBottom: 48 }}>
+    <div className="page-content" style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 48 }}>
       {/* ── 1. Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '28px 24px 20px' }}>
         {portal.logo_url ? (
@@ -652,48 +652,52 @@ export function ClientPortalPublicPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '0 24px' }}>
-        {/* ── 2. Calendario mensual ── */}
-        <GlassCard style={{ padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <button className="btn-secondary" style={{ padding: 6 }} onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1))}>
-              <ChevronLeft size={14} />
-            </button>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--fg)' }}>{monthLabel(monthDate)}</span>
-            <button className="btn-secondary" style={{ padding: 6 }} onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))}>
-              <ChevronRight size={14} />
-            </button>
-          </div>
+      <div className="client-portal-grid" style={{ padding: '0 24px' }}>
+        {/* ── 2. Calendario mensual — compacto, sidebar fijo en desktop ── */}
+        <div className="client-portal-calendar-col">
+          <GlassCard style={{ padding: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <button className="btn-secondary" style={{ padding: 4 }} onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1))}>
+                <ChevronLeft size={12} />
+              </button>
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--fg)' }}>{monthLabel(monthDate)}</span>
+              <button className="btn-secondary" style={{ padding: 4 }} onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))}>
+                <ChevronRight size={12} />
+              </button>
+            </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
-            {DAYS_OF_WEEK.map((d) => (
-              <span key={d} style={{ textAlign: 'center', fontSize: '0.6rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>{d}</span>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
-            {gridDays.map(({ key, day, inMonth }) => {
-              const count = adCountByDate.get(key) ?? 0;
-              const intensity = count > 0 ? 0.15 + 0.55 * (count / maxAdCount) : 0;
-              const isSelected = key === selectedDate;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setSelectedDate(key)}
-                  style={{
-                    aspectRatio: '1', borderRadius: 8, border: isSelected ? '2px solid var(--cyan)' : '1px solid var(--border)',
-                    background: count > 0 ? `oklch(0.72 0.15 200 / ${intensity})` : 'var(--surface-2)',
-                    opacity: inMonth ? 1 : 0.35, cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
-                    color: 'var(--fg)', fontSize: '0.72rem',
-                  }}
-                >
-                  <span>{day}</span>
-                  {count > 0 && <span style={{ fontSize: '0.55rem', color: 'var(--fg-muted)' }}>{count}</span>}
-                </button>
-              );
-            })}
-          </div>
-        </GlassCard>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 2 }}>
+              {DAYS_OF_WEEK.map((d) => (
+                <span key={d} style={{ textAlign: 'center', fontSize: '0.5rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>{d}</span>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+              {gridDays.map(({ key, day, inMonth }) => {
+                const count = adCountByDate.get(key) ?? 0;
+                const intensity = count > 0 ? 0.15 + 0.55 * (count / maxAdCount) : 0;
+                const isSelected = key === selectedDate;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedDate(key)}
+                    style={{
+                      aspectRatio: '1', borderRadius: 6, border: isSelected ? '2px solid var(--cyan)' : '1px solid var(--border)',
+                      background: count > 0 ? `oklch(0.72 0.15 200 / ${intensity})` : 'var(--surface-2)',
+                      opacity: inMonth ? 1 : 0.35, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0,
+                      color: 'var(--fg)', fontSize: '0.6rem', padding: 0,
+                    }}
+                  >
+                    <span>{day}</span>
+                    {count > 0 && <span style={{ fontSize: '0.44rem', color: 'var(--fg-muted)' }}>{count}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </GlassCard>
+        </div>
+
+        <div className="client-portal-main-col">
 
         {/* ── 3. Registro del día seleccionado — uno por anuncio individual ── */}
         <GlassCard style={{ padding: 20 }}>
@@ -979,6 +983,7 @@ export function ClientPortalPublicPage() {
             </div>
           )}
         </GlassCard>
+        </div>
       </div>
 
       {leadModal && (

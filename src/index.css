@@ -260,6 +260,30 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 600; }
 
 .client-portal-shell { min-height: 100vh; background: var(--background); }
 
+.client-portal-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.client-portal-calendar-col {
+  position: sticky;
+  top: 20px;
+}
+
+.client-portal-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .client-portal-grid { grid-template-columns: 1fr; }
+  .client-portal-calendar-col { position: static; }
+}
+
 .portal-shell-header {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
