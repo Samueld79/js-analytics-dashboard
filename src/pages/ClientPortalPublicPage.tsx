@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ImageIcon, Lock, Minus, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
 import { GlassCard } from '../components/ui-custom/GlassCard';
@@ -515,42 +515,80 @@ export function ClientPortalPublicPage() {
   };
 
   // ── Summary by adset_name (real Meta conjunto) — scoped to the calendar month ─
+  // Each conjunto row also carries its individual ads (keyed by ad_id, so two
+  // ads named the same in different conjuntos never collide) for the accordion.
   const summaryMonthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
 
-  const summaryRows = useMemo(() => {
-    const adIdToAdsetName = new Map(adRows.map((r) => [r.ad_id, r.adset_name]));
+  type SummaryAdRow = { ad_id: string; ad_name: string; mensajes: number; citas: number; compras: number };
+  type SummaryConjuntoRow = { conjunto: string; mensajes: number; citas: number; compras: number; ads: SummaryAdRow[] };
 
-    const map = new Map<string, { conjunto: string; mensajes: number; citas: number; compras: number }>();
-    const getRow = (conjunto: string) => {
-      const existing = map.get(conjunto);
+  const summaryRows = useMemo<SummaryConjuntoRow[]>(() => {
+    const adIdToAdsetName = new Map(adRows.map((r) => [r.ad_id, r.adset_name]));
+    const adIdToName = new Map(adRows.map((r) => [r.ad_id, r.ad_name]));
+
+    const conjuntoMap = new Map<string, SummaryConjuntoRow>();
+    const adMap = new Map<string, SummaryAdRow>();
+
+    const getConjuntoRow = (conjunto: string) => {
+      const existing = conjuntoMap.get(conjunto);
       if (existing) return existing;
-      const created = { conjunto, mensajes: 0, citas: 0, compras: 0 };
-      map.set(conjunto, created);
+      const created: SummaryConjuntoRow = { conjunto, mensajes: 0, citas: 0, compras: 0, ads: [] };
+      conjuntoMap.set(conjunto, created);
+      return created;
+    };
+
+    const getAdRow = (adId: string, adName: string) => {
+      const existing = adMap.get(adId);
+      if (existing) return existing;
+      const created: SummaryAdRow = { ad_id: adId, ad_name: adName, mensajes: 0, citas: 0, compras: 0 };
+      adMap.set(adId, created);
       return created;
     };
 
     adRows
       .filter((r) => r.date.startsWith(summaryMonthKey))
       .forEach((r) => {
-        getRow(r.adset_name).mensajes += r.messages ?? 0;
+        getConjuntoRow(r.adset_name).mensajes += r.messages ?? 0;
+        getAdRow(r.ad_id, r.ad_name).mensajes += r.messages ?? 0;
       });
 
     dailyEntries
       .filter((e) => e.campaign_id !== PORTAL_NOTE_CAMPAIGN_ID && e.date.startsWith(summaryMonthKey)) // day-level note, not a per-ad row
       .forEach((e) => {
         const conjunto = adIdToAdsetName.get(e.campaign_id) ?? 'Sin conjunto asignado';
-        const row = getRow(conjunto);
-        row.citas += e.citas;
-        row.compras += e.compras;
+        const conjuntoRow = getConjuntoRow(conjunto);
+        conjuntoRow.citas += e.citas;
+        conjuntoRow.compras += e.compras;
+
+        const adRow = getAdRow(e.campaign_id, adIdToName.get(e.campaign_id) ?? e.campaign_id);
+        adRow.citas += e.citas;
+        adRow.compras += e.compras;
       });
 
-    return [...map.values()].sort((a, b) => b.mensajes - a.mensajes);
+    for (const adRow of adMap.values()) {
+      const conjunto = adIdToAdsetName.get(adRow.ad_id) ?? 'Sin conjunto asignado';
+      getConjuntoRow(conjunto).ads.push(adRow);
+    }
+
+    const rows = [...conjuntoMap.values()];
+    rows.forEach((r) => r.ads.sort((a, b) => b.mensajes - a.mensajes));
+    return rows.sort((a, b) => b.mensajes - a.mensajes);
   }, [adRows, dailyEntries, summaryMonthKey]);
 
   const summaryTotals = summaryRows.reduce(
     (acc, r) => ({ mensajes: acc.mensajes + r.mensajes, citas: acc.citas + r.citas, compras: acc.compras + r.compras }),
     { mensajes: 0, citas: 0, compras: 0 },
   );
+
+  const [expandedConjuntos, setExpandedConjuntos] = useState<Set<string>>(new Set());
+  const toggleConjunto = (conjunto: string) => {
+    setExpandedConjuntos((prev) => {
+      const next = new Set(prev);
+      if (next.has(conjunto)) next.delete(conjunto);
+      else next.add(conjunto);
+      return next;
+    });
+  };
 
   // ── Render states ────────────────────────────────────────────────────────────
   if (status === 'loading') {
@@ -826,17 +864,60 @@ export function ClientPortalPublicPage() {
                 </tr>
               </thead>
               <tbody>
-                {summaryRows.map((r) => (
-                  <tr key={r.conjunto} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '8px 10px', color: 'var(--fg)' }}>{r.conjunto}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--fg)' }}>{r.mensajes}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--fg)' }}>{r.citas}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--fg)' }}>{r.compras}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--cyan)' }}>
-                      {r.mensajes > 0 ? `${((r.compras / r.mensajes) * 100).toFixed(1)}%` : '—'}
-                    </td>
-                  </tr>
-                ))}
+                {summaryRows.map((r) => {
+                  const isExpanded = expandedConjuntos.has(r.conjunto);
+                  return (
+                    <Fragment key={r.conjunto}>
+                      <tr
+                        onClick={() => toggleConjunto(r.conjunto)}
+                        style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--border)', cursor: 'pointer' }}
+                      >
+                        <td style={{ padding: '8px 10px', color: 'var(--fg)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <ChevronRight
+                              size={13}
+                              style={{
+                                color: 'var(--fg-muted)', flexShrink: 0, transition: 'transform 150ms ease',
+                                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                              }}
+                            />
+                            {r.conjunto}
+                          </div>
+                        </td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--fg)' }}>{r.mensajes}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--fg)' }}>{r.citas}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--fg)' }}>{r.compras}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--cyan)' }}>
+                          {r.mensajes > 0 ? `${((r.compras / r.mensajes) * 100).toFixed(1)}%` : '—'}
+                        </td>
+                      </tr>
+
+                      {isExpanded && r.ads.map((ad) => {
+                        const asset = assetByAdId.get(ad.ad_id);
+                        return (
+                          <tr key={ad.ad_id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                            <td style={{ padding: '6px 10px 6px 30px', color: 'var(--fg-muted)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {asset?.asset_type === 'video' ? (
+                                  <Video size={11} style={{ flexShrink: 0 }} />
+                                ) : (
+                                  <ImageIcon size={11} style={{ flexShrink: 0 }} />
+                                )}
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.ad_name}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--fg-muted)' }}>{ad.mensajes}</td>
+                            <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--fg-muted)' }}>{ad.citas}</td>
+                            <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--fg-muted)' }}>{ad.compras}</td>
+                            <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--cyan)' }}>
+                              {ad.mensajes > 0 ? `${((ad.compras / ad.mensajes) * 100).toFixed(1)}%` : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  );
+                })}
                 <tr>
                   <td style={{ padding: '10px', fontWeight: 700, color: 'var(--fg)' }}>Total general</td>
                   <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700, color: 'var(--fg)' }}>{summaryTotals.mensajes}</td>
