@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ImageIcon, Lock, Minus, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
 import { GlassCard } from '../components/ui-custom/GlassCard';
+import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
 import {
   addPortalLead,
@@ -744,13 +745,7 @@ export function ClientPortalPublicPage() {
                       background: 'var(--surface-2)', border: '1px solid var(--border)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      {asset?.asset_type === 'video' ? (
-                        <Video size={16} style={{ color: 'var(--fg-muted)' }} />
-                      ) : asset?.asset_url ? (
-                        <img src={asset.asset_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <ImageIcon size={16} style={{ color: 'var(--fg-muted)' }} />
-                      )}
+                      <PortalCreativeThumb assetUrl={asset?.asset_url} assetType={asset?.asset_type} size={16} />
                     </div>
 
                     <div style={{ flex: 1, minWidth: 0 }}>

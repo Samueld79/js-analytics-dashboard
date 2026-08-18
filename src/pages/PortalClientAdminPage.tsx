@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, ExternalLink, ImageIcon, Loader2, Share2, Upload, Video } from 'lucide-react';
+import { Check, Copy, ExternalLink, Loader2, Share2, Upload } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
 import { GlassCard } from '../components/ui-custom/GlassCard';
+import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
 import {
   generatePortalPin,
@@ -99,12 +100,8 @@ function CreativeAssetRow({
       >
         {uploading ? (
           <Loader2 size={16} className="spin" style={{ color: 'var(--fg-muted)' }} />
-        ) : asset?.asset_type === 'video' ? (
-          <Video size={18} style={{ color: 'var(--fg-muted)' }} />
-        ) : asset?.asset_url ? (
-          <img src={asset.asset_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <ImageIcon size={18} style={{ color: 'var(--fg-muted)' }} />
+          <PortalCreativeThumb assetUrl={asset?.asset_url} assetType={asset?.asset_type} size={18} />
         )}
         <input ref={fileRef} type="file" accept="image/*,video/*" onChange={handleFile} style={{ display: 'none' }} />
       </div>
