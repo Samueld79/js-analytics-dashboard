@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Clock, Smile } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Copy, ExternalLink, Smile } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
-import { currentMonthFirstDay, listPulseResponsesByMonth, listPulseSettings } from '../services/pulse';
+import { GlassCard } from '../components/ui-custom/GlassCard';
+import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
+import {
+  currentMonthFirstDay,
+  generatePulseSlug,
+  listPulseResponsesByMonth,
+  listPulseSettings,
+  upsertPulseSettings,
+} from '../services/pulse';
 import { pulseMoodLabelFromScore, PULSE_MOOD_EMOJI, type PulseResponse, type PulseSettings } from '../lib/supabase';
 import { formatDateTime } from '../lib/utils';
 import { getMonthLabel } from '../utils/monthLabel';
@@ -19,12 +27,26 @@ function monthOptions(): string[] {
 export function SatisfactionPage() {
   const { clients } = useClients();
   const [month, setMonth] = useState(() => currentMonthFirstDay());
-  const [settings, setSettings] = useState<PulseSettings[]>([]);
+  const [settingsMap, setSettingsMap] = useState<Record<string, PulseSettings>>({});
+  const [loadingSettings, setLoadingSettings] = useState(true);
   const [responses, setResponses] = useState<PulseResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [enabled, setEnabled] = useState(false);
+  const [slug, setSlug] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const reloadSettings = async () => {
+    setLoadingSettings(true);
+    const rows = await listPulseSettings();
+    setSettingsMap(Object.fromEntries(rows.map((r) => [r.client_id, r])));
+    setLoadingSettings(false);
+  };
+
   useEffect(() => {
-    void listPulseSettings().then(setSettings);
+    void reloadSettings();
   }, []);
 
   useEffect(() => {
@@ -35,9 +57,56 @@ export function SatisfactionPage() {
     });
   }, [month]);
 
+  useEffect(() => {
+    if (!selectedClientId && clients.length > 0) setSelectedClientId(clients[0].id);
+  }, [clients, selectedClientId]);
+
+  const currentClient = clients.find((c) => c.id === selectedClientId) ?? null;
+  const currentSettings = settingsMap[selectedClientId] ?? null;
+
+  useEffect(() => {
+    if (currentSettings) {
+      setEnabled(currentSettings.enabled);
+      setSlug(currentSettings.public_slug);
+    } else {
+      setEnabled(false);
+      setSlug('');
+    }
+    setCopied(false);
+  }, [currentSettings, selectedClientId]);
+
+  const publicUrl = slug ? `${window.location.origin}/pulso/${slug}` : '';
+
+  const handleToggleEnabled = async (next: boolean) => {
+    if (!selectedClientId || !currentClient) return;
+    setSaving(true);
+
+    const nextSlug = slug || generatePulseSlug(currentClient.name);
+
+    const result = await upsertPulseSettings({
+      client_id: selectedClientId,
+      enabled: next,
+      public_slug: nextSlug,
+    });
+
+    setSaving(false);
+    if (result.error || !result.data) {
+      alert(result.error ?? 'No se pudo guardar.');
+      return;
+    }
+    setSettingsMap((prev) => ({ ...prev, [selectedClientId]: result.data as PulseSettings }));
+  };
+
+  const handleCopyLink = async () => {
+    if (!publicUrl) return;
+    await navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const enabledClientIds = useMemo(
-    () => new Set(settings.filter((s) => s.enabled).map((s) => s.client_id)),
-    [settings],
+    () => new Set(Object.values(settingsMap).filter((s) => s.enabled).map((s) => s.client_id)),
+    [settingsMap],
   );
 
   const responseByClientId = useMemo(
@@ -92,6 +161,68 @@ export function SatisfactionPage() {
       </div>
 
       <div style={{ padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <GlassCard style={{ padding: 22 }}>
+          <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'var(--fg-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 14 }}>
+            Configuración por cliente
+          </span>
+
+          <select
+            className="form-input"
+            value={selectedClientId}
+            onChange={(e) => setSelectedClientId(e.target.value)}
+            style={{ marginBottom: 18 }}
+          >
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>{client.name}</option>
+            ))}
+          </select>
+
+          {selectedClientId && !loadingSettings && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: slug ? 18 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Smile size={16} style={{ color: 'var(--cyan)' }} />
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)' }}>Pulso habilitado</span>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    disabled={saving}
+                    onChange={(e) => { setEnabled(e.target.checked); void handleToggleEnabled(e.target.checked); }}
+                  />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+
+              {slug && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'var(--fg-muted)', textTransform: 'uppercase' }}>
+                    Link público
+                  </span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input className="form-input" value={publicUrl} readOnly style={{ flex: 1, fontFamily: 'JetBrains Mono', fontSize: '0.76rem' }} />
+                    <PrimaryButton size="sm" onClick={handleCopyLink}>
+                      {copied ? <Check size={14} /> : <Copy size={14} />}
+                      {copied ? 'Copiado' : 'Copiar link'}
+                    </PrimaryButton>
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-primary"
+                      style={{ padding: '7px 14px', fontSize: '0.78rem' }}
+                    >
+                      <ExternalLink size={14} />
+                      Abrir
+                    </a>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </GlassCard>
+
         <div style={{ padding: '16px 20px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <Smile size={14} style={{ color: 'var(--cyan)' }} />
@@ -130,7 +261,7 @@ export function SatisfactionPage() {
             </div>
           ) : rows.length === 0 ? (
             <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
-              Ningún cliente tiene el Pulso de Satisfacción habilitado. Actívalo desde Portal Cliente.
+              Ningún cliente tiene el Pulso de Satisfacción habilitado. Actívalo arriba.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
