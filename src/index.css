@@ -39,6 +39,21 @@
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, var(--cyan), var(--cyan-glow));
 
+  /* Pulso de Satisfacción — 5 mood states, same L/C family as the semantic
+     tokens above (danger/warning/success/cyan), only the hue sweeps across
+     red → orange → amber → green → teal. Theme-invariant, same as danger/
+     warning/success already are in this system. */
+  --mood-1:     oklch(0.68 0.20 25);
+  --mood-1-dim: oklch(0.68 0.20 25 / 0.14);
+  --mood-2:     oklch(0.74 0.18 55);
+  --mood-2-dim: oklch(0.74 0.18 55 / 0.14);
+  --mood-3:     oklch(0.82 0.15 85);
+  --mood-3-dim: oklch(0.82 0.15 85 / 0.14);
+  --mood-4:     oklch(0.80 0.17 140);
+  --mood-4-dim: oklch(0.80 0.17 140 / 0.14);
+  --mood-5:     oklch(0.80 0.15 185);
+  --mood-5-dim: oklch(0.80 0.15 185 / 0.14);
+
   /* Shadows */
   --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px -12px oklch(0 0 0 / 0.5);
   --shadow-glow: 0 8px 32px -8px oklch(0.82 0.15 200 / 0.40);
@@ -1830,4 +1845,103 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
   background: var(--surface-2);
   color: var(--fg-muted);
   font-size: 11px;
+}
+
+/* ============================================================
+   SECTION 16: Pulso de Satisfaccion
+   ============================================================ */
+.pulse-card {
+  transition: background 300ms ease, border-color 300ms ease;
+}
+
+/* Custom range slider — hides native styling, colored by current mood */
+.pulse-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  outline: none;
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+.pulse-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mood-color, var(--cyan));
+  border: 3px solid var(--surface);
+  box-shadow: 0 2px 10px oklch(0 0 0 / 0.35);
+  cursor: grab;
+  transition: background 200ms ease, transform 120ms ease;
+}
+.pulse-slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.1); }
+.pulse-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mood-color, var(--cyan));
+  border: 3px solid var(--surface);
+  box-shadow: 0 2px 10px oklch(0 0 0 / 0.35);
+  cursor: grab;
+  transition: background 200ms ease, transform 120ms ease;
+}
+.pulse-slider::-moz-range-track { background: transparent; }
+
+@keyframes mood-bounce {
+  0%   { transform: scale(0.7); }
+  55%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.pulse-mood-emoji {
+  display: inline-block;
+  animation: mood-bounce 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes chip-bounce {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.pulse-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg-2);
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  animation: chip-bounce 250ms ease;
+}
+.pulse-chip.selected {
+  background: var(--success-dim);
+  border-color: var(--success);
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Confetti — absolutely positioned pieces falling from the top of the card */
+.pulse-confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 8px;
+  height: 14px;
+  opacity: 0;
+  animation: confetti-fall 1500ms ease-in forwards;
+}
+@keyframes confetti-fall {
+  0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(240px) rotate(540deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-mood-emoji, .pulse-chip, .pulse-confetti-piece { animation: none !important; }
 }

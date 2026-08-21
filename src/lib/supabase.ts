@@ -521,6 +521,52 @@ export type PortalObjectionTally = {
   updated_at: string;
 };
 
+// ── Pulso de Satisfacción ────────────────────────────────────────────────────
+
+export type PulseSettings = {
+  id: string;
+  client_id: string;
+  enabled: boolean;
+  public_slug: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export const PULSE_MOOD_LABELS = ['Muy mal', 'Mal', 'Regular', 'Bien', 'Excelente'] as const;
+export type PulseMoodLabel = (typeof PULSE_MOOD_LABELS)[number];
+
+export function pulseMoodLabelFromScore(score: number): PulseMoodLabel {
+  if (score <= 20) return 'Muy mal';
+  if (score <= 40) return 'Mal';
+  if (score <= 60) return 'Regular';
+  if (score <= 80) return 'Bien';
+  return 'Excelente';
+}
+
+export const PULSE_MOOD_EMOJI: Record<PulseMoodLabel, string> = {
+  'Muy mal': '😞',
+  'Mal': '😕',
+  'Regular': '😐',
+  'Bien': '🙂',
+  'Excelente': '😍',
+};
+
+// Same options for every client for now, per spec — not client-configurable yet.
+export const PULSE_TAG_OPTIONS = ['Reportes', 'Comunicación', 'Resultados', 'Creatividad', 'Rapidez'] as const;
+export type PulseTag = (typeof PULSE_TAG_OPTIONS)[number];
+
+export type PulseResponse = {
+  id: string;
+  client_id: string;
+  month: string;
+  mood_score: number;
+  mood_label: PulseMoodLabel;
+  liked_tags: string[];
+  improve_tags: string[];
+  note: string | null;
+  submitted_at: string;
+};
+
 export type HistoricalMonthlyAdMetricInput = {
   client_id: string;
   month: string;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, ExternalLink, Loader2, Share2, Upload } from 'lucide-react';
+import { Check, Copy, ExternalLink, Loader2, Share2, Smile, Upload } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
@@ -20,6 +20,7 @@ import {
   uploadPortalCreativeFile,
   type DistinctPortalAd,
 } from '../services/portal';
+import { generatePulseSlug, listPulseSettings, upsertPulseSettings } from '../services/pulse';
 import {
   PORTAL_OBJECTION_TALLY_CATEGORIES,
   PORTAL_VISIT_TALLY_CATEGORIES,
@@ -28,6 +29,7 @@ import {
   type PortalDailyEntry,
   type PortalLeadTipo,
   type PortalLeadWithEntry,
+  type PulseSettings,
   type PortalObjectionTally,
 } from '../lib/supabase';
 import { formatCop } from '../lib/utils';
@@ -160,6 +162,13 @@ export function PortalClientAdminPage() {
   const [tallyDateFrom, setTallyDateFrom] = useState('');
   const [tallyDateTo, setTallyDateTo] = useState('');
 
+  const [pulseSettingsMap, setPulseSettingsMap] = useState<Record<string, PulseSettings>>({});
+  const [loadingPulseSettings, setLoadingPulseSettings] = useState(true);
+  const [pulseEnabled, setPulseEnabled] = useState(false);
+  const [pulseSlug, setPulseSlug] = useState('');
+  const [pulseSaving, setPulseSaving] = useState(false);
+  const [pulseCopied, setPulseCopied] = useState(false);
+
   const reloadSettings = async () => {
     setLoadingSettings(true);
     const rows = await listClientPortalSettings();
@@ -167,8 +176,16 @@ export function PortalClientAdminPage() {
     setLoadingSettings(false);
   };
 
+  const reloadPulseSettings = async () => {
+    setLoadingPulseSettings(true);
+    const rows = await listPulseSettings();
+    setPulseSettingsMap(Object.fromEntries(rows.map((r) => [r.client_id, r])));
+    setLoadingPulseSettings(false);
+  };
+
   useEffect(() => {
     void reloadSettings();
+    void reloadPulseSettings();
   }, []);
 
   useEffect(() => {
@@ -177,6 +194,18 @@ export function PortalClientAdminPage() {
 
   const currentSettings = settingsMap[selectedClientId] ?? null;
   const currentClient = clients.find((c) => c.id === selectedClientId) ?? null;
+  const currentPulseSettings = pulseSettingsMap[selectedClientId] ?? null;
+
+  useEffect(() => {
+    if (currentPulseSettings) {
+      setPulseEnabled(currentPulseSettings.enabled);
+      setPulseSlug(currentPulseSettings.public_slug);
+    } else {
+      setPulseEnabled(false);
+      setPulseSlug('');
+    }
+    setPulseCopied(false);
+  }, [currentPulseSettings, selectedClientId]);
 
   useEffect(() => {
     if (currentSettings) {
@@ -331,6 +360,35 @@ export function PortalClientAdminPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const publicPulseUrl = pulseSlug ? `${window.location.origin}/pulso/${pulseSlug}` : '';
+
+  const handleTogglePulseEnabled = async (next: boolean) => {
+    if (!selectedClientId || !currentClient) return;
+    setPulseSaving(true);
+
+    const nextSlug = pulseSlug || generatePulseSlug(currentClient.name);
+
+    const result = await upsertPulseSettings({
+      client_id: selectedClientId,
+      enabled: next,
+      public_slug: nextSlug,
+    });
+
+    setPulseSaving(false);
+    if (result.error || !result.data) {
+      alert(result.error ?? 'No se pudo guardar.');
+      return;
+    }
+    setPulseSettingsMap((prev) => ({ ...prev, [selectedClientId]: result.data as PulseSettings }));
+  };
+
+  const handleCopyPulseLink = async () => {
+    if (!publicPulseUrl) return;
+    await navigator.clipboard.writeText(publicPulseUrl);
+    setPulseCopied(true);
+    setTimeout(() => setPulseCopied(false), 2000);
+  };
+
   return (
     <div className="page-content">
       <div className="page-header">
@@ -430,6 +488,51 @@ export function PortalClientAdminPage() {
                   Guardar PINs
                 </PrimaryButton>
               </>
+            )}
+          </GlassCard>
+        )}
+
+        {selectedClientId && !loadingPulseSettings && (
+          <GlassCard style={{ padding: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: pulseSlug ? 18 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Smile size={16} style={{ color: 'var(--cyan)' }} />
+                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)' }}>Pulso de Satisfacción</span>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={pulseEnabled}
+                  disabled={pulseSaving}
+                  onChange={(e) => { setPulseEnabled(e.target.checked); void handleTogglePulseEnabled(e.target.checked); }}
+                />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+
+            {pulseSlug && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: '0.62rem', fontFamily: 'JetBrains Mono', letterSpacing: '0.08em', color: 'var(--fg-muted)', textTransform: 'uppercase' }}>
+                  Link público
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input className="form-input" value={publicPulseUrl} readOnly style={{ flex: 1, fontFamily: 'JetBrains Mono', fontSize: '0.76rem' }} />
+                  <PrimaryButton size="sm" onClick={handleCopyPulseLink}>
+                    {pulseCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {pulseCopied ? 'Copiado' : 'Copiar link'}
+                  </PrimaryButton>
+                  <a
+                    href={publicPulseUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary"
+                    style={{ padding: '7px 14px', fontSize: '0.78rem' }}
+                  >
+                    <ExternalLink size={14} />
+                    Abrir
+                  </a>
+                </div>
+              </div>
             )}
           </GlassCard>
         )}

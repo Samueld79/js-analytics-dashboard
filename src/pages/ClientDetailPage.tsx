@@ -19,6 +19,7 @@ import { motion, type Transition } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { ClientAvatar } from '../components/ClientAvatar';
 import { ClientFileModal } from '../components/ClientFileModal';
+import { ClientSatisfactionCard } from '../components/ClientSatisfactionCard';
 import { HistoricalMonthlyModal } from '../components/HistoricalMonthlyModal';
 import { SalesModal } from '../components/SalesModal';
 import { useAuth } from '../hooks/useAuth';
@@ -296,6 +297,12 @@ export function ClientDetailPage() {
           </motion.div>
         ))}
       </div>
+
+      {showInternalTools && client && (
+        <div style={{ marginTop: 16 }}>
+          <ClientSatisfactionCard clientId={client.id} salesByMonth={salesByMonth} />
+        </div>
+      )}
 
       {/* ── Charts Row ── */}
       <div className="portal-charts-grid">

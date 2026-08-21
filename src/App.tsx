@@ -21,6 +21,7 @@ import { AIToolsPage } from './pages/ai-tools/AIToolsPage';
 import { DashboardClientPage } from './pages/DashboardClientPage';
 import { PortalClientAdminPage } from './pages/PortalClientAdminPage';
 import { ClientPortalPublicPage } from './pages/ClientPortalPublicPage';
+import { PulsePublicPage } from './pages/PulsePublicPage';
 import { SplashScreen } from './components/SplashScreen';
 import { WelcomeOverlay } from './components/WelcomeOverlay';
 
@@ -50,7 +51,8 @@ function AppContent() {
   const location = useLocation();
   const isPortalRoute = location.pathname.startsWith('/portal/');
   const isClientPortalRoute = location.pathname.startsWith('/cliente/');
-  const isPublicRoute = isPortalRoute || isClientPortalRoute;
+  const isPulseRoute = location.pathname.startsWith('/pulso/');
+  const isPublicRoute = isPortalRoute || isClientPortalRoute || isPulseRoute;
   const hadNullSession = useRef(false);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
 
@@ -98,6 +100,7 @@ function AppContent() {
       <Route path="/dashboard/cliente/:clientId" element={<RequireInternal><DashboardClientPage /></RequireInternal>} />
       <Route path="/portal/:id" element={<ClientDetailPage />} />
       <Route path="/cliente/:slug" element={<ClientPortalPublicPage />} />
+      <Route path="/pulso/:slug" element={<PulsePublicPage />} />
       <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
       <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />
       <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
@@ -133,8 +136,9 @@ function AppContent() {
     );
   }
 
-  // /cliente/:slug builds its own header/layout — bare wrapper, no sidebar, no auth gate
-  if (isClientPortalRoute) {
+  // /cliente/:slug and /pulso/:slug build their own header/layout — bare
+  // wrapper, no sidebar, no auth gate
+  if (isClientPortalRoute || isPulseRoute) {
     return (
       <div className="client-portal-shell">
         <div className="page-bg" />
