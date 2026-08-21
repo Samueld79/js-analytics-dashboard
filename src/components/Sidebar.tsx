@@ -21,6 +21,7 @@ import {
   Moon,
   Sparkles,
   Share2,
+  Smile,
 } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useAuth } from '../hooks/useAuth';
@@ -39,6 +40,7 @@ const INTERNAL_NAV: NavItem[] = [
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
   { to: '/portal-cliente', icon: Share2, label: 'Portal Cliente' },
+  { to: '/satisfaccion', icon: Smile, label: 'Satisfacción' },
   { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
   { to: '/ai-tools', icon: Sparkles, label: 'Área de Trabajo' },
 ];

@@ -37,7 +37,6 @@ import {
 import { sumCampaignMonthAggregates } from '../services/adCampaignMetrics';
 import type { AdMetric, DailySale } from '../lib/supabase';
 import { ClientCard, ClientCardSkeleton } from '../components/dashboard/ClientCard';
-import { PortfolioSatisfactionCard } from '../components/dashboard/PortfolioSatisfactionCard';
 import { SparklineChart } from '../components/dashboard/SparklineChart';
 import { useClientDashboardData } from '../hooks/useClientDashboardData';
 import {
@@ -397,12 +396,6 @@ export function DashboardPage() {
           </div>
         </div>
       </motion.div>
-
-      {isInternal && (
-        <motion.div {...fadeUp(0.2)} style={{ padding: '0 24px' }}>
-          <PortfolioSatisfactionCard />
-        </motion.div>
-      )}
 
       {/* ── Area Charts Row ── */}
       <motion.div {...fadeUp(0.24)} style={{ display: 'grid', gridTemplateColumns: '60% 40%', gap: 16, padding: '0 24px' }}>

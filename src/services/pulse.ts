@@ -72,23 +72,23 @@ export async function listPulseResponses(clientId: string): Promise<PulseRespons
   return (data ?? []) as PulseResponse[];
 }
 
-function currentMonthFirstDay(): string {
+export function currentMonthFirstDay(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
-// All responses for the current month, across every client — the Dashboard
-// "Satisfacción de la cartera" section does the averaging/tag-tallying itself.
-export async function listCurrentMonthPulseResponses(): Promise<PulseResponse[]> {
+// All responses for a given month (first-of-month date), across every
+// client — the Satisfacción page does the averaging/tag-tallying itself.
+export async function listPulseResponsesByMonth(monthFirstDay: string): Promise<PulseResponse[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
   const { data, error } = await supabase
     .from('pulse_responses')
     .select('*')
-    .eq('month', currentMonthFirstDay());
+    .eq('month', monthFirstDay);
 
   if (error) {
-    console.error('[pulse] listCurrentMonthPulseResponses', error);
+    console.error('[pulse] listPulseResponsesByMonth', error);
     return [];
   }
 

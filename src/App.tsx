@@ -20,6 +20,7 @@ import { CalendarPage } from './pages/CalendarPage';
 import { AIToolsPage } from './pages/ai-tools/AIToolsPage';
 import { DashboardClientPage } from './pages/DashboardClientPage';
 import { PortalClientAdminPage } from './pages/PortalClientAdminPage';
+import { SatisfactionPage } from './pages/SatisfactionPage';
 import { ClientPortalPublicPage } from './pages/ClientPortalPublicPage';
 import { PulsePublicPage } from './pages/PulsePublicPage';
 import { SplashScreen } from './components/SplashScreen';
@@ -106,6 +107,7 @@ function AppContent() {
       <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
       <Route path="/calendar" element={<RequireInternal><CalendarPage /></RequireInternal>} />
       <Route path="/portal-cliente" element={<RequireInternal><PortalClientAdminPage /></RequireInternal>} />
+      <Route path="/satisfaccion" element={<RequireInternal><SatisfactionPage /></RequireInternal>} />
       <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} />
       <Route path="/ai-tools/*" element={<RequireInternal><AIToolsPage /></RequireInternal>} />
       <Route path="/settings" element={<RequireSignedIn><SettingsPage /></RequireSignedIn>} />
