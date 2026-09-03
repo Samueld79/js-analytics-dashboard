@@ -38,6 +38,8 @@ import { sumCampaignMonthAggregates } from '../services/adCampaignMetrics';
 import type { AdMetric, DailySale } from '../lib/supabase';
 import { ClientCard, ClientCardSkeleton } from '../components/dashboard/ClientCard';
 import { SparklineChart } from '../components/dashboard/SparklineChart';
+import { YearProgressWidget } from '../components/dashboard/YearProgressWidget';
+import { HiddenClientsMenu } from '../components/dashboard/HiddenClientsMenu';
 import { useClientDashboardData } from '../hooks/useClientDashboardData';
 import {
   formatCop,
@@ -94,7 +96,7 @@ function AreaTooltip({ active, payload, label }: { active?: boolean; payload?: C
 
 export function DashboardPage() {
   // ── Data hooks ────────────────────────────────────────────────────────────────
-  const { clients, loading: clientsLoading } = useClients();
+  const { clients, loading: clientsLoading, setDashboardHidden } = useClients();
   const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
   const { alerts, unreadCount } = useAlerts();
   const { tasks } = useTasks();
@@ -257,6 +259,8 @@ export function DashboardPage() {
 
   // ── Client card data (computed by hook) ──────────────────────────────────────
   const clientCards = useClientDashboardData({ visibleClients, scopedSales, campaignRows });
+  const visibleClientCards = useMemo(() => clientCards.filter((cd) => !cd.client.dashboard_hidden), [clientCards]);
+  const hiddenClients = useMemo(() => visibleClients.filter((c) => c.dashboard_hidden), [visibleClients]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
   const isRefreshing = clientsLoading || kpisLoading || metricsLoading || salesLoading;
@@ -320,6 +324,10 @@ export function DashboardPage() {
               <ChevronDown size={12} style={{ position: 'absolute', right: 10, pointerEvents: 'none', color: 'var(--color-text-muted)' }} />
             </div>
           )}
+          <HiddenClientsMenu
+            hiddenClients={hiddenClients}
+            onShow={(clientId) => setDashboardHidden(clientId, false)}
+          />
           <Link
             to="/ai-tools"
             className="btn-secondary"
@@ -497,6 +505,11 @@ export function DashboardPage() {
         </div>
       </motion.div>
 
+      {/* ── Year Progress Widget ── */}
+      <motion.div {...fadeUp(0.26)} style={{ padding: '0 24px' }}>
+        <YearProgressWidget />
+      </motion.div>
+
       {/* ── Activity Pulse ── */}
       <motion.div {...fadeUp(0.28)} style={{ padding: '0 24px' }}>
         <div style={{
@@ -541,21 +554,25 @@ export function DashboardPage() {
               Clientes · {getMonthLabel(currentMonthKey)}
             </span>
           </div>
-          <span style={{ fontSize: '0.6rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>{clientCards.length} clientes</span>
+          <span style={{ fontSize: '0.6rem', fontFamily: 'JetBrains Mono', color: 'var(--color-text-muted)' }}>{visibleClientCards.length} clientes</span>
         </div>
 
         {clientsLoading ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
             {[0, 1, 2].map((i) => <ClientCardSkeleton key={i} />)}
           </div>
-        ) : clientCards.length === 0 ? (
+        ) : visibleClientCards.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem', fontFamily: 'JetBrains Mono' }}>
             No hay clientes activos.
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-            {clientCards.map((cardData) => (
-              <ClientCard key={cardData.client.id} data={cardData} />
+            {visibleClientCards.map((cardData) => (
+              <ClientCard
+                key={cardData.client.id}
+                data={cardData}
+                onHide={(clientId) => setDashboardHidden(clientId, true)}
+              />
             ))}
           </div>
         )}

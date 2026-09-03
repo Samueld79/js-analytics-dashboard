@@ -868,6 +868,34 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
 
 .client-card-divider { height: 1px; background: var(--cc-divider); flex-shrink: 0; }
 
+.client-card-hide-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease, background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.client-card:hover .client-card-hide-btn,
+.client-card-hide-btn:focus-visible { opacity: 1; }
+
+.client-card-hide-btn:hover {
+  background: var(--danger-dim);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 /* ============================================================
    SECTION 16: Skeleton loaders
    ============================================================ */
@@ -916,6 +944,170 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
+
+/* ============================================================
+   SECTION 17b: Year progress widget
+   ============================================================ */
+.year-progress-widget {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 28px;
+  padding: 22px 26px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.ypw-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    oklch(1 0 0 / 0.015) 0px,
+    oklch(1 0 0 / 0.015) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+.ypw-ring-col {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.ypw-ring-bg { fill: none; stroke: var(--border); stroke-width: 8; }
+
+.ypw-ring-progress {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 8;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px var(--cyan)) drop-shadow(0 0 14px var(--cyan-border));
+  transition: stroke-dashoffset 700ms ease;
+}
+
+.ypw-ring-marker {
+  fill: var(--cyan-glow);
+  filter: drop-shadow(0 0 5px var(--cyan-glow)) drop-shadow(0 0 10px var(--cyan-glow));
+}
+
+.ypw-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.ypw-percent {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.ypw-percent-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  color: var(--color-text-muted);
+}
+
+.ypw-divider { width: 1px; background: var(--border); }
+
+.ypw-calendar { min-width: 0; }
+
+.ypw-calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ypw-calendar-header span:first-child {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.ypw-calendar-header span:last-child { font-size: 0.62rem; color: var(--cyan); }
+
+.ypw-months-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px 16px;
+}
+
+@media (max-width: 1100px) { .ypw-months-grid { grid-template-columns: repeat(4, 1fr); } }
+
+@media (max-width: 900px) {
+  .year-progress-widget { grid-template-columns: 1fr; }
+  .ypw-divider { display: none; }
+  .ypw-months-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.ypw-month { padding: 6px 4px; border-radius: 8px; transition: background 200ms ease; }
+.ypw-month.is-current { background: var(--cyan-dim); }
+
+.ypw-month-label {
+  margin: 0 0 5px;
+  font-size: 0.58rem;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ypw-month.is-current .ypw-month-label { color: var(--cyan); font-weight: 700; }
+
+.ypw-weekday-row, .ypw-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.ypw-weekday-row span {
+  font-size: 0.44rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--color-text-muted);
+  text-align: center;
+  opacity: 0.6;
+}
+
+.ypw-day, .ypw-day-blank { width: 100%; aspect-ratio: 1; border-radius: 2px; }
+.ypw-day-blank { visibility: hidden; }
+
+.ypw-day { border: 1px solid var(--border); transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
+.ypw-day.is-future { background: transparent; }
+
+.ypw-day.is-past {
+  background: var(--cyan-dim);
+  border-color: var(--cyan-border);
+  box-shadow: 0 0 4px oklch(0.82 0.15 200 / 0.25);
+}
+
+.ypw-day.is-today {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan-glow), 0 0 16px var(--cyan-border);
+}
+
+.ypw-day:hover { border-color: var(--border-hover); transform: scale(1.2); }
 
 /* ============================================================
    SECTION 18: AI Tools page

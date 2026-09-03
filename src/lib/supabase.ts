@@ -108,6 +108,7 @@ export type Client = {
   target_cities?: string[] | null;
   notes?: string | null;
   monthly_goal?: number | null;
+  dashboard_hidden?: boolean | null;
   last_optimization_at?: string | null;
   last_sales_entry_at?: string | null;
   created_at: string;

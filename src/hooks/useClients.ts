@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createClient, getClientByIdOrSlug, listClients } from '../services/clients';
+import { createClient, getClientByIdOrSlug, listClients, setClientDashboardHidden } from '../services/clients';
 import {
   isSupabaseConfigured,
   type Client,
@@ -50,6 +50,19 @@ export function useClients() {
     [load],
   );
 
+  const setDashboardHidden = useCallback(
+    async (clientId: string, hidden: boolean): Promise<ServiceMutationResult<{ dashboard_hidden: boolean }>> => {
+      setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, dashboard_hidden: hidden } : c)));
+      const result = await setClientDashboardHidden(clientId, hidden);
+      if (result.error) {
+        setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, dashboard_hidden: !hidden } : c)));
+        setError(result.error);
+      }
+      return result;
+    },
+    [],
+  );
+
   return {
     clients,
     loading,
@@ -57,6 +70,7 @@ export function useClients() {
     error,
     reload: load,
     createClient: create,
+    setDashboardHidden,
     isConfigured: isSupabaseConfigured,
   };
 }

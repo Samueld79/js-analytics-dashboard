@@ -116,6 +116,30 @@ export async function updateClientLogo(
   return { data: { logo_url }, error: null };
 }
 
+export async function setClientDashboardHidden(
+  clientId: string,
+  hidden: boolean,
+): Promise<ServiceMutationResult<{ dashboard_hidden: boolean }>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const { error } = await supabase
+    .from('clients')
+    .update({ dashboard_hidden: hidden })
+    .eq('id', clientId);
+
+  if (error) {
+    console.error('[clients] setClientDashboardHidden', error);
+    return {
+      data: null,
+      error: getErrorMessage(error, 'No se pudo actualizar la visibilidad del cliente.'),
+    };
+  }
+
+  return { data: { dashboard_hidden: hidden }, error: null };
+}
+
 export async function listClients(): Promise<Client[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { EyeOff } from 'lucide-react';
 import type { Client } from '../../lib/supabase';
 import { formatCop, formatNumber } from '../../lib/utils';
 import { ClientAvatar } from '../ClientAvatar';
@@ -64,7 +65,7 @@ export function ClientCardSkeleton() {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ClientCard({ data: d }: { data: ClientCardData }) {
+export function ClientCard({ data: d, onHide }: { data: ClientCardData; onHide?: (clientId: string) => void }) {
   const { client: c } = d;
 
   const campaignDelta  = d.campaignCountPrev > 0 ? d.campaignCount - d.campaignCountPrev : null;
@@ -77,7 +78,23 @@ export function ClientCard({ data: d }: { data: ClientCardData }) {
       style={{ textDecoration: 'none', display: 'block', height: '100%' }}
       aria-label={`Ver perfil de ${c.name}`}
     >
-      <div className="client-card">
+      <div className="client-card" style={{ position: 'relative' }}>
+
+        {onHide && (
+          <button
+            type="button"
+            className="client-card-hide-btn"
+            title="Ocultar del dashboard"
+            aria-label={`Ocultar ${c.name} del dashboard`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onHide(c.id);
+            }}
+          >
+            <EyeOff size={13} />
+          </button>
+        )}
 
         {/* ── Header ── */}
         <div style={{ padding: '16px 18px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
