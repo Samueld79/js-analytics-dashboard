@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { CalendarCheck, ChevronLeft, ChevronRight, ImageIcon, Lock, Minus, Phone, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, Globe, ImageIcon, Lock, Minus, Phone, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
@@ -15,6 +15,7 @@ import {
   listPortalLeadsForPortal,
   listPublicPortalDailySales,
   listPublicPortalObjectionTally,
+  PORTAL_NO_AD_CAMPAIGN_ID,
   PORTAL_NOTE_CAMPAIGN_ID,
   removePortalLead,
   resolvePortalSlug,
@@ -90,6 +91,12 @@ function monthLabel(d: Date): string {
 }
 
 const RECENT_SALE_DAYS = 10;
+
+// Display label for citas/compras registered under PORTAL_NO_AD_CAMPAIGN_ID
+// — shown wherever those would otherwise sit next to real ad/conjunto names
+// (Resumen de efectividad, Seguimiento), so they read as a deliberate bucket
+// rather than a stray or missing ad.
+const SIN_ANUNCIO_LABEL = 'Sin anuncio / Tráfico';
 
 // Builds the last `count` days ending on `todayKey` (a Bogota YYYY-MM-DD
 // key) — anchored to that key rather than `new Date()` so it stays
@@ -216,6 +223,39 @@ function TallyStepperRow({
           <Plus size={10} />
         </button>
       </div>
+    </div>
+  );
+}
+
+// Single row in "Seguimiento de citas y compras" — used both for leads tied
+// to a real ad and for PORTAL_NO_AD_CAMPAIGN_ID ones (same shape either way,
+// the caller decides which sub-group to render it under).
+function LeadRow({ lead }: { lead: PortalLeadSummary }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+      padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)',
+    }}>
+      <span style={{
+        fontSize: '0.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+        background: lead.tipo === 'cita' ? 'var(--cyan-dim)' : 'var(--success-dim)',
+        color: lead.tipo === 'cita' ? 'var(--cyan)' : 'var(--success)',
+      }}>
+        {lead.tipo === 'cita' ? 'Cita' : 'Compra'}
+      </span>
+      <span style={{ fontSize: '0.8rem', color: 'var(--fg)', fontWeight: 500 }}>
+        {lead.nombre_cliente}
+      </span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.74rem', color: 'var(--fg-muted)' }}>
+        <Phone size={11} />
+        {lead.numero_contacto}
+      </span>
+      <span style={{
+        marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--fg-muted)',
+        fontFamily: 'JetBrains Mono, monospace', flexShrink: 0,
+      }}>
+        {formatBogotaTime(lead.created_at)}
+      </span>
     </div>
   );
 }
@@ -412,6 +452,8 @@ export function ClientPortalPublicPage() {
       const entry = dailyEntries.find((e) => e.date === selectedDate && e.campaign_id === row.ad_id);
       next[row.ad_id] = leadEntryStateFrom(entry);
     });
+    const noAdEntry = dailyEntries.find((e) => e.date === selectedDate && e.campaign_id === PORTAL_NO_AD_CAMPAIGN_ID);
+    next[PORTAL_NO_AD_CAMPAIGN_ID] = leadEntryStateFrom(noAdEntry);
     setLeadEntriesState(next);
   }, [selectedDate, dayRows, dailyEntries]);
 
@@ -684,6 +726,16 @@ export function ClientPortalPublicPage() {
     dailyEntries
       .filter((e) => e.campaign_id !== PORTAL_NOTE_CAMPAIGN_ID && e.date.startsWith(summaryMonthKey)) // day-level note, not a per-ad row
       .forEach((e) => {
+        // "Sin anuncio" gets its own bucket, kept separate from real
+        // conjuntos/ads and from the generic "Sin conjunto asignado"
+        // fallback — no per-ad sub-row for it, the bucket total IS the row.
+        if (e.campaign_id === PORTAL_NO_AD_CAMPAIGN_ID) {
+          const conjuntoRow = getConjuntoRow(SIN_ANUNCIO_LABEL);
+          conjuntoRow.citas += e.citas;
+          conjuntoRow.compras += e.compras;
+          return;
+        }
+
         const conjunto = adIdToAdsetName.get(e.campaign_id) ?? 'Sin conjunto asignado';
         const conjuntoRow = getConjuntoRow(conjunto);
         conjuntoRow.citas += e.citas;
@@ -868,10 +920,10 @@ export function ClientPortalPublicPage() {
             </div>
           )}
 
-          {dayRows.length === 0 ? (
-            <p style={{ fontSize: '0.8rem', color: 'var(--fg-muted)' }}>No hay anuncios activos este día.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {dayRows.length === 0 && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--fg-muted)' }}>No hay anuncios activos este día.</p>
+              )}
               {dayRows.map((row) => {
                 const asset = assetByAdId.get(row.ad_id);
                 const entry = leadEntriesState[row.ad_id] ?? leadEntryStateFrom(undefined);
@@ -956,8 +1008,54 @@ export function ClientPortalPublicPage() {
                   </div>
                 );
               })}
+
+              {/* ── Venta sin anuncio específico — Tráfico, orgánico, etc. Same lead-
+                   capture flow (nombre/teléfono/monto/tipo), just tracked under
+                   PORTAL_NO_AD_CAMPAIGN_ID instead of a real ad_id — same pattern
+                   already used for "Nota del día" (PORTAL_NOTE_CAMPAIGN_ID). ── */}
+              {(() => {
+                const noAdEntry = leadEntriesState[PORTAL_NO_AD_CAMPAIGN_ID] ?? leadEntryStateFrom(undefined);
+                return (
+                  <div style={{ display: 'flex', gap: 12, padding: '12px 0' }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 8, flexShrink: 0,
+                      background: 'var(--surface-2)', border: '1px dashed var(--border)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Globe size={18} style={{ color: 'var(--fg-muted)' }} />
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--fg)' }}>Venta sin anuncio específico</span>
+                        <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--fg-muted)' }}>
+                          {SIN_ANUNCIO_LABEL}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(90px, 1fr))', gap: 8, marginTop: 8 }}>
+                        <LeadCounterStepper
+                          label="Citas"
+                          value={noAdEntry.citas}
+                          disabled={!unlockedRegistro}
+                          busy={leadBusy[`${PORTAL_NO_AD_CAMPAIGN_ID}:cita`] ?? false}
+                          onIncrement={() => handleLeadIncrementClick(PORTAL_NO_AD_CAMPAIGN_ID, 'cita')}
+                          onDecrement={() => void handleLeadDecrement(PORTAL_NO_AD_CAMPAIGN_ID, 'cita')}
+                        />
+                        <LeadCounterStepper
+                          label="Compras"
+                          value={noAdEntry.compras}
+                          disabled={!unlockedRegistro}
+                          busy={leadBusy[`${PORTAL_NO_AD_CAMPAIGN_ID}:compra`] ?? false}
+                          onIncrement={() => handleLeadIncrementClick(PORTAL_NO_AD_CAMPAIGN_ID, 'compra')}
+                          onDecrement={() => void handleLeadDecrement(PORTAL_NO_AD_CAMPAIGN_ID, 'compra')}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-          )}
         </GlassCard>
 
         {/* ── Nota del día ── */}
@@ -1002,6 +1100,10 @@ export function ClientPortalPublicPage() {
                 {leadsByDate.map(([dateKey, leads]) => {
                   const raw = new Date(`${dateKey}T00:00:00`).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
                   const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+                  // Leads without a tracked ad get their own visible sub-group —
+                  // never interleaved anonymously with the ones tied to a real ad.
+                  const withAd = leads.filter((l) => l.campaign_id !== PORTAL_NO_AD_CAMPAIGN_ID);
+                  const withoutAd = leads.filter((l) => l.campaign_id === PORTAL_NO_AD_CAMPAIGN_ID);
                   return (
                     <div key={dateKey}>
                       <p style={{
@@ -1011,37 +1113,18 @@ export function ClientPortalPublicPage() {
                         {dateKey === todayKey ? `Hoy · ${label}` : label}
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {leads.map((lead) => (
-                          <div
-                            key={lead.id}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-                              padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)',
-                            }}
-                          >
-                            <span style={{
-                              fontSize: '0.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
-                              background: lead.tipo === 'cita' ? 'var(--cyan-dim)' : 'var(--success-dim)',
-                              color: lead.tipo === 'cita' ? 'var(--cyan)' : 'var(--success)',
-                            }}>
-                              {lead.tipo === 'cita' ? 'Cita' : 'Compra'}
-                            </span>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--fg)', fontWeight: 500 }}>
-                              {lead.nombre_cliente}
-                            </span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.74rem', color: 'var(--fg-muted)' }}>
-                              <Phone size={11} />
-                              {lead.numero_contacto}
-                            </span>
-                            <span style={{
-                              marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--fg-muted)',
-                              fontFamily: 'JetBrains Mono, monospace', flexShrink: 0,
-                            }}>
-                              {formatBogotaTime(lead.created_at)}
-                            </span>
-                          </div>
-                        ))}
+                        {withAd.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
                       </div>
+                      {withoutAd.length > 0 && (
+                        <div style={{ marginTop: withAd.length > 0 ? 12 : 0 }}>
+                          <p style={{ margin: '0 0 6px', fontSize: '0.58rem', color: 'var(--fg-muted)', fontStyle: 'italic' }}>
+                            {SIN_ANUNCIO_LABEL}
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {withoutAd.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

@@ -22,6 +22,14 @@ import {
 // api/portal/_lib.ts.
 export const PORTAL_NOTE_CAMPAIGN_ID = '__nota_general__';
 
+// Sentinel campaign_id for citas/compras that didn't come from any tracked
+// ad (Tráfico, orgánico, etc). Same pattern as PORTAL_NOTE_CAMPAIGN_ID —
+// portal_daily_entries.campaign_id has no FK to portal_ad_daily_metrics, so
+// any non-empty string is a valid "bucket". No server-side route needs to
+// know this value specially (add-lead/remove-last-lead accept any
+// campaign_id already); only the public page's own display logic checks it.
+export const PORTAL_NO_AD_CAMPAIGN_ID = '__sin_anuncio__';
+
 function slugifyName(value: string): string {
   return value
     .normalize('NFD')
