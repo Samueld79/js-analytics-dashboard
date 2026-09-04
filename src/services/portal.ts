@@ -4,6 +4,7 @@ import {
   SUPABASE_MISSING_MESSAGE,
   supabase,
   type ClientPortalSettings,
+  type DailySale,
   type PortalAdDailyMetric,
   type PortalAssetType,
   type PortalCreativeAsset,
@@ -309,6 +310,22 @@ export async function listPublicPortalAdDailyMetrics(clientId: string): Promise<
   return (data ?? []) as PortalAdDailyMetric[];
 }
 
+export async function listPublicPortalDailySales(clientId: string): Promise<DailySale[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('daily_sales')
+    .select('*')
+    .eq('client_id', clientId);
+
+  if (error) {
+    console.error('[portal] listPublicPortalDailySales', error);
+    return [];
+  }
+
+  return (data ?? []) as DailySale[];
+}
+
 export async function listPublicPortalObjectionTally(clientId: string): Promise<PortalObjectionTally[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
@@ -352,6 +369,7 @@ export type PortalResolveResult = {
   name: string;
   logo_url: string | null;
   enabled: boolean;
+  monthly_goal: number | null;
 };
 
 export type PortalApiResult<T> = { data: T | null; error: string | null; status: number };

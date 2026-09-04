@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, ImageIcon, Lock, Minus, Plus, ShoppingBag, U
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
+import { PortalIndicators } from '../components/portal/PortalIndicators';
 import {
   addPortalLead,
   decrementPortalTally,
@@ -11,6 +12,7 @@ import {
   listPublicPortalAdDailyMetrics,
   listPublicPortalCreativeAssets,
   listPublicPortalDailyEntries,
+  listPublicPortalDailySales,
   listPublicPortalObjectionTally,
   PORTAL_NOTE_CAMPAIGN_ID,
   removePortalLead,
@@ -41,6 +43,17 @@ function toDateKey(d: Date): string {
 function monthLabel(d: Date): string {
   const label = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+const RECENT_SALE_DAYS = 10;
+
+function buildRecentDays(count: number): Array<{ key: string; day: number; weekday: string }> {
+  const today = new Date();
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (count - 1 - i));
+    return { key: toDateKey(d), day: d.getDate(), weekday: DAYS_OF_WEEK[(d.getDay() + 6) % 7] };
+  });
 }
 
 function buildMonthGrid(monthDate: Date): Array<{ key: string; day: number; inMonth: boolean }> {
@@ -237,6 +250,7 @@ export function ClientPortalPublicPage() {
   const [creativeAssets, setCreativeAssets] = useState<PortalCreativeAsset[]>([]);
   const [dailyEntries, setDailyEntries] = useState<PortalDailyEntry[]>([]);
   const [tallyRows, setTallyRows] = useState<PortalObjectionTally[]>([]);
+  const [salesByDate, setSalesByDate] = useState<Record<string, number>>({});
 
   const [monthDate, setMonthDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
@@ -247,6 +261,7 @@ export function ClientPortalPublicPage() {
   const [pinVentas, setPinVentas] = useState('');
   const [pinVentasInput, setPinVentasInput] = useState('');
   const [pinVentasError, setPinVentasError] = useState('');
+  const [saleDate, setSaleDate] = useState(() => toDateKey(new Date()));
   const [saleAmount, setSaleAmount] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   const [lastSavedAmount, setLastSavedAmount] = useState<number | null>(null);
@@ -277,16 +292,18 @@ export function ClientPortalPublicPage() {
         return;
       }
       setPortal(result.data);
-      const [ads, assets, entries, tally] = await Promise.all([
+      const [ads, assets, entries, tally, sales] = await Promise.all([
         listPublicPortalAdDailyMetrics(result.data.client_id),
         listPublicPortalCreativeAssets(result.data.client_id),
         listPublicPortalDailyEntries(result.data.client_id),
         listPublicPortalObjectionTally(result.data.client_id),
+        listPublicPortalDailySales(result.data.client_id),
       ]);
       setAdRows(ads);
       setCreativeAssets(assets);
       setDailyEntries(entries);
       setTallyRows(tally);
+      setSalesByDate(Object.fromEntries(sales.map((s) => [s.date, s.total_sales])));
 
       const lastDate = ads.length > 0 ? [...ads].sort((a, b) => b.date.localeCompare(a.date))[0].date : null;
       if (lastDate) {
@@ -346,6 +363,29 @@ export function ClientPortalPublicPage() {
 
   const getTallyCount = (adId: string, tipo: PortalTallyTipo, categoria: string): number =>
     tallyRows.find((t) => t.date === selectedDate && t.ad_id === adId && t.tipo === tipo && t.categoria === categoria)?.count ?? 0;
+
+  // ── Sales indicators (progreso del mes, meta mensual, acumulado del año) ─────
+  const todayKey = toDateKey(new Date());
+  const currentYear = Number(todayKey.slice(0, 4));
+  const currentMonthKey = todayKey.slice(0, 7);
+
+  const monthSalesTotal = useMemo(
+    () => Object.entries(salesByDate).filter(([date]) => date.startsWith(currentMonthKey)).reduce((sum, [, v]) => sum + v, 0),
+    [salesByDate, currentMonthKey],
+  );
+  const yearSalesTotal = useMemo(
+    () => Object.entries(salesByDate).filter(([date]) => date.startsWith(String(currentYear))).reduce((sum, [, v]) => sum + v, 0),
+    [salesByDate, currentYear],
+  );
+
+  // ── Recent-days sale correction ───────────────────────────────────────────────
+  const recentSaleDays = useMemo(() => buildRecentDays(RECENT_SALE_DAYS), []);
+  const existingSaleForSelectedDate = salesByDate[saleDate] ?? null;
+
+  useEffect(() => {
+    const existing = salesByDate[saleDate];
+    setSaleAmount(existing != null ? String(existing) : '');
+  }, [saleDate, salesByDate]);
 
   const unlockedRegistro = pinRegistro.length === 4;
   const unlockedVentas = pinVentas.length === 4;
@@ -503,13 +543,13 @@ export function ClientPortalPublicPage() {
       slug,
       pin: pinVentas,
       client_id: portal.client_id,
-      date: toDateKey(new Date()),
+      date: saleDate,
       total_sales: amount,
     });
     setSavingSale(false);
     if (result.data) {
       setLastSavedAmount(amount);
-      setSaleAmount('');
+      setSalesByDate((prev) => ({ ...prev, [saleDate]: amount }));
     } else if (result.error) {
       alert(result.error);
     }
@@ -651,6 +691,15 @@ export function ClientPortalPublicPage() {
             Panel de resultados
           </p>
         </div>
+      </div>
+
+      <div style={{ padding: '0 24px 16px' }}>
+        <PortalIndicators
+          monthSales={monthSalesTotal}
+          monthlyGoal={portal.monthly_goal}
+          yearSales={yearSalesTotal}
+          year={currentYear}
+        />
       </div>
 
       <div className="client-portal-grid" style={{ padding: '0 24px' }}>
@@ -931,11 +980,11 @@ export function ClientPortalPublicPage() {
           </div>
         </GlassCard>
 
-        {/* ── 5. Registrar venta de hoy ── */}
+        {/* ── 5. Registrar o corregir venta ── */}
         <GlassCard style={{ padding: 20, marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <ShoppingBag size={15} style={{ color: 'var(--success)' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>Registrar venta de hoy</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>Registrar o corregir venta</span>
           </div>
 
           {!unlockedVentas ? (
@@ -960,21 +1009,56 @@ export function ClientPortalPublicPage() {
               {pinVentasError && <span style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>{pinVentasError}</span>}
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Unlock size={14} style={{ color: 'var(--success)' }} />
-              <input
-                className="form-input"
-                type="number"
-                min={0}
-                placeholder="Monto de la venta"
-                value={saleAmount}
-                onChange={(e) => setSaleAmount(e.target.value)}
-                style={{ flex: 1, minWidth: 160 }}
-              />
-              <PrimaryButton onClick={handleRegisterSale} loading={savingSale} disabled={!saleAmount}>
-                Registrar
-              </PrimaryButton>
-              {lastSavedAmount != null && <span style={{ fontSize: '0.76rem', color: 'var(--success)' }}>Guardado {formatCop(lastSavedAmount)}</span>}
+            <div>
+              <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>
+                Elige el día
+              </span>
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, marginBottom: 12 }}>
+                {recentSaleDays.map((d) => {
+                  const hasSale = salesByDate[d.key] != null;
+                  const isSelected = d.key === saleDate;
+                  return (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => { setSaleDate(d.key); setLastSavedAmount(null); }}
+                      style={{
+                        flexShrink: 0, minWidth: 42, padding: '6px 4px 8px', borderRadius: 8, cursor: 'pointer',
+                        border: isSelected ? '2px solid var(--success)' : '1px solid var(--border)',
+                        background: hasSale ? 'var(--success-dim)' : 'var(--surface-2)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                      }}
+                    >
+                      <span style={{ fontSize: '0.5rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>{d.weekday}</span>
+                      <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--fg)' }}>{d.day}</span>
+                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: hasSale ? 'var(--success)' : 'transparent' }} />
+                    </button>
+                  );
+                })}
+              </div>
+
+              {existingSaleForSelectedDate != null && (
+                <p style={{ margin: '0 0 10px', fontSize: '0.74rem', color: 'var(--fg-muted)' }}>
+                  Ya tienes <strong style={{ color: 'var(--fg)' }}>{formatCop(existingSaleForSelectedDate)}</strong> registrado para este día. ¿Quieres corregirlo?
+                </p>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Unlock size={14} style={{ color: 'var(--success)' }} />
+                <input
+                  className="form-input"
+                  type="number"
+                  min={0}
+                  placeholder="Monto de la venta"
+                  value={saleAmount}
+                  onChange={(e) => setSaleAmount(e.target.value)}
+                  style={{ flex: 1, minWidth: 160 }}
+                />
+                <PrimaryButton onClick={handleRegisterSale} loading={savingSale} disabled={!saleAmount}>
+                  {existingSaleForSelectedDate != null ? 'Guardar corrección' : 'Registrar'}
+                </PrimaryButton>
+                {lastSavedAmount != null && <span style={{ fontSize: '0.76rem', color: 'var(--success)' }}>Guardado {formatCop(lastSavedAmount)}</span>}
+              </div>
             </div>
           )}
         </GlassCard>

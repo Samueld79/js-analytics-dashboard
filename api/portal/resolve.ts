@@ -34,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data: client, error: clientError } = await supabase
     .from('clients')
-    .select('name, logo_url')
+    .select('name, logo_url, monthly_goal')
     .eq('id', settings.client_id)
     .maybeSingle();
 
@@ -48,5 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     enabled: settings.enabled,
     name: client.name,
     logo_url: client.logo_url,
+    monthly_goal: client.monthly_goal ?? null,
   });
 }
