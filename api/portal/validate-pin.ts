@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSupabaseAdmin, isValidPin, setCors } from './_lib.js';
+import { checkPin, getSupabaseAdmin, setCors } from './_lib.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res);
@@ -10,13 +10,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!supabase) return res.status(500).json({ error: 'Supabase no configurado en el servidor.' });
 
   const { slug, pin, kind } = req.body as { slug?: string; pin?: string; kind?: 'registro' | 'ventas' };
-  if (!slug || !isValidPin(pin) || (kind !== 'registro' && kind !== 'ventas')) {
+  if (!slug || (kind !== 'registro' && kind !== 'ventas')) {
     return res.status(400).json({ error: 'Solicitud inválida.' });
   }
 
   const { data: settings, error } = await supabase
     .from('client_portal_settings')
-    .select('pin_registro, pin_ventas, enabled')
+    .select('pin_registro, pin_ventas, pin_required, enabled')
     .eq('public_slug', slug)
     .maybeSingle();
 
@@ -30,5 +30,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const expected = kind === 'registro' ? settings.pin_registro : settings.pin_ventas;
-  return res.status(200).json({ valid: pin === expected });
+  return res.status(200).json({ valid: checkPin(pin, settings.pin_required, expected) });
 }

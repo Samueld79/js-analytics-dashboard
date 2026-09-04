@@ -394,6 +394,7 @@ export type ClientPortalSettings = {
   public_slug: string;
   pin_registro: string;
   pin_ventas: string;
+  pin_required: boolean;
   created_at: string;
   updated_at: string;
 };

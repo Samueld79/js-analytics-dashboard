@@ -387,8 +387,10 @@ export function ClientPortalPublicPage() {
     setSaleAmount(existing != null ? String(existing) : '');
   }, [saleDate, salesByDate]);
 
-  const unlockedRegistro = pinRegistro.length === 4;
-  const unlockedVentas = pinVentas.length === 4;
+  // A client can opt out of the PIN gate entirely (client_portal_settings.pin_required
+  // = false) — the flow then behaves exactly as if it were already unlocked.
+  const unlockedRegistro = portal?.pin_required === false || pinRegistro.length === 4;
+  const unlockedVentas = portal?.pin_required === false || pinVentas.length === 4;
 
   const handleUnlockRegistro = async () => {
     if (!slug) return;

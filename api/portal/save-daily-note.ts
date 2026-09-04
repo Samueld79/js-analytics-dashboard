@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSupabaseAdmin, isValidPin, setCors, PORTAL_NOTE_CAMPAIGN_ID } from './_lib.js';
+import { checkPin, getSupabaseAdmin, setCors, PORTAL_NOTE_CAMPAIGN_ID } from './_lib.js';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -20,20 +20,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     nota?: string;
   };
 
-  if (!slug || !isValidPin(pin) || !date || !DATE_PATTERN.test(date)) {
+  if (!slug || !date || !DATE_PATTERN.test(date)) {
     return res.status(400).json({ error: 'Solicitud inválida.' });
   }
 
   const { data: settings, error: settingsError } = await supabase
     .from('client_portal_settings')
-    .select('client_id, pin_registro, enabled')
+    .select('client_id, pin_registro, pin_required, enabled')
     .eq('public_slug', slug)
     .maybeSingle();
 
   if (settingsError || !settings || !settings.enabled) {
     return res.status(404).json({ error: 'Enlace no válido o inactivo.' });
   }
-  if (pin !== settings.pin_registro) {
+  if (!checkPin(pin, settings.pin_required, settings.pin_registro)) {
     return res.status(403).json({ error: 'PIN incorrecto.' });
   }
 

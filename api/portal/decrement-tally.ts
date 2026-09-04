@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSupabaseAdmin, isValidPin, setCors } from './_lib.js';
+import { checkPin, getSupabaseAdmin, setCors } from './_lib.js';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIPOS = ['objecion', 'visita'];
@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     categoria?: string;
   };
 
-  if (!slug || !isValidPin(pin) || !date || !DATE_PATTERN.test(date) || !ad_id || !TIPOS.includes(tipo ?? '')) {
+  if (!slug || !date || !DATE_PATTERN.test(date) || !ad_id || !TIPOS.includes(tipo ?? '')) {
     return res.status(400).json({ error: 'Solicitud inválida.' });
   }
   if (!categoria || !CATEGORIAS[tipo as string].includes(categoria)) {
@@ -34,14 +34,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data: settings, error: settingsError } = await supabase
     .from('client_portal_settings')
-    .select('client_id, pin_registro, enabled')
+    .select('client_id, pin_registro, pin_required, enabled')
     .eq('public_slug', slug)
     .maybeSingle();
 
   if (settingsError || !settings || !settings.enabled) {
     return res.status(404).json({ error: 'Enlace no válido o inactivo.' });
   }
-  if (pin !== settings.pin_registro) {
+  if (!checkPin(pin, settings.pin_required, settings.pin_registro)) {
     return res.status(403).json({ error: 'PIN incorrecto.' });
   }
 

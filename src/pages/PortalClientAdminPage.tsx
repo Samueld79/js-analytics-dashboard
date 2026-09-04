@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, ExternalLink, Loader2, Share2, Upload } from 'lucide-react';
+import { Check, Copy, ExternalLink, Loader2, Lock, Share2, Upload } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
@@ -138,6 +138,7 @@ export function PortalClientAdminPage() {
   const [slug, setSlug] = useState('');
   const [pinRegistro, setPinRegistro] = useState('');
   const [pinVentas, setPinVentas] = useState('');
+  const [pinRequired, setPinRequired] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -184,11 +185,13 @@ export function PortalClientAdminPage() {
       setSlug(currentSettings.public_slug);
       setPinRegistro(currentSettings.pin_registro);
       setPinVentas(currentSettings.pin_ventas);
+      setPinRequired(currentSettings.pin_required);
     } else {
       setEnabled(false);
       setSlug('');
       setPinRegistro('');
       setPinVentas('');
+      setPinRequired(true);
     }
     setCopied(false);
   }, [currentSettings, selectedClientId]);
@@ -296,6 +299,7 @@ export function PortalClientAdminPage() {
       public_slug: nextSlug,
       pin_registro: nextPinRegistro,
       pin_ventas: nextPinVentas,
+      pin_required: pinRequired,
     });
 
     setSaving(false);
@@ -315,6 +319,26 @@ export function PortalClientAdminPage() {
       public_slug: slug,
       pin_registro: pinRegistro,
       pin_ventas: pinVentas,
+      pin_required: pinRequired,
+    });
+    setSaving(false);
+    if (result.error || !result.data) {
+      alert(result.error ?? 'No se pudo guardar.');
+      return;
+    }
+    setSettingsMap((prev) => ({ ...prev, [selectedClientId]: result.data as ClientPortalSettings }));
+  };
+
+  const handleTogglePinRequired = async (next: boolean) => {
+    if (!selectedClientId || !slug) return;
+    setSaving(true);
+    const result = await upsertClientPortalSettings({
+      client_id: selectedClientId,
+      enabled,
+      public_slug: slug,
+      pin_registro: pinRegistro,
+      pin_ventas: pinVentas,
+      pin_required: next,
     });
     setSaving(false);
     if (result.error || !result.data) {
@@ -429,6 +453,30 @@ export function PortalClientAdminPage() {
                 <PrimaryButton size="sm" onClick={handleSavePins} loading={saving} disabled={pinRegistro.length !== 4 || pinVentas.length !== 4}>
                   Guardar PINs
                 </PrimaryButton>
+
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                  marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Lock size={14} style={{ color: 'var(--fg-muted)' }} />
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--fg)', display: 'block' }}>Requiere PIN</span>
+                      <span style={{ fontSize: '0.66rem', color: 'var(--fg-muted)' }}>
+                        Si lo desactivas, cualquiera con el link registra sin PIN.
+                      </span>
+                    </div>
+                  </div>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={pinRequired}
+                      disabled={saving}
+                      onChange={(e) => { setPinRequired(e.target.checked); void handleTogglePinRequired(e.target.checked); }}
+                    />
+                    <span className="toggle-slider" />
+                  </label>
+                </div>
               </>
             )}
           </GlassCard>

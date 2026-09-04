@@ -70,6 +70,7 @@ type UpsertPortalSettingsInput = {
   public_slug?: string;
   pin_registro?: string;
   pin_ventas?: string;
+  pin_required?: boolean;
 };
 
 export async function upsertClientPortalSettings(
@@ -85,6 +86,7 @@ export async function upsertClientPortalSettings(
     public_slug: input.public_slug,
     pin_registro: input.pin_registro,
     pin_ventas: input.pin_ventas,
+    pin_required: input.pin_required,
   };
 
   const { data, error } = await supabase
@@ -370,6 +372,7 @@ export type PortalResolveResult = {
   logo_url: string | null;
   enabled: boolean;
   monthly_goal: number | null;
+  pin_required: boolean;
 };
 
 export type PortalApiResult<T> = { data: T | null; error: string | null; status: number };

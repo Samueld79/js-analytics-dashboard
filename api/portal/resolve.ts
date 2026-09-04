@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data: settings, error } = await supabase
     .from('client_portal_settings')
-    .select('client_id, enabled')
+    .select('client_id, enabled, pin_required')
     .eq('public_slug', slug)
     .maybeSingle();
 
@@ -49,5 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     name: client.name,
     logo_url: client.logo_url,
     monthly_goal: client.monthly_goal ?? null,
+    pin_required: settings.pin_required,
   });
 }

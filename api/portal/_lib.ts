@@ -26,6 +26,15 @@ export function isValidPin(pin: unknown): pin is string {
   return typeof pin === 'string' && PIN_PATTERN.test(pin);
 }
 
+// A client can opt out of the PIN gate entirely (client_portal_settings.pin_required
+// = false) — in that case any request is allowed through regardless of what
+// pin value (if any) was sent. When required, falls back to the normal
+// format + equality check.
+export function checkPin(pin: unknown, required: boolean, expected: string): boolean {
+  if (!required) return true;
+  return isValidPin(pin) && pin === expected;
+}
+
 // Sentinel campaign_id for the day-level "Nota del día" row in
 // portal_daily_entries — a note isn't tied to any single campaign, but the
 // table's grain is (client_id, date, campaign_id). Must match the constant
