@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ImageIcon, Lock, Minus, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, ImageIcon, Lock, Minus, Phone, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
@@ -12,6 +12,7 @@ import {
   listPublicPortalAdDailyMetrics,
   listPublicPortalCreativeAssets,
   listPublicPortalDailyEntries,
+  listPortalLeadsForPortal,
   listPublicPortalDailySales,
   listPublicPortalObjectionTally,
   PORTAL_NOTE_CAMPAIGN_ID,
@@ -28,6 +29,7 @@ import {
   type PortalAdDailyMetric,
   type PortalCreativeAsset,
   type PortalDailyEntry,
+  type PortalLeadSummary,
   type PortalLeadTipo,
   type PortalObjectionTally,
   type PortalTallyTipo,
@@ -49,18 +51,37 @@ function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// "Today" as a YYYY-MM-DD string in PORTAL_TIMEZONE, independent of the
+// `d` as a YYYY-MM-DD string in PORTAL_TIMEZONE, independent of the
 // visitor's device timezone.
-function getBogotaTodayKey(): string {
+function formatBogotaDateKey(d: Date): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: PORTAL_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).formatToParts(new Date());
+  }).formatToParts(d);
   const map: Record<string, string> = {};
   for (const part of parts) if (part.type !== 'literal') map[part.type] = part.value;
   return `${map.year}-${map.month}-${map.day}`;
+}
+
+function getBogotaTodayKey(): string {
+  return formatBogotaDateKey(new Date());
+}
+
+// Groups portal_leads by the Bogota calendar day of their created_at
+// (a timestamptz) — same "today" criterion as the rest of the portal, not
+// the visitor's device timezone.
+function toBogotaDateKey(iso: string): string {
+  return formatBogotaDateKey(new Date(iso));
+}
+
+function formatBogotaTime(iso: string): string {
+  return new Intl.DateTimeFormat('es-CO', {
+    timeZone: PORTAL_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
 }
 
 function monthLabel(d: Date): string {
@@ -304,6 +325,9 @@ export function ClientPortalPublicPage() {
   const [leadBusy, setLeadBusy] = useState<Record<string, boolean>>({});
   const [tallyBusy, setTallyBusy] = useState<Record<string, boolean>>({});
 
+  const [leadsList, setLeadsList] = useState<PortalLeadSummary[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+
   // ── Load portal + data ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!slug) return;
@@ -450,6 +474,32 @@ export function ClientPortalPublicPage() {
     }
   };
 
+  // "Seguimiento" list — PIN-gated (portal_leads carries real names/phone
+  // numbers), so it only loads once Registro is unlocked, and reloads after
+  // every add/remove so it never goes stale mid-session.
+  const reloadLeads = async () => {
+    if (!slug || !unlockedRegistro) return;
+    setLeadsLoading(true);
+    const result = await listPortalLeadsForPortal({ slug, pin: pinRegistro });
+    setLeadsLoading(false);
+    if (result.data) setLeadsList(result.data);
+  };
+
+  useEffect(() => {
+    void reloadLeads();
+  }, [unlockedRegistro, slug, pinRegistro]);
+
+  const leadsByDate = useMemo(() => {
+    const map = new Map<string, PortalLeadSummary[]>();
+    leadsList.forEach((lead) => {
+      const key = toBogotaDateKey(lead.created_at);
+      const arr = map.get(key) ?? [];
+      arr.push(lead);
+      map.set(key, arr);
+    });
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [leadsList]);
+
   const applyEntryUpdate = (adId: string, updated: PortalDailyEntry) => {
     setDailyEntries((prev) => [
       ...prev.filter((e) => !(e.date === selectedDate && e.campaign_id === adId)),
@@ -487,6 +537,7 @@ export function ClientPortalPublicPage() {
     if (result.data) {
       applyEntryUpdate(adId, result.data.daily_entry);
       setLeadModal(null);
+      void reloadLeads();
     } else {
       setLeadError(result.error ?? 'No se pudo guardar el registro.');
     }
@@ -507,6 +558,7 @@ export function ClientPortalPublicPage() {
     setLeadBusy((prev) => ({ ...prev, [key]: false }));
     if (result.data) {
       applyEntryUpdate(adId, result.data.daily_entry);
+      void reloadLeads();
     } else if (result.error) {
       alert(result.error);
     }
@@ -927,6 +979,76 @@ export function ClientPortalPublicPage() {
             style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.82rem', padding: '10px 12px' }}
           />
         </GlassCard>
+
+        {/* ── Seguimiento de citas y compras — quién se registró, agrupado por día ── */}
+        {unlockedRegistro && (
+          <GlassCard style={{ padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <CalendarCheck size={15} style={{ color: 'var(--cyan)' }} />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>Seguimiento de citas y compras</span>
+              {leadsList.length > 0 && (
+                <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'var(--fg-muted)' }}>
+                  {leadsList.length} registro{leadsList.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
+            {leadsLoading ? (
+              <p style={{ fontSize: '0.8rem', color: 'var(--fg-muted)' }}>Cargando…</p>
+            ) : leadsByDate.length === 0 ? (
+              <p style={{ fontSize: '0.8rem', color: 'var(--fg-muted)' }}>Aún no hay citas ni compras registradas.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {leadsByDate.map(([dateKey, leads]) => {
+                  const raw = new Date(`${dateKey}T00:00:00`).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+                  const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+                  return (
+                    <div key={dateKey}>
+                      <p style={{
+                        margin: '0 0 8px', fontSize: '0.62rem', fontFamily: 'JetBrains Mono, monospace',
+                        letterSpacing: '0.06em', color: 'var(--fg-muted)', textTransform: 'uppercase',
+                      }}>
+                        {dateKey === todayKey ? `Hoy · ${label}` : label}
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {leads.map((lead) => (
+                          <div
+                            key={lead.id}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                              padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)',
+                            }}
+                          >
+                            <span style={{
+                              fontSize: '0.62rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+                              background: lead.tipo === 'cita' ? 'var(--cyan-dim)' : 'var(--success-dim)',
+                              color: lead.tipo === 'cita' ? 'var(--cyan)' : 'var(--success)',
+                            }}>
+                              {lead.tipo === 'cita' ? 'Cita' : 'Compra'}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--fg)', fontWeight: 500 }}>
+                              {lead.nombre_cliente}
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.74rem', color: 'var(--fg-muted)' }}>
+                              <Phone size={11} />
+                              {lead.numero_contacto}
+                            </span>
+                            <span style={{
+                              marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--fg-muted)',
+                              fontFamily: 'JetBrains Mono, monospace', flexShrink: 0,
+                            }}>
+                              {formatBogotaTime(lead.created_at)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </GlassCard>
+        )}
 
         {/* ── 4. Resumen de efectividad — agrupado por conjunto real de Meta (adset_name) ── */}
         <GlassCard style={{ padding: 20 }}>

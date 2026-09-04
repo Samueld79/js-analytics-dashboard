@@ -9,6 +9,7 @@ import {
   type PortalAssetType,
   type PortalCreativeAsset,
   type PortalDailyEntry,
+  type PortalLeadSummary,
   type PortalLeadTipo,
   type PortalLeadWithEntry,
   type PortalObjectionTally,
@@ -473,4 +474,11 @@ export async function savePortalSale(input: {
   total_sales: number;
 }): Promise<PortalApiResult<{ id: string }>> {
   return portalApi<{ id: string }>('save-sale', input);
+}
+
+export async function listPortalLeadsForPortal(input: {
+  slug: string;
+  pin: string;
+}): Promise<PortalApiResult<PortalLeadSummary[]>> {
+  return portalApi<PortalLeadSummary[]>('list-leads', input);
 }

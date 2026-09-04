@@ -465,6 +465,17 @@ export type PortalLead = {
   created_at: string;
 };
 
+// Minimal shape returned by the PIN-gated public portal read (api/portal/list-leads)
+// — no client_id/daily_entry_id/monto, those aren't needed by the "seguimiento"
+// list and there's no reason to send them to the public page.
+export type PortalLeadSummary = {
+  id: string;
+  tipo: PortalLeadTipo;
+  nombre_cliente: string;
+  numero_contacto: string;
+  created_at: string;
+};
+
 export type PortalLeadWithEntry = PortalLead & {
   // daily_entry.campaign_id: the underlying portal_daily_entries column is
   // still named campaign_id, but as of the ad-level migration new rows store
