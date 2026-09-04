@@ -36,8 +36,31 @@ import { formatCop } from '../lib/utils';
 
 const DAYS_OF_WEEK = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
+// Business timezone for this portal — the ad-sync pipeline and the RLS
+// policies that gate writes to portal_ad_daily_metrics both compute "today"
+// against America/Bogota, not against whatever timezone the visitor's
+// device happens to be set to. Using the browser's local Date accessors
+// (getFullYear/getMonth/getDate) here would silently disagree with that
+// whenever a visitor's device clock isn't set to Colombia — pin "today" to
+// Bogota explicitly instead.
+const PORTAL_TIMEZONE = 'America/Bogota';
+
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// "Today" as a YYYY-MM-DD string in PORTAL_TIMEZONE, independent of the
+// visitor's device timezone.
+function getBogotaTodayKey(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: PORTAL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const map: Record<string, string> = {};
+  for (const part of parts) if (part.type !== 'literal') map[part.type] = part.value;
+  return `${map.year}-${map.month}-${map.day}`;
 }
 
 function monthLabel(d: Date): string {
@@ -47,12 +70,16 @@ function monthLabel(d: Date): string {
 
 const RECENT_SALE_DAYS = 10;
 
-function buildRecentDays(count: number): Array<{ key: string; day: number; weekday: string }> {
-  const today = new Date();
+// Builds the last `count` days ending on `todayKey` (a Bogota YYYY-MM-DD
+// key) — anchored to that key rather than `new Date()` so it stays
+// consistent with getBogotaTodayKey() regardless of device timezone.
+function buildRecentDays(count: number, todayKey: string): Array<{ key: string; day: number; weekday: string }> {
+  const [y, m, d] = todayKey.split('-').map(Number);
+  const anchor = new Date(y, m - 1, d);
   return Array.from({ length: count }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - (count - 1 - i));
-    return { key: toDateKey(d), day: d.getDate(), weekday: DAYS_OF_WEEK[(d.getDay() + 6) % 7] };
+    const day = new Date(anchor);
+    day.setDate(anchor.getDate() - (count - 1 - i));
+    return { key: toDateKey(day), day: day.getDate(), weekday: DAYS_OF_WEEK[(day.getDay() + 6) % 7] };
   });
 }
 
@@ -252,8 +279,8 @@ export function ClientPortalPublicPage() {
   const [tallyRows, setTallyRows] = useState<PortalObjectionTally[]>([]);
   const [salesByDate, setSalesByDate] = useState<Record<string, number>>({});
 
-  const [monthDate, setMonthDate] = useState(() => new Date());
-  const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
+  const [monthDate, setMonthDate] = useState(() => new Date(`${getBogotaTodayKey()}T00:00:00`));
+  const [selectedDate, setSelectedDate] = useState(() => getBogotaTodayKey());
 
   const [pinRegistro, setPinRegistro] = useState('');
   const [pinRegistroInput, setPinRegistroInput] = useState('');
@@ -261,7 +288,7 @@ export function ClientPortalPublicPage() {
   const [pinVentas, setPinVentas] = useState('');
   const [pinVentasInput, setPinVentasInput] = useState('');
   const [pinVentasError, setPinVentasError] = useState('');
-  const [saleDate, setSaleDate] = useState(() => toDateKey(new Date()));
+  const [saleDate, setSaleDate] = useState(() => getBogotaTodayKey());
   const [saleAmount, setSaleAmount] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   const [lastSavedAmount, setLastSavedAmount] = useState<number | null>(null);
@@ -314,13 +341,21 @@ export function ClientPortalPublicPage() {
     });
   }, [slug]);
 
+  // "Today" in the portal's business timezone (America/Bogota), not the
+  // visitor's device timezone — see PORTAL_TIMEZONE above.
+  const todayKey = getBogotaTodayKey();
+
   // ── Calendar — colored by count of ads truly active that day ─────────────────
   // effective_status='ACTIVE' alone isn't enough (Meta leaves old promoted
   // posts ACTIVE indefinitely with no budget) — also require real spend > 0
-  // on that specific date.
+  // on that specific date. EXCEPT for today: the sync job writes today's row
+  // early (with spend=0 so far) and spend accumulates through the day, so
+  // requiring spend > 0 for today hid every ad from "Registro" until the
+  // first dollar posted — sometimes not until mid-afternoon. Today's ads are
+  // trusted on effective_status alone; past days keep the stricter check.
   const activeAdRows = useMemo(
-    () => adRows.filter((r) => r.effective_status === 'ACTIVE' && r.spend > 0),
-    [adRows],
+    () => adRows.filter((r) => r.effective_status === 'ACTIVE' && (r.spend > 0 || r.date === todayKey)),
+    [adRows, todayKey],
   );
 
   const adCountByDate = useMemo(() => {
@@ -365,7 +400,6 @@ export function ClientPortalPublicPage() {
     tallyRows.find((t) => t.date === selectedDate && t.ad_id === adId && t.tipo === tipo && t.categoria === categoria)?.count ?? 0;
 
   // ── Sales indicators (progreso del mes, meta mensual, acumulado del año) ─────
-  const todayKey = toDateKey(new Date());
   const currentYear = Number(todayKey.slice(0, 4));
   const currentMonthKey = todayKey.slice(0, 7);
 
@@ -379,7 +413,7 @@ export function ClientPortalPublicPage() {
   );
 
   // ── Recent-days sale correction ───────────────────────────────────────────────
-  const recentSaleDays = useMemo(() => buildRecentDays(RECENT_SALE_DAYS), []);
+  const recentSaleDays = useMemo(() => buildRecentDays(RECENT_SALE_DAYS, todayKey), [todayKey]);
   const existingSaleForSelectedDate = salesByDate[saleDate] ?? null;
 
   useEffect(() => {
