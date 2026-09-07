@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data, error } = await supabase
     .from('portal_leads')
-    .select('id, tipo, nombre_cliente, numero_contacto, created_at, daily_entry:portal_daily_entries(campaign_id)')
+    .select('id, tipo, nombre_cliente, numero_contacto, monto, created_at, daily_entry:portal_daily_entries(campaign_id)')
     .eq('client_id', settings.client_id)
     .order('created_at', { ascending: false })
     .limit(500);
@@ -56,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tipo: row.tipo,
       nombre_cliente: row.nombre_cliente,
       numero_contacto: row.numero_contacto,
+      monto: row.monto,
       created_at: row.created_at,
       campaign_id,
     };

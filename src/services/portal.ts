@@ -9,6 +9,7 @@ import {
   type PortalAssetType,
   type PortalCreativeAsset,
   type PortalDailyEntry,
+  type PortalLead,
   type PortalLeadSummary,
   type PortalLeadTipo,
   type PortalLeadWithEntry,
@@ -470,6 +471,21 @@ export async function removePortalLead(input: {
   tipo: PortalLeadTipo;
 }): Promise<PortalApiResult<{ daily_entry: PortalDailyEntry; removed_lead_id: string | null }>> {
   return portalApi('remove-last-lead', input);
+}
+
+// Corrects an existing lead's nombre_cliente/numero_contacto/monto — never
+// its tipo. Same pin_registro gate as add/remove; the underlying RPC
+// re-derives client_id ownership server-side, so lead_id alone can't reach
+// another client's row even with a valid PIN for this one.
+export async function editPortalLead(input: {
+  slug: string;
+  pin: string;
+  lead_id: string;
+  nombre_cliente: string;
+  numero_contacto: string;
+  monto: number | null;
+}): Promise<PortalApiResult<PortalLead>> {
+  return portalApi<PortalLead>('edit-lead', input);
 }
 
 export async function savePortalDailyNote(input: {

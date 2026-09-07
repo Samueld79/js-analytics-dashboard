@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { CalendarCheck, ChevronLeft, ChevronRight, Globe, ImageIcon, Lock, Minus, Phone, Plus, Store, Video } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, Globe, ImageIcon, Lock, Minus, Pencil, Phone, Plus, Store, Video } from 'lucide-react';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
@@ -8,6 +8,7 @@ import { PortalIndicators } from '../components/portal/PortalIndicators';
 import {
   addPortalLead,
   decrementPortalTally,
+  editPortalLead,
   incrementPortalTally,
   listPublicPortalAdDailyMetrics,
   listPublicPortalCreativeAssets,
@@ -218,8 +219,10 @@ function TallyStepperRow({
 
 // Single row in "Seguimiento de citas y compras" — used both for leads tied
 // to a real ad and for PORTAL_NO_AD_CAMPAIGN_ID ones (same shape either way,
-// the caller decides which sub-group to render it under).
-function LeadRow({ lead }: { lead: PortalLeadSummary }) {
+// the caller decides which sub-group to render it under). `onEdit` is only
+// passed when Registro is unlocked (same PIN gate that protects the rest of
+// this flow), so the pencil button never appears otherwise.
+function LeadRow({ lead, onEdit }: { lead: PortalLeadSummary; onEdit?: (lead: PortalLeadSummary) => void }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
@@ -245,36 +248,62 @@ function LeadRow({ lead }: { lead: PortalLeadSummary }) {
       }}>
         {formatBogotaTime(lead.created_at)}
       </span>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit(lead)}
+          title="Corregir nombre, teléfono o monto"
+          aria-label={`Corregir registro de ${lead.nombre_cliente}`}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 22, height: 22, borderRadius: 5, border: 'none', flexShrink: 0,
+            background: 'transparent', color: 'var(--fg-muted)', cursor: 'pointer',
+          }}
+        >
+          <Pencil size={12} />
+        </button>
+      )}
     </div>
   );
 }
 
 function LeadModal({
   tipo,
+  mode = 'add',
+  initial,
   saving,
   error,
   onSubmit,
   onClose,
 }: {
   tipo: PortalLeadTipo;
+  mode?: 'add' | 'edit';
+  initial?: { nombre_cliente: string; numero_contacto: string; monto: number | null };
   saving: boolean;
   error: string;
   onSubmit: (input: { nombre_cliente: string; numero_contacto: string; monto: number | null }) => void;
   onClose: () => void;
 }) {
-  const [nombre, setNombre] = useState('');
-  const [numero, setNumero] = useState('');
-  const [monto, setMonto] = useState('');
+  const [nombre, setNombre] = useState(initial?.nombre_cliente ?? '');
+  const [numero, setNumero] = useState(initial?.numero_contacto ?? '');
+  const [monto, setMonto] = useState(initial?.monto != null ? String(initial.monto) : '');
 
   const isValid = nombre.trim().length > 0 && numero.trim().length > 0 && (tipo !== 'compra' || Number(monto) > 0);
+
+  const titles = {
+    add: { cita: 'Nueva cita', compra: 'Nueva compra' },
+    edit: { cita: 'Editar cita', compra: 'Editar compra' },
+  } as const;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <h2 className="modal-title">{tipo === 'cita' ? 'Nueva cita' : 'Nueva compra'}</h2>
-            <p className="modal-subtitle">Datos de contacto para seguimiento</p>
+            <h2 className="modal-title">{titles[mode][tipo]}</h2>
+            <p className="modal-subtitle">
+              {mode === 'edit' ? 'Corrige los datos de este registro' : 'Datos de contacto para seguimiento'}
+            </p>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
@@ -310,7 +339,7 @@ function LeadModal({
               })
             }
           >
-            Guardar
+            {mode === 'edit' ? 'Guardar cambios' : 'Guardar'}
           </PrimaryButton>
         </div>
       </div>
@@ -342,6 +371,7 @@ export function ClientPortalPublicPage() {
   const [notaText, setNotaText] = useState('');
 
   const [leadModal, setLeadModal] = useState<{ adId: string; tipo: PortalLeadTipo } | null>(null);
+  const [editingLead, setEditingLead] = useState<PortalLeadSummary | null>(null);
   const [leadSaving, setLeadSaving] = useState(false);
   const [leadError, setLeadError] = useState('');
   const [leadBusy, setLeadBusy] = useState<Record<string, boolean>>({});
@@ -554,6 +584,32 @@ export function ClientPortalPublicPage() {
       void reloadSalesTotals();
     } else {
       setLeadError(result.error ?? 'No se pudo guardar el registro.');
+    }
+  };
+
+  // Corrects an existing lead in place — never touches citas/compras counts
+  // (tipo doesn't change), so no applyEntryUpdate here. reloadSalesTotals()
+  // still matters: editing a compra's monto changes daily_sales via the
+  // recalc trigger.
+  const handleEditLeadSubmit = async (input: { nombre_cliente: string; numero_contacto: string; monto: number | null }) => {
+    if (!slug || !editingLead) return;
+    setLeadSaving(true);
+    setLeadError('');
+    const result = await editPortalLead({
+      slug,
+      pin: pinRegistro,
+      lead_id: editingLead.id,
+      nombre_cliente: input.nombre_cliente,
+      numero_contacto: input.numero_contacto,
+      monto: input.monto,
+    });
+    setLeadSaving(false);
+    if (result.data) {
+      setEditingLead(null);
+      void reloadLeads();
+      void reloadSalesTotals();
+    } else {
+      setLeadError(result.error ?? 'No se pudo guardar el cambio.');
     }
   };
 
@@ -824,11 +880,14 @@ export function ClientPortalPublicPage() {
                 const count = adCountByDate.get(key) ?? 0;
                 const intensity = count > 0 ? 0.15 + 0.55 * (count / maxAdCount) : 0;
                 const isSelected = key === selectedDate;
+                const hasSale = (salesByDate[key] ?? 0) > 0;
                 return (
                   <button
                     key={key}
                     onClick={() => setSelectedDate(key)}
+                    title={hasSale ? 'Venta registrada este día' : undefined}
                     style={{
+                      position: 'relative',
                       aspectRatio: '1', borderRadius: 6, border: isSelected ? '2px solid var(--cyan)' : '1px solid var(--border)',
                       background: count > 0 ? `oklch(0.72 0.15 200 / ${intensity})` : 'var(--surface-2)',
                       opacity: inMonth ? 1 : 0.35, cursor: 'pointer',
@@ -838,6 +897,12 @@ export function ClientPortalPublicPage() {
                   >
                     <span>{day}</span>
                     {count > 0 && <span style={{ fontSize: '0.44rem', color: 'var(--fg-muted)' }}>{count}</span>}
+                    {hasSale && (
+                      <span style={{
+                        position: 'absolute', top: 2, right: 2, width: 5, height: 5, borderRadius: '50%',
+                        background: 'var(--success)', boxShadow: '0 0 0 1px var(--surface-2)',
+                      }} />
+                    )}
                   </button>
                 );
               })}
@@ -1120,7 +1185,7 @@ export function ClientPortalPublicPage() {
                         {dateKey === todayKey ? `Hoy · ${label}` : label}
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {withAd.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                        {withAd.map((lead) => <LeadRow key={lead.id} lead={lead} onEdit={setEditingLead} />)}
                       </div>
                       {sinAnuncio.length > 0 && (
                         <div style={{ marginTop: withAd.length > 0 ? 12 : 0 }}>
@@ -1128,7 +1193,7 @@ export function ClientPortalPublicPage() {
                             {SIN_ANUNCIO_LABEL}
                           </p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {sinAnuncio.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                            {sinAnuncio.map((lead) => <LeadRow key={lead.id} lead={lead} onEdit={setEditingLead} />)}
                           </div>
                         </div>
                       )}
@@ -1138,7 +1203,7 @@ export function ClientPortalPublicPage() {
                             {VENTA_DIRECTA_LABEL}
                           </p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {ventaDirecta.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                            {ventaDirecta.map((lead) => <LeadRow key={lead.id} lead={lead} onEdit={setEditingLead} />)}
                           </div>
                         </div>
                       )}
@@ -1248,6 +1313,22 @@ export function ClientPortalPublicPage() {
           error={leadError}
           onSubmit={(input) => void handleLeadModalSubmit(input)}
           onClose={() => { setLeadModal(null); setLeadError(''); }}
+        />
+      )}
+
+      {editingLead && (
+        <LeadModal
+          tipo={editingLead.tipo}
+          mode="edit"
+          initial={{
+            nombre_cliente: editingLead.nombre_cliente,
+            numero_contacto: editingLead.numero_contacto,
+            monto: editingLead.monto,
+          }}
+          saving={leadSaving}
+          error={leadError}
+          onSubmit={(input) => void handleEditLeadSubmit(input)}
+          onClose={() => { setEditingLead(null); setLeadError(''); }}
         />
       )}
     </div>

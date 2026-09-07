@@ -486,6 +486,7 @@ export type PortalLeadSummary = {
   tipo: PortalLeadTipo;
   nombre_cliente: string;
   numero_contacto: string;
+  monto: number | null;
   created_at: string;
   // The campaign_id of the portal_daily_entries row this lead was recorded
   // against — a real ad_id, PORTAL_NO_AD_CAMPAIGN_ID, or null for older rows
