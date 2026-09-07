@@ -30,6 +30,14 @@ export const PORTAL_NOTE_CAMPAIGN_ID = '__nota_general__';
 // campaign_id already); only the public page's own display logic checks it.
 export const PORTAL_NO_AD_CAMPAIGN_ID = '__sin_anuncio__';
 
+// Sentinel campaign_id for a sale with no lead at all — the customer walked
+// into the physical store with zero prior digital contact (no ad, no
+// organic message), as opposed to PORTAL_NO_AD_CAMPAIGN_ID which is still a
+// lead that wrote in, just not traceable to a specific tracked ad. Kept as a
+// distinct bucket on purpose so "came from traffic but didn't message" and
+// "never had any digital contact" don't get merged into one number.
+export const PORTAL_WALK_IN_CAMPAIGN_ID = '__venta_directa__';
+
 function slugifyName(value: string): string {
   return value
     .normalize('NFD')
@@ -472,16 +480,6 @@ export async function savePortalDailyNote(input: {
   nota: string;
 }): Promise<PortalApiResult<PortalDailyEntry>> {
   return portalApi<PortalDailyEntry>('save-daily-note', input);
-}
-
-export async function savePortalSale(input: {
-  slug: string;
-  pin: string;
-  client_id: string;
-  date: string;
-  total_sales: number;
-}): Promise<PortalApiResult<{ id: string }>> {
-  return portalApi<{ id: string }>('save-sale', input);
 }
 
 export async function listPortalLeadsForPortal(input: {

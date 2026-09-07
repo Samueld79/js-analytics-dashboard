@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { CalendarCheck, ChevronLeft, ChevronRight, Globe, ImageIcon, Lock, Minus, Phone, Plus, ShoppingBag, Unlock, Video } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, Globe, ImageIcon, Lock, Minus, Phone, Plus, Store, Video } from 'lucide-react';
 import { GlassCard } from '../components/ui-custom/GlassCard';
 import { PortalCreativeThumb } from '../components/PortalCreativeThumb';
 import { PrimaryButton } from '../components/ui-custom/PrimaryButton';
@@ -17,10 +17,10 @@ import {
   listPublicPortalObjectionTally,
   PORTAL_NO_AD_CAMPAIGN_ID,
   PORTAL_NOTE_CAMPAIGN_ID,
+  PORTAL_WALK_IN_CAMPAIGN_ID,
   removePortalLead,
   resolvePortalSlug,
   savePortalDailyNote,
-  savePortalSale,
   validatePortalPin,
   type PortalResolveResult,
 } from '../services/portal';
@@ -35,7 +35,6 @@ import {
   type PortalObjectionTally,
   type PortalTallyTipo,
 } from '../lib/supabase';
-import { formatCop } from '../lib/utils';
 
 const DAYS_OF_WEEK = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
@@ -90,26 +89,16 @@ function monthLabel(d: Date): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-const RECENT_SALE_DAYS = 10;
-
 // Display label for citas/compras registered under PORTAL_NO_AD_CAMPAIGN_ID
 // — shown wherever those would otherwise sit next to real ad/conjunto names
 // (Resumen de efectividad, Seguimiento), so they read as a deliberate bucket
 // rather than a stray or missing ad.
 const SIN_ANUNCIO_LABEL = 'Sin anuncio / Tráfico';
 
-// Builds the last `count` days ending on `todayKey` (a Bogota YYYY-MM-DD
-// key) — anchored to that key rather than `new Date()` so it stays
-// consistent with getBogotaTodayKey() regardless of device timezone.
-function buildRecentDays(count: number, todayKey: string): Array<{ key: string; day: number; weekday: string }> {
-  const [y, m, d] = todayKey.split('-').map(Number);
-  const anchor = new Date(y, m - 1, d);
-  return Array.from({ length: count }, (_, i) => {
-    const day = new Date(anchor);
-    day.setDate(anchor.getDate() - (count - 1 - i));
-    return { key: toDateKey(day), day: day.getDate(), weekday: DAYS_OF_WEEK[(day.getDay() + 6) % 7] };
-  });
-}
+// Same idea for PORTAL_WALK_IN_CAMPAIGN_ID — a sale with zero prior digital
+// contact, kept visibly separate from SIN_ANUNCIO_LABEL (that one is still a
+// lead who wrote in, just not attributable to one tracked ad).
+const VENTA_DIRECTA_LABEL = 'Venta directa en tienda';
 
 function buildMonthGrid(monthDate: Date): Array<{ key: string; day: number; inMonth: boolean }> {
   const year = monthDate.getFullYear();
@@ -346,13 +335,6 @@ export function ClientPortalPublicPage() {
   const [pinRegistro, setPinRegistro] = useState('');
   const [pinRegistroInput, setPinRegistroInput] = useState('');
   const [pinRegistroError, setPinRegistroError] = useState('');
-  const [pinVentas, setPinVentas] = useState('');
-  const [pinVentasInput, setPinVentasInput] = useState('');
-  const [pinVentasError, setPinVentasError] = useState('');
-  const [saleDate, setSaleDate] = useState(() => getBogotaTodayKey());
-  const [saleAmount, setSaleAmount] = useState('');
-  const [savingSale, setSavingSale] = useState(false);
-  const [lastSavedAmount, setLastSavedAmount] = useState<number | null>(null);
 
   const [leadEntriesState, setLeadEntriesState] = useState<Record<string, LeadEntryState>>({});
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -372,7 +354,6 @@ export function ClientPortalPublicPage() {
   useEffect(() => {
     if (!slug) return;
     setPinRegistro(sessionStorage.getItem(`portal:${slug}:pin_registro`) ?? '');
-    setPinVentas(sessionStorage.getItem(`portal:${slug}:pin_ventas`) ?? '');
 
     resolvePortalSlug(slug).then(async (result) => {
       if (result.error || !result.data) {
@@ -454,6 +435,8 @@ export function ClientPortalPublicPage() {
     });
     const noAdEntry = dailyEntries.find((e) => e.date === selectedDate && e.campaign_id === PORTAL_NO_AD_CAMPAIGN_ID);
     next[PORTAL_NO_AD_CAMPAIGN_ID] = leadEntryStateFrom(noAdEntry);
+    const walkInEntry = dailyEntries.find((e) => e.date === selectedDate && e.campaign_id === PORTAL_WALK_IN_CAMPAIGN_ID);
+    next[PORTAL_WALK_IN_CAMPAIGN_ID] = leadEntryStateFrom(walkInEntry);
     setLeadEntriesState(next);
   }, [selectedDate, dayRows, dailyEntries]);
 
@@ -478,19 +461,9 @@ export function ClientPortalPublicPage() {
     [salesByDate, currentYear],
   );
 
-  // ── Recent-days sale correction ───────────────────────────────────────────────
-  const recentSaleDays = useMemo(() => buildRecentDays(RECENT_SALE_DAYS, todayKey), [todayKey]);
-  const existingSaleForSelectedDate = salesByDate[saleDate] ?? null;
-
-  useEffect(() => {
-    const existing = salesByDate[saleDate];
-    setSaleAmount(existing != null ? String(existing) : '');
-  }, [saleDate, salesByDate]);
-
   // A client can opt out of the PIN gate entirely (client_portal_settings.pin_required
   // = false) — the flow then behaves exactly as if it were already unlocked.
   const unlockedRegistro = portal?.pin_required === false || pinRegistro.length === 4;
-  const unlockedVentas = portal?.pin_required === false || pinVentas.length === 4;
 
   const handleUnlockRegistro = async () => {
     if (!slug) return;
@@ -501,18 +474,6 @@ export function ClientPortalPublicPage() {
       setPinRegistro(pinRegistroInput);
     } else {
       setPinRegistroError('PIN incorrecto.');
-    }
-  };
-
-  const handleUnlockVentas = async () => {
-    if (!slug) return;
-    setPinVentasError('');
-    const result = await validatePortalPin(slug, pinVentasInput, 'ventas');
-    if (result.data?.valid) {
-      sessionStorage.setItem(`portal:${slug}:pin_ventas`, pinVentasInput);
-      setPinVentas(pinVentasInput);
-    } else {
-      setPinVentasError('PIN incorrecto.');
     }
   };
 
@@ -530,6 +491,16 @@ export function ClientPortalPublicPage() {
   useEffect(() => {
     void reloadLeads();
   }, [unlockedRegistro, slug, pinRegistro]);
+
+  // daily_sales.total_sales is now derived server-side (a trigger recomputes
+  // it from portal_leads on every insert/update/delete) — refetch it after any
+  // compra add/remove so PortalIndicators reflects the new total immediately,
+  // instead of only after a page reload.
+  const reloadSalesTotals = async () => {
+    if (!portal) return;
+    const sales = await listPublicPortalDailySales(portal.client_id);
+    setSalesByDate(Object.fromEntries(sales.map((s) => [s.date, s.total_sales])));
+  };
 
   const leadsByDate = useMemo(() => {
     const map = new Map<string, PortalLeadSummary[]>();
@@ -580,6 +551,7 @@ export function ClientPortalPublicPage() {
       applyEntryUpdate(adId, result.data.daily_entry);
       setLeadModal(null);
       void reloadLeads();
+      void reloadSalesTotals();
     } else {
       setLeadError(result.error ?? 'No se pudo guardar el registro.');
     }
@@ -601,6 +573,7 @@ export function ClientPortalPublicPage() {
     if (result.data) {
       applyEntryUpdate(adId, result.data.daily_entry);
       void reloadLeads();
+      void reloadSalesTotals();
     } else if (result.error) {
       alert(result.error);
     }
@@ -663,28 +636,6 @@ export function ClientPortalPublicPage() {
     scheduleNoteSave(value);
   };
 
-  const handleRegisterSale = async () => {
-    if (!slug || !portal) return;
-    const amount = Number(saleAmount);
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    setSavingSale(true);
-    setLastSavedAmount(null);
-    const result = await savePortalSale({
-      slug,
-      pin: pinVentas,
-      client_id: portal.client_id,
-      date: saleDate,
-      total_sales: amount,
-    });
-    setSavingSale(false);
-    if (result.data) {
-      setLastSavedAmount(amount);
-      setSalesByDate((prev) => ({ ...prev, [saleDate]: amount }));
-    } else if (result.error) {
-      alert(result.error);
-    }
-  };
-
   // ── Summary by adset_name (real Meta conjunto) — scoped to the calendar month ─
   // Each conjunto row also carries its individual ads (keyed by ad_id, so two
   // ads named the same in different conjuntos never collide) for the accordion.
@@ -726,11 +677,18 @@ export function ClientPortalPublicPage() {
     dailyEntries
       .filter((e) => e.campaign_id !== PORTAL_NOTE_CAMPAIGN_ID && e.date.startsWith(summaryMonthKey)) // day-level note, not a per-ad row
       .forEach((e) => {
-        // "Sin anuncio" gets its own bucket, kept separate from real
-        // conjuntos/ads and from the generic "Sin conjunto asignado"
-        // fallback — no per-ad sub-row for it, the bucket total IS the row.
+        // "Sin anuncio" and "Venta directa" each get their own bucket, kept
+        // separate from real conjuntos/ads and from the generic "Sin
+        // conjunto asignado" fallback — no per-ad sub-row for either, the
+        // bucket total IS the row.
         if (e.campaign_id === PORTAL_NO_AD_CAMPAIGN_ID) {
           const conjuntoRow = getConjuntoRow(SIN_ANUNCIO_LABEL);
+          conjuntoRow.citas += e.citas;
+          conjuntoRow.compras += e.compras;
+          return;
+        }
+        if (e.campaign_id === PORTAL_WALK_IN_CAMPAIGN_ID) {
+          const conjuntoRow = getConjuntoRow(VENTA_DIRECTA_LABEL);
           conjuntoRow.citas += e.citas;
           conjuntoRow.compras += e.compras;
           return;
@@ -1055,6 +1013,53 @@ export function ClientPortalPublicPage() {
                   </div>
                 );
               })()}
+
+              {/* ── Venta directa en tienda — cero contacto digital previo (no
+                   escribió, no vino de ningún anuncio). Distinta de "Sin anuncio /
+                   Tráfico" (esa sí es un lead que escribió) — mismo patrón de
+                   campaign_id centinela, bucket separado a propósito. ── */}
+              {(() => {
+                const walkInEntry = leadEntriesState[PORTAL_WALK_IN_CAMPAIGN_ID] ?? leadEntryStateFrom(undefined);
+                return (
+                  <div style={{ display: 'flex', gap: 12, padding: '12px 0' }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 8, flexShrink: 0,
+                      background: 'var(--surface-2)', border: '1px dashed var(--border)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Store size={18} style={{ color: 'var(--fg-muted)' }} />
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--fg)' }}>{VENTA_DIRECTA_LABEL}</span>
+                        <span style={{ fontSize: '0.62rem', padding: '2px 7px', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--fg-muted)' }}>
+                          Sin lead previo
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(90px, 1fr))', gap: 8, marginTop: 8 }}>
+                        <LeadCounterStepper
+                          label="Citas"
+                          value={walkInEntry.citas}
+                          disabled={!unlockedRegistro}
+                          busy={leadBusy[`${PORTAL_WALK_IN_CAMPAIGN_ID}:cita`] ?? false}
+                          onIncrement={() => handleLeadIncrementClick(PORTAL_WALK_IN_CAMPAIGN_ID, 'cita')}
+                          onDecrement={() => void handleLeadDecrement(PORTAL_WALK_IN_CAMPAIGN_ID, 'cita')}
+                        />
+                        <LeadCounterStepper
+                          label="Compras"
+                          value={walkInEntry.compras}
+                          disabled={!unlockedRegistro}
+                          busy={leadBusy[`${PORTAL_WALK_IN_CAMPAIGN_ID}:compra`] ?? false}
+                          onIncrement={() => handleLeadIncrementClick(PORTAL_WALK_IN_CAMPAIGN_ID, 'compra')}
+                          onDecrement={() => void handleLeadDecrement(PORTAL_WALK_IN_CAMPAIGN_ID, 'compra')}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
         </GlassCard>
 
@@ -1100,10 +1105,12 @@ export function ClientPortalPublicPage() {
                 {leadsByDate.map(([dateKey, leads]) => {
                   const raw = new Date(`${dateKey}T00:00:00`).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
                   const label = raw.charAt(0).toUpperCase() + raw.slice(1);
-                  // Leads without a tracked ad get their own visible sub-group —
-                  // never interleaved anonymously with the ones tied to a real ad.
-                  const withAd = leads.filter((l) => l.campaign_id !== PORTAL_NO_AD_CAMPAIGN_ID);
-                  const withoutAd = leads.filter((l) => l.campaign_id === PORTAL_NO_AD_CAMPAIGN_ID);
+                  // Three visibly separate sub-groups per day — never interleave
+                  // a real-ad lead, a "wrote in but no specific ad" one, and a
+                  // "zero digital contact" one anonymously under the same list.
+                  const withAd = leads.filter((l) => l.campaign_id !== PORTAL_NO_AD_CAMPAIGN_ID && l.campaign_id !== PORTAL_WALK_IN_CAMPAIGN_ID);
+                  const sinAnuncio = leads.filter((l) => l.campaign_id === PORTAL_NO_AD_CAMPAIGN_ID);
+                  const ventaDirecta = leads.filter((l) => l.campaign_id === PORTAL_WALK_IN_CAMPAIGN_ID);
                   return (
                     <div key={dateKey}>
                       <p style={{
@@ -1115,13 +1122,23 @@ export function ClientPortalPublicPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {withAd.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
                       </div>
-                      {withoutAd.length > 0 && (
+                      {sinAnuncio.length > 0 && (
                         <div style={{ marginTop: withAd.length > 0 ? 12 : 0 }}>
                           <p style={{ margin: '0 0 6px', fontSize: '0.58rem', color: 'var(--fg-muted)', fontStyle: 'italic' }}>
                             {SIN_ANUNCIO_LABEL}
                           </p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {withoutAd.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                            {sinAnuncio.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                          </div>
+                        </div>
+                      )}
+                      {ventaDirecta.length > 0 && (
+                        <div style={{ marginTop: (withAd.length > 0 || sinAnuncio.length > 0) ? 12 : 0 }}>
+                          <p style={{ margin: '0 0 6px', fontSize: '0.58rem', color: 'var(--fg-muted)', fontStyle: 'italic' }}>
+                            {VENTA_DIRECTA_LABEL}
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {ventaDirecta.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
                           </div>
                         </div>
                       )}
@@ -1134,7 +1151,7 @@ export function ClientPortalPublicPage() {
         )}
 
         {/* ── 4. Resumen de efectividad — agrupado por conjunto real de Meta (adset_name) ── */}
-        <GlassCard style={{ padding: 20 }}>
+        <GlassCard style={{ padding: 20, marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>
               Resumen de efectividad
@@ -1221,88 +1238,6 @@ export function ClientPortalPublicPage() {
           </div>
         </GlassCard>
 
-        {/* ── 5. Registrar o corregir venta ── */}
-        <GlassCard style={{ padding: 20, marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <ShoppingBag size={15} style={{ color: 'var(--success)' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>Registrar o corregir venta</span>
-          </div>
-
-          {!unlockedVentas ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
-              background: 'var(--success-dim)', border: '1px solid var(--success)', flexWrap: 'wrap',
-            }}>
-              <Lock size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.76rem', color: 'var(--fg)' }}>Ingresa el PIN de ventas</span>
-              <input
-                className="form-input"
-                value={pinVentasInput}
-                maxLength={4}
-                inputMode="numeric"
-                placeholder="0000"
-                onChange={(e) => setPinVentasInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                style={{ width: 90, padding: '6px 10px', fontFamily: 'JetBrains Mono' }}
-              />
-              <PrimaryButton size="sm" onClick={handleUnlockVentas} disabled={pinVentasInput.length !== 4}>
-                Desbloquear
-              </PrimaryButton>
-              {pinVentasError && <span style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>{pinVentasError}</span>}
-            </div>
-          ) : (
-            <div>
-              <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 8 }}>
-                Elige el día
-              </span>
-              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, marginBottom: 12 }}>
-                {recentSaleDays.map((d) => {
-                  const hasSale = salesByDate[d.key] != null;
-                  const isSelected = d.key === saleDate;
-                  return (
-                    <button
-                      key={d.key}
-                      type="button"
-                      onClick={() => { setSaleDate(d.key); setLastSavedAmount(null); }}
-                      style={{
-                        flexShrink: 0, minWidth: 42, padding: '6px 4px 8px', borderRadius: 8, cursor: 'pointer',
-                        border: isSelected ? '2px solid var(--success)' : '1px solid var(--border)',
-                        background: hasSale ? 'var(--success-dim)' : 'var(--surface-2)',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                      }}
-                    >
-                      <span style={{ fontSize: '0.5rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>{d.weekday}</span>
-                      <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--fg)' }}>{d.day}</span>
-                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: hasSale ? 'var(--success)' : 'transparent' }} />
-                    </button>
-                  );
-                })}
-              </div>
-
-              {existingSaleForSelectedDate != null && (
-                <p style={{ margin: '0 0 10px', fontSize: '0.74rem', color: 'var(--fg-muted)' }}>
-                  Ya tienes <strong style={{ color: 'var(--fg)' }}>{formatCop(existingSaleForSelectedDate)}</strong> registrado para este día. ¿Quieres corregirlo?
-                </p>
-              )}
-
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <Unlock size={14} style={{ color: 'var(--success)' }} />
-                <input
-                  className="form-input"
-                  type="number"
-                  min={0}
-                  placeholder="Monto de la venta"
-                  value={saleAmount}
-                  onChange={(e) => setSaleAmount(e.target.value)}
-                  style={{ flex: 1, minWidth: 160 }}
-                />
-                <PrimaryButton onClick={handleRegisterSale} loading={savingSale} disabled={!saleAmount}>
-                  {existingSaleForSelectedDate != null ? 'Guardar corrección' : 'Registrar'}
-                </PrimaryButton>
-                {lastSavedAmount != null && <span style={{ fontSize: '0.76rem', color: 'var(--success)' }}>Guardado {formatCop(lastSavedAmount)}</span>}
-              </div>
-            </div>
-          )}
-        </GlassCard>
         </div>
       </div>
 
