@@ -385,6 +385,19 @@ export type DailySale = {
 
 export type DailySaleInput = Omit<DailySale, 'id' | 'created_at' | 'updated_at'>;
 
+// One row per (client_id, month) — month is always the first of the month.
+// Configured ahead of time, independent of whether daily_sales/ad_campaign_metrics
+// have any rows yet for that month.
+export type MonthlySalesTarget = {
+  id: string;
+  client_id: string;
+  month: string;
+  sales_goal: number;
+  budget_goal: number;
+  created_at: string;
+  updated_at: string;
+};
+
 // ── Portal Cliente ────────────────────────────────────────────────────────────
 
 export type ClientPortalSettings = {

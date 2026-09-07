@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
+import { useMonthlySalesTargets } from '../hooks/useMonthlySalesTargets';
 import { useCampaignSummary } from '../hooks/useData';
 import {
   aggregateCampaignMetricsByMonth,
@@ -32,6 +33,20 @@ import { formatCop, formatNumber, getDateKey, sumSales } from '../lib/utils';
 import { getMonthLabel } from '../utils/monthLabel';
 
 const EMPTY_SCOPE = '00000000-0000-0000-0000-000000000000';
+
+// How many months past the current one are always selectable in the period
+// picker, even with zero sales/ad spend recorded yet — a monthly_sales_target
+// configured ahead of time must be pickable before any activity exists for it.
+const MONTHS_AHEAD = 3;
+
+// `count` consecutive YYYY-MM keys starting at `todayKey`'s month (YYYY-MM-DD).
+function monthKeysFrom(todayKey: string, count: number): string[] {
+  const [y, m] = todayKey.split('-').map(Number);
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(y, m - 1 + i, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+}
 
 function shortMonth(monthKey: string): string {
   const [year, month] = monthKey.split('-');
@@ -148,6 +163,7 @@ export function SalesPage() {
     { clientId: accessQueryId, days: 730 },
   );
   const { rows: allCampaignRows } = useCampaignSummary(accessQueryId, 730);
+  const { targets: allSalesTargets } = useMonthlySalesTargets(accessQueryId);
 
   // ── in-memory filter by UI-selected client ────────────────────────────────
   const selectedClientId = selectedClient === 'all' ? undefined : selectedClient;
@@ -175,16 +191,37 @@ export function SalesPage() {
     () => aggregateCampaignMetricsByMonth(filteredCampaignRows),
     [filteredCampaignRows],
   );
+  const filteredSalesTargets = useMemo(
+    () =>
+      selectedClientId
+        ? allSalesTargets.filter((t) => t.client_id === selectedClientId)
+        : allSalesTargets,
+    [allSalesTargets, selectedClientId],
+  );
 
-  // ── available periods: union of campaign months + sales months ────────────
-  const availableMonths = useMemo(() => {
+  // Months with actual activity (sales or ad spend) — used only to pick the
+  // default period, so opening the page still lands on the latest month with
+  // real numbers rather than an empty future one.
+  const monthsWithData = useMemo(() => {
     const set = new Set<string>();
     campaignByMonth.forEach((m) => set.add(m.month));
     clientFilteredSales.forEach((s) => set.add(s.date.slice(0, 7)));
     return [...set].sort();
   }, [campaignByMonth, clientFilteredSales]);
 
-  const activePeriod = selectedPeriod ?? availableMonths[availableMonths.length - 1] ?? '';
+  // ── available periods for the picker: activity months + configured target
+  // months (monthly_sales_targets) + current month and a few ahead — a target
+  // set up for a future month must be selectable before any sales/spend
+  // exist for it, not just months that already have data loaded.
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>(monthsWithData);
+    filteredSalesTargets.forEach((t) => set.add(t.month.slice(0, 7)));
+    monthKeysFrom(today, MONTHS_AHEAD + 1).forEach((k) => set.add(k));
+    return [...set].sort();
+  }, [monthsWithData, filteredSalesTargets, today]);
+
+  const currentMonthKey = today.slice(0, 7);
+  const activePeriod = selectedPeriod ?? monthsWithData[monthsWithData.length - 1] ?? currentMonthKey;
 
   // ── period-filtered data ──────────────────────────────────────────────────
   const periodSales = useMemo(() => {
