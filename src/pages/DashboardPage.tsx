@@ -9,11 +9,12 @@ import {
 } from 'recharts';
 import { motion, type Transition } from 'framer-motion';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+// import { Link } from 'react-router-dom'; // only used by the disabled Alertas/Área de Trabajo widgets below
 import {
-  AlertTriangle,
   Banknote,
-  BarChart3,
+  // AlertTriangle, BarChart3, Zap — only used by the disabled Alertas/Área de
+  // Trabajo dashboard widgets below; restore these when re-enabling those
+  // nav sections (see also src/components/Sidebar.tsx and src/App.tsx).
   ChevronDown,
   DollarSign,
   MessageCircle,
@@ -21,10 +22,9 @@ import {
   Users,
   CheckCircle,
   AlertCircle,
-  Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useAlerts } from '../hooks/useAlerts';
+// import { useAlerts } from '../hooks/useAlerts'; // disabled with the Alertas nav section
 import { useAuth } from '../hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { useDailySales } from '../hooks/useDailySales';
@@ -43,7 +43,7 @@ import { HiddenClientsMenu } from '../components/dashboard/HiddenClientsMenu';
 import { useClientDashboardData } from '../hooks/useClientDashboardData';
 import {
   formatCop,
-  isAlertSnoozed,
+  // isAlertSnoozed, // only used by the disabled Alertas widgets below
   sumMetrics,
   sumSales,
 } from '../lib/utils';
@@ -98,7 +98,7 @@ export function DashboardPage() {
   // ── Data hooks ────────────────────────────────────────────────────────────────
   const { clients, loading: clientsLoading, setDashboardHidden } = useClients();
   const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
-  const { alerts, unreadCount } = useAlerts();
+  // const { alerts, unreadCount } = useAlerts(); // disabled with the Alertas nav section
   const { tasks } = useTasks();
 
   const scopedClientId =
@@ -132,10 +132,10 @@ export function DashboardPage() {
     () => isInternal ? sales : sales.filter((r) => visibleClientIds.has(r.client_id)),
     [isInternal, sales, visibleClientIds],
   );
-  const scopedAlerts = useMemo(
-    () => isInternal ? alerts : alerts.filter((a) => a.client_id && visibleClientIds.has(a.client_id)),
-    [alerts, isInternal, visibleClientIds],
-  );
+  // const scopedAlerts = useMemo( // disabled with the Alertas nav section
+  //   () => isInternal ? alerts : alerts.filter((a) => a.client_id && visibleClientIds.has(a.client_id)),
+  //   [alerts, isInternal, visibleClientIds],
+  // );
   const scopedTasks = useMemo(
     () => isInternal ? tasks : tasks.filter((t) => t.client_id && visibleClientIds.has(t.client_id)),
     [isInternal, tasks, visibleClientIds],
@@ -172,11 +172,11 @@ export function DashboardPage() {
     [scopedSales, activePeriod],
   );
 
-  // ── Alerts ────────────────────────────────────────────────────────────────────
-  const visibleOpenAlerts = useMemo(
-    () => scopedAlerts.filter((a) => ['unread', 'read'].includes(a.status) && !isAlertSnoozed(a)),
-    [scopedAlerts],
-  );
+  // ── Alerts (disabled with the Alertas nav section) ───────────────────────────
+  // const visibleOpenAlerts = useMemo(
+  //   () => scopedAlerts.filter((a) => ['unread', 'read'].includes(a.status) && !isAlertSnoozed(a)),
+  //   [scopedAlerts],
+  // );
 
   // ── Goal tracking ─────────────────────────────────────────────────────────────
   const currentMonthKey = getCurrentMonthKey();
@@ -307,12 +307,14 @@ export function DashboardPage() {
               {pendingTasks} tarea{pendingTasks !== 1 ? 's' : ''} pendiente{pendingTasks !== 1 ? 's' : ''}
             </span>
           )}
+          {/* Alertas nav section disabled — see Sidebar.tsx / App.tsx
           {unreadCount > 0 && (
             <Link to="/alerts" className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem' }}>
               <AlertTriangle size={13} />
               {unreadCount} alerta{unreadCount !== 1 ? 's' : ''}
             </Link>
           )}
+          */}
           {campaignByMonth.length > 0 && (
             <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
               <select className="dash-period-select" value={activePeriod} onChange={(e) => setSelectedPeriod(e.target.value)}>
@@ -328,6 +330,7 @@ export function DashboardPage() {
             hiddenClients={hiddenClients}
             onShow={(clientId) => setDashboardHidden(clientId, false)}
           />
+          {/* Área de Trabajo nav section disabled — see Sidebar.tsx / App.tsx
           <Link
             to="/ai-tools"
             className="btn-secondary"
@@ -336,6 +339,7 @@ export function DashboardPage() {
             <Zap size={12} />
             Área de Trabajo
           </Link>
+          */}
         </div>
       </motion.div>
 
@@ -578,7 +582,7 @@ export function DashboardPage() {
         )}
       </motion.div>
 
-      {/* ── Open alerts quick summary ── */}
+      {/* ── Open alerts quick summary — disabled with the Alertas nav section
       {visibleOpenAlerts.length > 0 && (
         <motion.div {...fadeUp(0.36)} style={{ padding: '0 24px 24px' }}>
           <Link to="/alerts" style={{ textDecoration: 'none' }}>
@@ -595,6 +599,7 @@ export function DashboardPage() {
           </Link>
         </motion.div>
       )}
+      ── */}
 
     </div>
   );

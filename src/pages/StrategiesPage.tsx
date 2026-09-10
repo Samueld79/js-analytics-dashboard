@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Calendar, ChevronDown, ChevronUp, Plus, Sparkles, Trash2 } from 'lucide-react';
+// import { useNavigate } from 'react-router-dom'; // only used by the disabled "AI Tools" entry points below
+import { useSearchParams } from 'react-router-dom';
+import { Calendar, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+// Sparkles — only used by the disabled "Crear con AI Tools" button below;
+// restore alongside re-enabling the Área de Trabajo nav section.
 import { StrategyDetailModal } from '../components/StrategyDetailModal';
 import { StrategyFormModal } from '../components/StrategyFormModal';
 import { useAuth } from '../hooks/useAuth';
@@ -66,7 +69,7 @@ const CAL_BTN_STYLE: React.CSSProperties = {
 };
 
 export function StrategiesPage() {
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // only used by the disabled "AI Tools" entry points below
   const { clients } = useClients();
   const { isInternal, accessibleClientIds, defaultClientId } = useAuth();
   const visibleClients = useMemo(
@@ -512,6 +515,7 @@ export function StrategiesPage() {
         <div className="header-actions">
           {isInternal ? (
             <>
+              {/* "Crear con AI Tools" disabled with the Área de Trabajo nav section
               <button
                 className="btn-ghost"
                 onClick={() => {
@@ -522,6 +526,7 @@ export function StrategiesPage() {
               >
                 <Sparkles size={15} /> Crear con AI Tools
               </button>
+              */}
               <button
                 className="btn-primary"
                 onClick={() => {
@@ -538,7 +543,7 @@ export function StrategiesPage() {
         </div>
       </div>
 
-      {/* AI Tools banner — visible solo para internos */}
+      {/* AI Tools banner — disabled with the Área de Trabajo nav section
       {isInternal && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -570,6 +575,7 @@ export function StrategiesPage() {
           </button>
         </div>
       )}
+      */}
 
       {/* Client filter pills */}
       <div className="filter-row">

@@ -519,10 +519,9 @@ export function DashboardClientPage() {
           }}>
             {!kit ? (
               <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono' }}>
-                No hay Kit de Marca configurado para este cliente.{' '}
-                <Link to="/ai-tools/kit" style={{ color: 'var(--color-accent-cyan)', textDecoration: 'none' }}>
-                  Crear en Área de Trabajo →
-                </Link>
+                {/* El link a "Crear en Área de Trabajo" se quitó junto con esa
+                    sección de la navegación — ver Sidebar.tsx / App.tsx. */}
+                No hay Kit de Marca configurado para este cliente.
               </p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>

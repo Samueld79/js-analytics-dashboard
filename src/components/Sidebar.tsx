@@ -7,8 +7,9 @@ import {
   BarChart2,
   TrendingUp,
   ClipboardList,
-  Bell,
-  Calendar,
+  // Bell, Calendar, Sparkles, Smile — only used by the disabled Alertas/
+  // Calendario/Área de Trabajo/Satisfacción nav entries below; restore when
+  // re-enabling them.
   Settings,
   ChevronRight,
   LockKeyhole,
@@ -19,9 +20,7 @@ import {
   X,
   Sun,
   Moon,
-  Sparkles,
   Share2,
-  Smile,
 } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useAuth } from '../hooks/useAuth';
@@ -34,15 +33,19 @@ type NavItem = {
   badge?: boolean;
 };
 
+// Calendario, Satisfacción, Alertas y Área de Trabajo deshabilitadas
+// temporalmente (sin uso) — las rutas siguen comentadas en App.tsx y los
+// componentes/tablas de Supabase no se tocaron. Para reactivar una sección,
+// descomenta su línea aquí y el ícono correspondiente en el import de arriba.
 const INTERNAL_NAV: NavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Clientes' },
-  { to: '/calendar', icon: Calendar, label: 'Calendario' },
+  // { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
   { to: '/portal-cliente', icon: Share2, label: 'Portal Cliente' },
-  { to: '/satisfaccion', icon: Smile, label: 'Satisfacción' },
-  { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
-  { to: '/ai-tools', icon: Sparkles, label: 'Área de Trabajo' },
+  // { to: '/satisfaccion', icon: Smile, label: 'Satisfacción' },
+  // { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
+  // { to: '/ai-tools', icon: Sparkles, label: 'Área de Trabajo' },
 ];
 
 const CLIENT_NAV: NavItem[] = [

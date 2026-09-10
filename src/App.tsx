@@ -9,18 +9,22 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { isSupabaseConfigured } from './lib/supabase';
 import { formatDateTime, roleLabel } from './lib/utils';
 import { LoginPage } from './pages/LoginPage';
-import { AlertsPage } from './pages/AlertsPage';
+// Alertas, Calendario, Área de Trabajo y Satisfacción están deshabilitadas
+// temporalmente (sin uso) — ver también src/components/Sidebar.tsx. Los
+// componentes/tablas de Supabase no se tocaron; para reactivar una sección,
+// descomenta su import aquí y su <Route> más abajo.
+// import { AlertsPage } from './pages/AlertsPage';
 import { ClientDetailPage } from './pages/ClientDetailPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MetricsPage } from './pages/MetricsPage';
 import { SalesPage } from './pages/SalesPage';
 import { StrategiesPage } from './pages/StrategiesPage';
-import { CalendarPage } from './pages/CalendarPage';
-import { AIToolsPage } from './pages/ai-tools/AIToolsPage';
+// import { CalendarPage } from './pages/CalendarPage';
+// import { AIToolsPage } from './pages/ai-tools/AIToolsPage';
 import { DashboardClientPage } from './pages/DashboardClientPage';
 import { PortalClientAdminPage } from './pages/PortalClientAdminPage';
-import { SatisfactionPage } from './pages/SatisfactionPage';
+// import { SatisfactionPage } from './pages/SatisfactionPage';
 import { ClientPortalPublicPage } from './pages/ClientPortalPublicPage';
 import { PulsePublicPage } from './pages/PulsePublicPage';
 import { SplashScreen } from './components/SplashScreen';
@@ -105,11 +109,11 @@ function AppContent() {
       <Route path="/metrics" element={<RequireSignedIn><MetricsPage /></RequireSignedIn>} />
       <Route path="/sales" element={<RequireSignedIn><SalesPage /></RequireSignedIn>} />
       <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
-      <Route path="/calendar" element={<RequireInternal><CalendarPage /></RequireInternal>} />
+      {/* <Route path="/calendar" element={<RequireInternal><CalendarPage /></RequireInternal>} /> */}
       <Route path="/portal-cliente" element={<RequireInternal><PortalClientAdminPage /></RequireInternal>} />
-      <Route path="/satisfaccion" element={<RequireInternal><SatisfactionPage /></RequireInternal>} />
-      <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} />
-      <Route path="/ai-tools/*" element={<RequireInternal><AIToolsPage /></RequireInternal>} />
+      {/* <Route path="/satisfaccion" element={<RequireInternal><SatisfactionPage /></RequireInternal>} /> */}
+      {/* <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} /> */}
+      {/* <Route path="/ai-tools/*" element={<RequireInternal><AIToolsPage /></RequireInternal>} /> */}
       <Route path="/settings" element={<RequireSignedIn><SettingsPage /></RequireSignedIn>} />
       <Route path="*" element={<RoleAwareFallback />} />
     </Routes>
