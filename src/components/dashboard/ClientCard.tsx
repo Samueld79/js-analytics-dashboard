@@ -38,6 +38,12 @@ const STATUS_LABEL: Record<string, string> = { active: 'Activo', paused: 'Pausad
 
 const SEP = <div className="client-card-divider" />;
 
+// 52 semanas/año ÷ 12 meses ≈ 4.33 semanas/mes en promedio. Se usa este
+// promedio fijo (en vez de contar las semanas exactas del mes en curso) para
+// que la meta semanal se mantenga simple y estable mes a mes, sin "saltar"
+// solo porque un mes calza con un fin de semana más o menos.
+const AVG_WEEKS_PER_MONTH = 4.33;
+
 // ── Skeleton card ─────────────────────────────────────────────────────────────
 
 export function ClientCardSkeleton() {
@@ -71,6 +77,9 @@ export function ClientCard({ data: d, onHide }: { data: ClientCardData; onHide?:
   const campaignDelta  = d.campaignCountPrev > 0 ? d.campaignCount - d.campaignCountPrev : null;
   const hasGoal        = c.monthly_goal != null && c.monthly_goal > 0;
   const hasAds         = d.monthSpend > 0 || d.campaignCount > 0;
+  // Puramente derivado de monthly_goal — nada que guardar, se recalcula cada
+  // vez que se renderiza la tarjeta.
+  const weeklyGoal      = hasGoal ? c.monthly_goal! / AVG_WEEKS_PER_MONTH : null;
 
   return (
     <Link
@@ -160,7 +169,17 @@ export function ClientCard({ data: d, onHide }: { data: ClientCardData; onHide?:
         {/* ── Meta mensual ── */}
         <div style={{ padding: '12px 18px' }}>
           {hasGoal ? (
-            <ProgressBar current={d.monthlySales} target={c.monthly_goal!} />
+            <>
+              <ProgressBar current={d.monthlySales} target={c.monthly_goal!} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                <span style={{ fontSize: '0.56rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  Meta semanal
+                </span>
+                <span style={{ fontSize: '0.6rem', fontWeight: 600, color: 'var(--color-text-secondary)', fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>
+                  {formatCop(weeklyGoal!)}
+                </span>
+              </div>
+            </>
           ) : (
             <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
               Sin meta definida
