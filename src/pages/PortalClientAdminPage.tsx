@@ -364,20 +364,32 @@ export function PortalClientAdminPage() {
             HABILITA Y CONFIGURA EL PORTAL PÚBLICO DE CADA CLIENTE
           </p>
         </div>
-        {/* Catálogo IVALENT — proyecto independiente de Agency OS (repo, deploy y
-            schema de Supabase propios). Esto es solo un atajo de acceso, no una
-            integración visual ni de datos — por eso no depende del cliente
+        {/* Catálogo + Admin IVALENT — proyecto independiente de Agency OS (repo,
+            deploy y schema de Supabase propios). Son solo atajos de acceso, no
+            una integración visual ni de datos — por eso no dependen del cliente
             seleccionado en el selector de abajo. */}
-        <a
-          href="https://ivalent-catalogo.vercel.app"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem' }}
-        >
-          <ExternalLink size={13} />
-          Catálogo IVALENT
-        </a>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a
+            href="https://ivalent-catalogo.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem' }}
+          >
+            <ExternalLink size={13} />
+            Catálogo IVALENT
+          </a>
+          <a
+            href="https://ivalent-catalogo.vercel.app/admin"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem' }}
+          >
+            <ExternalLink size={13} />
+            Admin IVALENT
+          </a>
+        </div>
       </div>
 
       <div style={{ padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
