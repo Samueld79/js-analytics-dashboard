@@ -130,25 +130,37 @@ export type ClientInput = Omit<
 };
 
 // ── Facturación interna (client_billing) — solo admin, nunca pública ───────────
-
-export type BillingPaymentStatus = 'al_dia' | 'pendiente' | 'vencido' | 'pausado';
+// Simplificada: solo fee mensual (el resto — día de cobro, contrato, "incluye
+// pauta", notas, estado de pago único — se quitó, ver client_billing_payments
+// más abajo para el control de pago mes a mes).
 
 export type ClientBilling = {
   client_id: string;
   monthly_fee: number | null;
   currency: string;
-  billing_day: number | null;
-  contract_start: string | null;
-  contract_end: string | null;
-  payment_status: BillingPaymentStatus;
-  includes_ad_spend: boolean;
-  notes: string | null;
   updated_by?: string | null;
   updated_at: string;
   created_at: string;
 };
 
-export type ClientBillingInput = Omit<ClientBilling, 'updated_at' | 'created_at' | 'updated_by'>;
+export type ClientBillingInput = Pick<ClientBilling, 'client_id' | 'monthly_fee' | 'currency'>;
+
+// ── Estado de pago mensual (client_billing_payments) — solo admin ──────────────
+// Una fila por (client_id, month); month siempre es el día 1 del mes
+// (America/Bogota). Sin fila para un mes => se trata como 'pendiente' en la UI.
+
+export type BillingPaymentMonthStatus = 'pagado' | 'pendiente';
+
+export type ClientBillingPayment = {
+  client_id: string;
+  month: string;
+  status: BillingPaymentMonthStatus;
+  paid_at: string | null;
+  updated_by?: string | null;
+  updated_at: string;
+};
+
+export type ClientBillingPaymentInput = Pick<ClientBillingPayment, 'client_id' | 'month' | 'status' | 'paid_at'>;
 
 // ── Pre-Diagnóstico (client_diagnostics) — interno (is_internal_user) ──────────
 

@@ -5,6 +5,8 @@ import {
   supabase,
   type ClientBilling,
   type ClientBillingInput,
+  type ClientBillingPayment,
+  type ClientBillingPaymentInput,
   type ServiceMutationResult,
 } from '../lib/supabase';
 import { getCurrentUserId } from './serviceHelpers';
@@ -47,4 +49,44 @@ export async function upsertClientBilling(
   }
 
   return { data: (data ?? null) as ClientBilling | null, error: null };
+}
+
+// ── Estado de pago mensual — mismo gate SOLO admin (RLS). Tabla pequeña (un
+// puñado de clientes activos x meses), se trae completa y se filtra en el
+// cliente, igual que listClientBilling de arriba. ──────────────────────────
+
+export async function listClientBillingPayments(): Promise<ClientBillingPayment[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase.from('client_billing_payments').select('*');
+  if (error) {
+    console.error('[billing] listClientBillingPayments', error);
+    return [];
+  }
+
+  return (data ?? []) as ClientBillingPayment[];
+}
+
+export async function upsertClientBillingPayment(
+  input: ClientBillingPaymentInput,
+): Promise<ServiceMutationResult<ClientBillingPayment>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const updated_by = await getCurrentUserId();
+  const payload = { ...input, updated_by };
+
+  const { data, error } = await supabase
+    .from('client_billing_payments')
+    .upsert(payload, { onConflict: 'client_id,month' })
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[billing] upsertClientBillingPayment', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo guardar el estado de pago.') };
+  }
+
+  return { data: (data ?? null) as ClientBillingPayment | null, error: null };
 }

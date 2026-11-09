@@ -1,43 +1,48 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
-import { listClientBilling, upsertClientBilling } from '../services/billing';
+import {
+  listClientBilling,
+  listClientBillingPayments,
+  upsertClientBilling,
+  upsertClientBillingPayment,
+} from '../services/billing';
 import { updateClientAdBudget } from '../services/clients';
-import type { BillingPaymentStatus, ClientBilling } from '../lib/supabase';
+import type { BillingPaymentMonthStatus, ClientBilling, ClientBillingPayment } from '../lib/supabase';
 import { formatCopExact } from '../lib/utils';
+import { getMonthLabel } from '../utils/monthLabel';
 
-const PAYMENT_STATUS_OPTIONS: Array<{ value: BillingPaymentStatus; label: string }> = [
-  { value: 'al_dia', label: 'Al día' },
-  { value: 'pendiente', label: 'Pendiente' },
-  { value: 'vencido', label: 'Vencido' },
-  { value: 'pausado', label: 'Pausado' },
-];
+type StatusFilter = 'active' | 'all';
 
-function paymentStatusStyle(status: BillingPaymentStatus): React.CSSProperties {
-  switch (status) {
-    case 'al_dia':
-      return { background: 'var(--success-dim)', color: 'var(--success)', border: '1px solid var(--success)' };
-    case 'pendiente':
-      return { background: 'var(--warning-dim)', color: 'var(--warning)', border: '1px solid var(--warning)' };
-    case 'vencido':
-      return { background: 'var(--danger-dim)', color: 'var(--danger)', border: '1px solid var(--danger)' };
-    case 'pausado':
-      return { background: 'var(--surface-3)', color: 'var(--fg-muted)', border: '1px solid var(--border)' };
-  }
+// Siempre el 1ro del mes actual en America/Bogota (no la zona del navegador
+// ni del servidor) — Colombia no tiene horario de verano, así que un offset
+// fijo bastaría, pero Intl con timeZone explícito es más a prueba de fallos.
+function getBogotaCurrentMonth(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+  return `${year}-${month}-01`;
 }
 
-// Fila editable local — separa lo que está en client_billing de
-// monthly_ad_budget, que vive en clients (ver migración). Un solo "Guardar"
-// por fila persiste ambas tablas.
+function shiftMonth(monthStr: string, delta: number): string {
+  const [y, m] = monthStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 10);
+}
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Fila editable local — solo fee + presupuesto de pauta (que vive en
+// clients, ver migración original). Un "Guardar" por fila persiste ambas.
 type EditableRow = {
   client_id: string;
   monthly_fee: string;
   monthly_ad_budget: string;
-  payment_status: BillingPaymentStatus;
-  billing_day: string;
-  contract_start: string;
-  contract_end: string;
-  includes_ad_spend: boolean;
-  notes: string;
 };
 
 function toEditableRow(clientId: string, budget: number | null | undefined, billing?: ClientBilling): EditableRow {
@@ -45,40 +50,39 @@ function toEditableRow(clientId: string, budget: number | null | undefined, bill
     client_id: clientId,
     monthly_fee: billing?.monthly_fee != null ? String(billing.monthly_fee) : '',
     monthly_ad_budget: budget != null ? String(budget) : '',
-    payment_status: billing?.payment_status ?? 'al_dia',
-    billing_day: billing?.billing_day != null ? String(billing.billing_day) : '',
-    contract_start: billing?.contract_start ?? '',
-    contract_end: billing?.contract_end ?? '',
-    includes_ad_spend: billing?.includes_ad_spend ?? false,
-    notes: billing?.notes ?? '',
   };
 }
 
 export function FacturacionPage() {
-  const { clients, loading: loadingClients } = useClients();
+  const { clients, loading: loadingClients, reload: reloadClients } = useClients();
   const [billingByClient, setBillingByClient] = useState<Map<string, ClientBilling>>(new Map());
+  const [payments, setPayments] = useState<ClientBillingPayment[]>([]);
   const [loadingBilling, setLoadingBilling] = useState(true);
   const [rows, setRows] = useState<Map<string, EditableRow>>(new Map());
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [togglingPaymentId, setTogglingPaymentId] = useState<string | null>(null);
   const [errorByClient, setErrorByClient] = useState<Map<string, string>>(new Map());
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => getBogotaCurrentMonth());
+
+  async function loadBilling() {
+    setLoadingBilling(true);
+    const [billing, pays] = await Promise.all([listClientBilling(), listClientBillingPayments()]);
+    setBillingByClient(new Map(billing.map((b) => [b.client_id, b])));
+    setPayments(pays);
+    setLoadingBilling(false);
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoadingBilling(true);
-      const data = await listClientBilling();
-      if (cancelled) return;
-      setBillingByClient(new Map(data.map((b) => [b.client_id, b])));
-      setLoadingBilling(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void loadBilling();
   }, []);
 
-  const activeClients = useMemo(
-    () => clients.filter((c) => c.status === 'active').sort((a, b) => a.name.localeCompare(b.name)),
-    [clients],
+  const visibleClients = useMemo(
+    () =>
+      clients
+        .filter((c) => statusFilter === 'all' || c.status === 'active')
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [clients, statusFilter],
   );
 
   // Inicializa las filas editables cuando llegan clientes/facturación, sin
@@ -86,39 +90,57 @@ export function FacturacionPage() {
   useEffect(() => {
     setRows((current) => {
       const next = new Map(current);
-      for (const client of activeClients) {
+      for (const client of visibleClients) {
         if (!next.has(client.id)) {
           next.set(client.id, toEditableRow(client.id, client.monthly_ad_budget, billingByClient.get(client.id)));
         }
       }
       return next;
     });
-  }, [activeClients, billingByClient]);
+  }, [visibleClients, billingByClient]);
+
+  const paymentByClientForMonth = useMemo(() => {
+    const map = new Map<string, ClientBillingPayment>();
+    for (const p of payments) {
+      if (p.month.slice(0, 10) === selectedMonth) map.set(p.client_id, p);
+    }
+    return map;
+  }, [payments, selectedMonth]);
+
+  function paymentStatusFor(clientId: string): BillingPaymentMonthStatus {
+    return paymentByClientForMonth.get(clientId)?.status ?? 'pendiente';
+  }
 
   const totals = useMemo(() => {
-    let monthlyRevenue = 0;
+    let feeExpected = 0;
+    let collected = 0;
+    let pending = 0;
+    let paidCount = 0;
+    let pendingCount = 0;
+    let feeUndefined = 0;
     let adSpendUnderManagement = 0;
-    let feesDefined = 0;
-    let feesPending = 0;
 
-    for (const client of activeClients) {
-      const billing = billingByClient.get(client.id);
-      if (billing?.monthly_fee != null) {
-        monthlyRevenue += billing.monthly_fee;
-        feesDefined += 1;
-      } else {
-        feesPending += 1;
-      }
+    for (const client of visibleClients) {
+      const fee = billingByClient.get(client.id)?.monthly_fee;
       if (client.monthly_ad_budget != null) adSpendUnderManagement += client.monthly_ad_budget;
+
+      if (fee == null) {
+        feeUndefined += 1;
+        continue;
+      }
+      feeExpected += fee;
+      if (paymentStatusFor(client.id) === 'pagado') {
+        collected += fee;
+        paidCount += 1;
+      } else {
+        pending += fee;
+        pendingCount += 1;
+      }
     }
 
-    return {
-      monthlyRevenue,
-      adSpendUnderManagement,
-      avgFee: feesDefined > 0 ? monthlyRevenue / feesDefined : null,
-      feesPending,
-    };
-  }, [activeClients, billingByClient]);
+    return { feeExpected, collected, pending, paidCount, pendingCount, feeUndefined, adSpendUnderManagement };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleClients, billingByClient, paymentByClientForMonth]);
 
   function updateRow(clientId: string, patch: Partial<EditableRow>) {
     setRows((current) => {
@@ -129,31 +151,30 @@ export function FacturacionPage() {
     });
   }
 
+  function setRowError(clientId: string, message: string | null) {
+    setErrorByClient((current) => {
+      const next = new Map(current);
+      if (message) next.set(clientId, message);
+      else next.delete(clientId);
+      return next;
+    });
+  }
+
   async function handleSave(clientId: string) {
     const row = rows.get(clientId);
     if (!row) return;
 
     setSavingId(clientId);
-    setErrorByClient((current) => {
-      const next = new Map(current);
-      next.delete(clientId);
-      return next;
-    });
+    setRowError(clientId, null);
 
     const billingResult = await upsertClientBilling({
       client_id: clientId,
       monthly_fee: row.monthly_fee.trim() ? Number(row.monthly_fee) : null,
       currency: 'COP',
-      billing_day: row.billing_day.trim() ? Number(row.billing_day) : null,
-      contract_start: row.contract_start.trim() || null,
-      contract_end: row.contract_end.trim() || null,
-      payment_status: row.payment_status,
-      includes_ad_spend: row.includes_ad_spend,
-      notes: row.notes.trim() || null,
     });
 
     if (billingResult.error) {
-      setErrorByClient((current) => new Map(current).set(clientId, billingResult.error as string));
+      setRowError(clientId, billingResult.error);
       setSavingId(null);
       return;
     }
@@ -164,7 +185,7 @@ export function FacturacionPage() {
     );
 
     if (budgetResult.error) {
-      setErrorByClient((current) => new Map(current).set(clientId, budgetResult.error as string));
+      setRowError(clientId, budgetResult.error);
       setSavingId(null);
       return;
     }
@@ -172,7 +193,32 @@ export function FacturacionPage() {
     if (billingResult.data) {
       setBillingByClient((current) => new Map(current).set(clientId, billingResult.data as ClientBilling));
     }
+    await reloadClients();
     setSavingId(null);
+  }
+
+  async function handleTogglePayment(clientId: string) {
+    const next: BillingPaymentMonthStatus = paymentStatusFor(clientId) === 'pagado' ? 'pendiente' : 'pagado';
+    setTogglingPaymentId(clientId);
+    setRowError(clientId, null);
+
+    const result = await upsertClientBillingPayment({
+      client_id: clientId,
+      month: selectedMonth,
+      status: next,
+      paid_at: next === 'pagado' ? todayIsoDate() : null,
+    });
+
+    if (result.error) {
+      setRowError(clientId, result.error);
+    } else if (result.data) {
+      const saved = result.data;
+      setPayments((current) => [
+        ...current.filter((p) => !(p.client_id === clientId && p.month.slice(0, 10) === selectedMonth)),
+        saved,
+      ]);
+    }
+    setTogglingPaymentId(null);
   }
 
   const loading = loadingClients || loadingBilling;
@@ -186,12 +232,61 @@ export function FacturacionPage() {
         </div>
       </div>
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 24px 16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            className="btn-secondary"
+            onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))}
+            aria-label="Mes anterior"
+            style={{ padding: '6px 8px' }}
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <span
+            className="number-label"
+            style={{ fontSize: '0.78rem', color: 'var(--fg)', minWidth: 160, textAlign: 'center' }}
+          >
+            {getMonthLabel(selectedMonth)}
+          </span>
+          <button
+            className="btn-secondary"
+            onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))}
+            aria-label="Mes siguiente"
+            style={{ padding: '6px 8px' }}
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          style={{
+            height: '36px',
+            padding: '0 12px',
+            background: 'var(--color-bg-input)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '4px',
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'JetBrains Mono',
+            fontSize: '0.72rem',
+            letterSpacing: '0.05em',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="active">Solo activos</option>
+          <option value="all">Todos (incluye inactivos)</option>
+        </select>
+      </div>
+
       <div className="portal-kpi-grid" style={{ marginBottom: 20 }}>
         {[
-          { label: 'Ingresos mensuales agencia', value: formatCopExact(totals.monthlyRevenue), sub: 'suma de fees definidos' },
-          { label: 'Inversión en pauta bajo gestión', value: formatCopExact(totals.adSpendUnderManagement), sub: `presupuesto mensual, ${activeClients.length} cliente${activeClients.length === 1 ? '' : 's'} activo${activeClients.length === 1 ? '' : 's'}` },
-          { label: 'Fee promedio', value: totals.avgFee != null ? formatCopExact(totals.avgFee) : '—', sub: 'solo clientes con fee definido' },
-          { label: 'Fees pendientes por definir', value: String(totals.feesPending), sub: 'de ' + activeClients.length + ' activos' },
+          { label: 'Fee total esperado', value: formatCopExact(totals.feeExpected), sub: getMonthLabel(selectedMonth) },
+          { label: 'Cobrado', value: formatCopExact(totals.collected), sub: `${totals.paidCount} cliente${totals.paidCount === 1 ? '' : 's'} pagado${totals.paidCount === 1 ? '' : 's'}` },
+          { label: 'Por cobrar', value: formatCopExact(totals.pending), sub: `${totals.pendingCount} cliente${totals.pendingCount === 1 ? '' : 's'} pendiente${totals.pendingCount === 1 ? '' : 's'}` },
+          { label: 'Fee sin definir', value: String(totals.feeUndefined), sub: `de ${visibleClients.length} mostrados` },
+          { label: 'Inversión en pauta bajo gestión', value: formatCopExact(totals.adSpendUnderManagement), sub: `presupuesto mensual, ${visibleClients.length} cliente${visibleClients.length === 1 ? '' : 's'}` },
         ].map((card) => (
           <div key={card.label} className="card-glass portal-kpi-card">
             <p className="portal-kpi-label">{card.label}</p>
@@ -208,10 +303,10 @@ export function FacturacionPage() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', minWidth: 1180, borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {['Cliente', 'Fee mensual (COP)', 'Presupuesto pauta (COP)', 'Estado pago', 'Día cobro', 'Inicio', 'Fin', 'Incluye pauta', 'Notas', ''].map((h) => (
+                  {['Cliente', 'Fee mensual (COP)', 'Presupuesto pauta (COP)', `Estado de pago — ${getMonthLabel(selectedMonth)}`, ''].map((h) => (
                     <th
                       key={h}
                       className="number-label"
@@ -223,17 +318,23 @@ export function FacturacionPage() {
                 </tr>
               </thead>
               <tbody>
-                {activeClients.map((client) => {
+                {visibleClients.map((client) => {
                   const row = rows.get(client.id);
                   if (!row) return null;
                   const rowError = errorByClient.get(client.id);
+                  const payment = paymentByClientForMonth.get(client.id);
+                  const status = paymentStatusFor(client.id);
+                  const isPaid = status === 'pagado';
 
                   return (
                     <tr key={client.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '9px 12px', fontFamily: 'Outfit, sans-serif', fontSize: '0.82rem', color: 'var(--fg)', whiteSpace: 'nowrap' }}>
                         {client.name}
+                        {client.status !== 'active' && (
+                          <span className="meta-chip" style={{ marginLeft: 6, fontSize: '0.56rem' }}>{client.status}</span>
+                        )}
                         {rowError && (
-                          <p style={{ margin: '4px 0 0', fontSize: '0.64rem', color: 'var(--danger)', whiteSpace: 'normal', maxWidth: 180 }}>
+                          <p style={{ margin: '4px 0 0', fontSize: '0.64rem', color: 'var(--danger)', whiteSpace: 'normal', maxWidth: 220 }}>
                             {rowError}
                           </p>
                         )}
@@ -261,68 +362,27 @@ export function FacturacionPage() {
                         />
                       </td>
                       <td style={{ padding: '6px 12px' }}>
-                        <select
-                          className="form-input"
-                          value={row.payment_status}
-                          onChange={(e) => updateRow(client.id, { payment_status: e.target.value as BillingPaymentStatus })}
-                          style={{ width: 120 }}
-                        >
-                          {PAYMENT_STATUS_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                        <span
+                        <button
                           className="status-pill"
-                          style={{ ...paymentStatusStyle(row.payment_status), marginLeft: 6, fontSize: '0.56rem' }}
+                          disabled={togglingPaymentId === client.id}
+                          onClick={() => void handleTogglePayment(client.id)}
+                          title="Click para alternar pagado/pendiente"
+                          style={{
+                            cursor: 'pointer',
+                            display: 'block',
+                            fontFamily: 'JetBrains Mono',
+                            background: isPaid ? 'var(--success-dim)' : 'var(--warning-dim)',
+                            color: isPaid ? 'var(--success)' : 'var(--warning)',
+                            border: `1px solid ${isPaid ? 'var(--success)' : 'var(--warning)'}`,
+                          }}
                         >
-                          {PAYMENT_STATUS_OPTIONS.find((o) => o.value === row.payment_status)?.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <input
-                          className="form-input"
-                          type="number"
-                          min={1}
-                          max={31}
-                          value={row.billing_day}
-                          onChange={(e) => updateRow(client.id, { billing_day: e.target.value })}
-                          placeholder="—"
-                          style={{ width: 64 }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <input
-                          className="form-input"
-                          type="date"
-                          value={row.contract_start}
-                          onChange={(e) => updateRow(client.id, { contract_start: e.target.value })}
-                          style={{ width: 140 }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <input
-                          className="form-input"
-                          type="date"
-                          value={row.contract_end}
-                          onChange={(e) => updateRow(client.id, { contract_end: e.target.value })}
-                          style={{ width: 140 }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={row.includes_ad_spend}
-                          onChange={(e) => updateRow(client.id, { includes_ad_spend: e.target.checked })}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <input
-                          className="form-input"
-                          value={row.notes}
-                          onChange={(e) => updateRow(client.id, { notes: e.target.value })}
-                          placeholder="Notas"
-                          style={{ width: 160 }}
-                        />
+                          {togglingPaymentId === client.id ? 'Guardando...' : isPaid ? 'Pagado' : 'Pendiente'}
+                        </button>
+                        {isPaid && payment?.paid_at && (
+                          <span style={{ display: 'block', marginTop: 4, fontSize: '0.58rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>
+                            {payment.paid_at}
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '6px 12px' }}>
                         <button
@@ -336,6 +396,14 @@ export function FacturacionPage() {
                     </tr>
                   );
                 })}
+
+                {visibleClients.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.72rem' }}>
+                      No hay clientes para este filtro.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

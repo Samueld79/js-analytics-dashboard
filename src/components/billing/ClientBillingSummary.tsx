@@ -1,31 +1,37 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listClientBilling } from '../../services/billing';
-import type { ClientBilling } from '../../lib/supabase';
+import { listClientBilling, listClientBillingPayments } from '../../services/billing';
+import type { ClientBilling, ClientBillingPayment } from '../../lib/supabase';
 import { formatCopExact } from '../../lib/utils';
+import { getMonthLabel } from '../../utils/monthLabel';
 
-const PAYMENT_STATUS_LABEL: Record<ClientBilling['payment_status'], string> = {
-  al_dia: 'Al día',
-  pendiente: 'Pendiente',
-  vencido: 'Vencido',
-  pausado: 'Pausado',
-};
+function lastSixMonths(): string[] {
+  const now = new Date();
+  const months: string[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    months.push(d.toISOString().slice(0, 10));
+  }
+  return months;
+}
 
 // Bloque resumido — SOLO se monta cuando el llamador ya confirmó role==='admin'
-// (ver ClientDetailPage). client_billing tiene RLS admin-only, así que
-// cualquier otro rol simplemente recibiría [] / error silencioso, pero la
-// intención es que esta consulta ni se dispare para ellos.
+// (ver ClientDetailPage). client_billing / client_billing_payments tienen RLS
+// admin-only, así que cualquier otro rol simplemente recibiría [] / error
+// silencioso, pero la intención es que esta consulta ni se dispare para ellos.
 export function ClientBillingSummary({ clientId }: { clientId: string }) {
   const [billing, setBilling] = useState<ClientBilling | null>(null);
+  const [payments, setPayments] = useState<ClientBillingPayment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const all = await listClientBilling();
+      const [allBilling, allPayments] = await Promise.all([listClientBilling(), listClientBillingPayments()]);
       if (cancelled) return;
-      setBilling(all.find((b) => b.client_id === clientId) ?? null);
+      setBilling(allBilling.find((b) => b.client_id === clientId) ?? null);
+      setPayments(allPayments.filter((p) => p.client_id === clientId));
       setLoading(false);
     })();
     return () => {
@@ -41,6 +47,9 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
     );
   }
 
+  const months = lastSixMonths();
+  const paymentByMonth = new Map(payments.map((p) => [p.month.slice(0, 10), p]));
+
   return (
     <div className="card-glass card-padded">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -53,28 +62,36 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
       {!billing || billing.monthly_fee == null ? (
         <p className="empty-note">Fee mensual sin definir todavía.</p>
       ) : (
-        <div className="portal-kpi-grid">
-          <div className="portal-kpi-card">
-            <p className="portal-kpi-label">Fee mensual</p>
-            <p className="portal-kpi-value">{formatCopExact(billing.monthly_fee)}</p>
-            <p className="portal-kpi-sub">{billing.includes_ad_spend ? 'incluye pauta' : 'sin pauta incluida'}</p>
-          </div>
-          <div className="portal-kpi-card">
-            <p className="portal-kpi-label">Estado de pago</p>
-            <p className="portal-kpi-value" style={{ fontSize: '1rem' }}>{PAYMENT_STATUS_LABEL[billing.payment_status]}</p>
-            <p className="portal-kpi-sub">{billing.billing_day ? `cobro día ${billing.billing_day}` : 'sin día de cobro'}</p>
-          </div>
-          <div className="portal-kpi-card">
-            <p className="portal-kpi-label">Contrato</p>
-            <p className="portal-kpi-value" style={{ fontSize: '0.95rem' }}>
-              {billing.contract_start ?? '—'} → {billing.contract_end ?? '—'}
-            </p>
-          </div>
+        <div className="portal-kpi-card" style={{ marginBottom: 16 }}>
+          <p className="portal-kpi-label">Fee mensual</p>
+          <p className="portal-kpi-value">{formatCopExact(billing.monthly_fee)}</p>
         </div>
       )}
-      {billing?.notes && (
-        <p style={{ marginTop: 12, fontSize: '0.78rem', color: 'var(--fg-2)' }}>{billing.notes}</p>
-      )}
+
+      <p style={{ fontSize: '0.64rem', color: 'var(--fg-muted)', marginBottom: 6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+        Últimos 6 meses
+      </p>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        {months.map((month) => {
+          const paid = paymentByMonth.get(month)?.status === 'pagado';
+          return (
+            <div key={month} title={`${getMonthLabel(month)} · ${paid ? 'Pagado' : 'Pendiente'}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <span
+                style={{
+                  display: 'block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: paid ? 'var(--success)' : 'var(--warning)',
+                }}
+              />
+              <span style={{ fontSize: '0.56rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>
+                {getMonthLabel(month).slice(0, 3)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
