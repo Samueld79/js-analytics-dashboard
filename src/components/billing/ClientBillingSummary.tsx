@@ -1,9 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listClientBilling, listClientBillingPayments } from '../../services/billing';
-import type { ClientBilling, ClientBillingPayment } from '../../lib/supabase';
+import type { BillingPaymentFrequency, BillingPaymentReceiver, ClientBilling, ClientBillingPayment } from '../../lib/supabase';
 import { formatCopExact } from '../../lib/utils';
 import { getMonthLabel } from '../../utils/monthLabel';
+
+const RECEIVER_LABELS: Record<BillingPaymentReceiver, string> = {
+  samuel: 'Samuel',
+  juanca: 'Juanca',
+  compartido: 'Compartido',
+};
+
+const FREQUENCY_LABELS: Record<BillingPaymentFrequency, string> = {
+  anticipado: 'Pago anticipado',
+  quincenal: 'Quincenal',
+  mensual: 'Mensual',
+};
 
 function lastSixMonths(): string[] {
   const now = new Date();
@@ -62,11 +74,20 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
       {!billing || billing.monthly_fee == null ? (
         <p className="empty-note">Fee mensual sin definir todavía.</p>
       ) : (
-        <div className="portal-kpi-card" style={{ marginBottom: 16 }}>
+        <div className="portal-kpi-card" style={{ marginBottom: 12 }}>
           <p className="portal-kpi-label">Fee mensual</p>
           <p className="portal-kpi-value">{formatCopExact(billing.monthly_fee)}</p>
         </div>
       )}
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        <span className="meta-chip">
+          Recibe: {billing?.payment_receiver ? RECEIVER_LABELS[billing.payment_receiver] : 'Sin asignar'}
+        </span>
+        <span className="meta-chip">
+          Modalidad: {billing?.payment_frequency ? FREQUENCY_LABELS[billing.payment_frequency] : '—'}
+        </span>
+      </div>
 
       <p style={{ fontSize: '0.64rem', color: 'var(--fg-muted)', marginBottom: 6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
         Últimos 6 meses

@@ -8,11 +8,30 @@ import {
   upsertClientBillingPayment,
 } from '../services/billing';
 import { updateClientAdBudget } from '../services/clients';
-import type { BillingPaymentMonthStatus, ClientBilling, ClientBillingPayment } from '../lib/supabase';
+import type {
+  BillingPaymentFrequency,
+  BillingPaymentMonthStatus,
+  BillingPaymentReceiver,
+  ClientBilling,
+  ClientBillingPayment,
+} from '../lib/supabase';
 import { formatCopExact } from '../lib/utils';
 import { getMonthLabel } from '../utils/monthLabel';
 
 type StatusFilter = 'active' | 'all';
+type ReceiverFilter = 'all' | BillingPaymentReceiver;
+
+const RECEIVER_LABELS: Record<BillingPaymentReceiver, string> = {
+  samuel: 'Samuel',
+  juanca: 'Juanca',
+  compartido: 'Compartido',
+};
+
+const FREQUENCY_LABELS: Record<BillingPaymentFrequency, string> = {
+  anticipado: 'Pago anticipado',
+  quincenal: 'Quincenal',
+  mensual: 'Mensual',
+};
 
 // Siempre el 1ro del mes actual en America/Bogota (no la zona del navegador
 // ni del servidor) — Colombia no tiene horario de verano, así que un offset
@@ -63,7 +82,9 @@ export function FacturacionPage() {
   const [togglingPaymentId, setTogglingPaymentId] = useState<string | null>(null);
   const [errorByClient, setErrorByClient] = useState<Map<string, string>>(new Map());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [receiverFilter, setReceiverFilter] = useState<ReceiverFilter>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => getBogotaCurrentMonth());
+  const [updatingFieldId, setUpdatingFieldId] = useState<string | null>(null);
 
   async function loadBilling() {
     setLoadingBilling(true);
@@ -81,8 +102,9 @@ export function FacturacionPage() {
     () =>
       clients
         .filter((c) => statusFilter === 'all' || c.status === 'active')
+        .filter((c) => receiverFilter === 'all' || billingByClient.get(c.id)?.payment_receiver === receiverFilter)
         .sort((a, b) => a.name.localeCompare(b.name)),
-    [clients, statusFilter],
+    [clients, statusFilter, receiverFilter, billingByClient],
   );
 
   // Inicializa las filas editables cuando llegan clientes/facturación, sin
@@ -119,9 +141,16 @@ export function FacturacionPage() {
     let pendingCount = 0;
     let feeUndefined = 0;
     let adSpendUnderManagement = 0;
+    let receiverUnassigned = 0;
+    const byReceiver: Record<BillingPaymentReceiver, { expected: number; collected: number }> = {
+      samuel: { expected: 0, collected: 0 },
+      juanca: { expected: 0, collected: 0 },
+      compartido: { expected: 0, collected: 0 },
+    };
 
     for (const client of visibleClients) {
-      const fee = billingByClient.get(client.id)?.monthly_fee;
+      const billing = billingByClient.get(client.id);
+      const fee = billing?.monthly_fee;
       if (client.monthly_ad_budget != null) adSpendUnderManagement += client.monthly_ad_budget;
 
       if (fee == null) {
@@ -129,16 +158,35 @@ export function FacturacionPage() {
         continue;
       }
       feeExpected += fee;
-      if (paymentStatusFor(client.id) === 'pagado') {
+      const isPaid = paymentStatusFor(client.id) === 'pagado';
+      if (isPaid) {
         collected += fee;
         paidCount += 1;
       } else {
         pending += fee;
         pendingCount += 1;
       }
+
+      const receiver = billing?.payment_receiver;
+      if (!receiver) {
+        receiverUnassigned += 1;
+        continue;
+      }
+      byReceiver[receiver].expected += fee;
+      if (isPaid) byReceiver[receiver].collected += fee;
     }
 
-    return { feeExpected, collected, pending, paidCount, pendingCount, feeUndefined, adSpendUnderManagement };
+    return {
+      feeExpected,
+      collected,
+      pending,
+      paidCount,
+      pendingCount,
+      feeUndefined,
+      adSpendUnderManagement,
+      byReceiver,
+      receiverUnassigned,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleClients, billingByClient, paymentByClientForMonth]);
 
@@ -195,6 +243,32 @@ export function FacturacionPage() {
     }
     await reloadClients();
     setSavingId(null);
+  }
+
+  // Guardado inmediato al cambiar receptor/modalidad — no espera al botón
+  // "Guardar" de la fila (ese sigue siendo solo para fee/presupuesto).
+  async function handleUpdateBillingField(
+    clientId: string,
+    patch: { payment_receiver?: BillingPaymentReceiver | null; payment_frequency?: BillingPaymentFrequency | null },
+  ) {
+    const existing = billingByClient.get(clientId);
+    setUpdatingFieldId(clientId);
+    setRowError(clientId, null);
+
+    const result = await upsertClientBilling({
+      client_id: clientId,
+      monthly_fee: existing?.monthly_fee ?? null,
+      currency: existing?.currency ?? 'COP',
+      payment_receiver: patch.payment_receiver !== undefined ? patch.payment_receiver : existing?.payment_receiver ?? null,
+      payment_frequency: patch.payment_frequency !== undefined ? patch.payment_frequency : existing?.payment_frequency ?? null,
+    });
+
+    if (result.error) {
+      setRowError(clientId, result.error);
+    } else if (result.data) {
+      setBillingByClient((current) => new Map(current).set(clientId, result.data as ClientBilling));
+    }
+    setUpdatingFieldId(null);
   }
 
   async function handleTogglePayment(clientId: string) {
@@ -278,6 +352,24 @@ export function FacturacionPage() {
           <option value="active">Solo activos</option>
           <option value="all">Todos (incluye inactivos)</option>
         </select>
+
+        <div style={{ display: 'flex', gap: 6 }}>
+          {([
+            ['all', 'Todos'],
+            ['samuel', 'Samuel'],
+            ['juanca', 'Juanca'],
+            ['compartido', 'Compartido'],
+          ] as [ReceiverFilter, string][]).map(([value, label]) => (
+            <button
+              key={value}
+              className={receiverFilter === value ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => setReceiverFilter(value)}
+              style={{ padding: '6px 12px', fontSize: '0.68rem' }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="portal-kpi-grid" style={{ marginBottom: 20 }}>
@@ -287,6 +379,10 @@ export function FacturacionPage() {
           { label: 'Por cobrar', value: formatCopExact(totals.pending), sub: `${totals.pendingCount} cliente${totals.pendingCount === 1 ? '' : 's'} pendiente${totals.pendingCount === 1 ? '' : 's'}` },
           { label: 'Fee sin definir', value: String(totals.feeUndefined), sub: `de ${visibleClients.length} mostrados` },
           { label: 'Inversión en pauta bajo gestión', value: formatCopExact(totals.adSpendUnderManagement), sub: `presupuesto mensual, ${visibleClients.length} cliente${visibleClients.length === 1 ? '' : 's'}` },
+          { label: 'Esperado — Samuel', value: formatCopExact(totals.byReceiver.samuel.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.samuel.collected)}` },
+          { label: 'Esperado — Juanca', value: formatCopExact(totals.byReceiver.juanca.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.juanca.collected)}` },
+          { label: 'Esperado — Compartido', value: formatCopExact(totals.byReceiver.compartido.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.compartido.collected)}` },
+          { label: 'Sin receptor asignado', value: String(totals.receiverUnassigned), sub: `de ${visibleClients.length} mostrados` },
         ].map((card) => (
           <div key={card.label} className="card-glass portal-kpi-card">
             <p className="portal-kpi-label">{card.label}</p>
@@ -306,7 +402,7 @@ export function FacturacionPage() {
             <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {['Cliente', 'Fee mensual (COP)', 'Presupuesto pauta (COP)', `Estado de pago — ${getMonthLabel(selectedMonth)}`, ''].map((h) => (
+                  {['Cliente', 'Fee mensual (COP)', 'Presupuesto pauta (COP)', 'Recibe', 'Modalidad', `Estado de pago — ${getMonthLabel(selectedMonth)}`, ''].map((h) => (
                     <th
                       key={h}
                       className="number-label"
@@ -325,6 +421,8 @@ export function FacturacionPage() {
                   const payment = paymentByClientForMonth.get(client.id);
                   const status = paymentStatusFor(client.id);
                   const isPaid = status === 'pagado';
+                  const billing = billingByClient.get(client.id);
+                  const isUpdatingField = updatingFieldId === client.id;
 
                   return (
                     <tr key={client.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -360,6 +458,66 @@ export function FacturacionPage() {
                           placeholder="—"
                           style={{ width: 130 }}
                         />
+                      </td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <select
+                          value={billing?.payment_receiver ?? ''}
+                          disabled={isUpdatingField}
+                          onChange={(e) =>
+                            void handleUpdateBillingField(client.id, {
+                              payment_receiver: (e.target.value || null) as BillingPaymentReceiver | null,
+                            })
+                          }
+                          style={{
+                            height: '34px',
+                            padding: '0 8px',
+                            background: 'var(--color-bg-input)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '4px',
+                            color: billing?.payment_receiver ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
+                            fontFamily: 'JetBrains Mono',
+                            fontSize: '0.7rem',
+                            outline: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <option value="">Sin asignar</option>
+                          {(Object.keys(RECEIVER_LABELS) as BillingPaymentReceiver[]).map((value) => (
+                            <option key={value} value={value}>
+                              {RECEIVER_LABELS[value]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <select
+                          value={billing?.payment_frequency ?? ''}
+                          disabled={isUpdatingField}
+                          onChange={(e) =>
+                            void handleUpdateBillingField(client.id, {
+                              payment_frequency: (e.target.value || null) as BillingPaymentFrequency | null,
+                            })
+                          }
+                          style={{
+                            height: '34px',
+                            padding: '0 8px',
+                            background: 'var(--color-bg-input)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '4px',
+                            color: billing?.payment_frequency ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
+                            fontFamily: 'JetBrains Mono',
+                            fontSize: '0.7rem',
+                            outline: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <option value="">—</option>
+                          {(Object.keys(FREQUENCY_LABELS) as BillingPaymentFrequency[]).map((value) => (
+                            <option key={value} value={value}>
+                              {FREQUENCY_LABELS[value]}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td style={{ padding: '6px 12px' }}>
                         <button
@@ -399,7 +557,7 @@ export function FacturacionPage() {
 
                 {visibleClients.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.72rem' }}>
+                    <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.72rem' }}>
                       No hay clientes para este filtro.
                     </td>
                   </tr>

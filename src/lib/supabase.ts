@@ -134,16 +134,24 @@ export type ClientInput = Omit<
 // pauta", notas, estado de pago único — se quitó, ver client_billing_payments
 // más abajo para el control de pago mes a mes).
 
+export type BillingPaymentReceiver = 'samuel' | 'juanca' | 'compartido';
+export type BillingPaymentFrequency = 'anticipado' | 'quincenal' | 'mensual';
+
 export type ClientBilling = {
   client_id: string;
   monthly_fee: number | null;
   currency: string;
+  payment_receiver?: BillingPaymentReceiver | null;
+  payment_frequency?: BillingPaymentFrequency | null;
   updated_by?: string | null;
   updated_at: string;
   created_at: string;
 };
 
-export type ClientBillingInput = Pick<ClientBilling, 'client_id' | 'monthly_fee' | 'currency'>;
+export type ClientBillingInput = Pick<
+  ClientBilling,
+  'client_id' | 'monthly_fee' | 'currency' | 'payment_receiver' | 'payment_frequency'
+>;
 
 // ── Estado de pago mensual (client_billing_payments) — solo admin ──────────────
 // Una fila por (client_id, month); month siempre es el día 1 del mes
