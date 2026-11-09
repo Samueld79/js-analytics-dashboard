@@ -1047,6 +1047,23 @@ export type Alert = {
   updated_at?: string;
 };
 
+export type ClientNoteType = 'general' | 'performance' | 'sales' | 'strategy' | 'creative' | 'meeting';
+export type ClientNoteVisibility = 'internal' | 'client';
+
+export type ClientNote = {
+  id: string;
+  client_id: string;
+  strategy_id?: string | null;
+  note_type: ClientNoteType;
+  visibility: ClientNoteVisibility;
+  title: string | null;
+  body: string;
+  pinned: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ClientMemory = {
   id: string;
   client_id: string;

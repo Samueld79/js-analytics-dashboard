@@ -1952,6 +1952,23 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
 }
 @media (max-width: 800px) { .portal-charts-grid { grid-template-columns: 1fr; } }
 
+/* ── MonthlyReport (src/components/report/MonthlyReport.tsx) ── */
+.monthly-report-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.monthly-report-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 800px) { .monthly-report-charts-grid { grid-template-columns: 1fr; } }
+.monthly-report-print-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 16px; }
+
 /* Card with padding utility */
 .card-padded { padding: 16px 20px; }
 
@@ -2146,4 +2163,44 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
 
 @media (prefers-reduced-motion: reduce) {
   .pulse-mood-emoji, .pulse-chip, .pulse-confetti-piece { animation: none !important; }
+}
+
+/* ============================================================
+   PRINT — MonthlyReport "Imprimir / Guardar PDF" (window.print(),
+   sin librerías). .no-print oculta nav/sidebar/controles; el resto del
+   reporte pasa a fondo blanco/texto negro para no gastar tinta imprimiendo
+   el tema oscuro del dashboard.
+   ============================================================ */
+@media print {
+  .sidebar, .mobile-nav-trigger, .sidebar-backdrop, .no-print {
+    display: none !important;
+  }
+  .app-main, .page-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  body, .monthly-report {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .monthly-report-print-title { display: block !important; }
+  .monthly-report .card-glass {
+    background: #fff !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  .monthly-report .portal-kpi-label,
+  .monthly-report .number-label,
+  .monthly-report .empty-note,
+  .monthly-report .portal-kpi-sub {
+    color: #555 !important;
+  }
+  .monthly-report .portal-kpi-value,
+  .monthly-report strong {
+    color: #111 !important;
+  }
+  .monthly-report-charts-grid, .portal-kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
 }

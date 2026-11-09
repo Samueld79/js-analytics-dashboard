@@ -24,6 +24,8 @@ import { StrategiesPage } from './pages/StrategiesPage';
 // import { AIToolsPage } from './pages/ai-tools/AIToolsPage';
 import { DashboardClientPage } from './pages/DashboardClientPage';
 import { PortalClientAdminPage } from './pages/PortalClientAdminPage';
+import { FacturacionPage } from './pages/FacturacionPage';
+import { ReportesPage } from './pages/ReportesPage';
 // import { SatisfactionPage } from './pages/SatisfactionPage';
 import { ClientPortalPublicPage } from './pages/ClientPortalPublicPage';
 import { PulsePublicPage } from './pages/PulsePublicPage';
@@ -111,6 +113,8 @@ function AppContent() {
       <Route path="/strategies" element={<RequireSignedIn><StrategiesPage /></RequireSignedIn>} />
       {/* <Route path="/calendar" element={<RequireInternal><CalendarPage /></RequireInternal>} /> */}
       <Route path="/portal-cliente" element={<RequireInternal><PortalClientAdminPage /></RequireInternal>} />
+      <Route path="/admin/facturacion" element={<RequireAgencyAdmin><FacturacionPage /></RequireAgencyAdmin>} />
+      <Route path="/admin/reportes" element={<RequireInternal><ReportesPage /></RequireInternal>} />
       {/* <Route path="/satisfaccion" element={<RequireInternal><SatisfactionPage /></RequireInternal>} /> */}
       {/* <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} /> */}
       {/* <Route path="/ai-tools/*" element={<RequireInternal><AIToolsPage /></RequireInternal>} /> */}
@@ -212,6 +216,20 @@ function RequireInternal({ children }: { children: ReactNode }) {
   }
 
   return <Navigate to="/" replace />;
+}
+
+// Facturación es admin-only, más estricto que RequireInternal (que deja
+// pasar team/strategist/operator/partner también) — espeja is_agency_admin()
+// del lado de la base de datos (role === 'admin', ver migración
+// 20261108_billing_diagnostic_report.sql).
+function RequireAgencyAdmin({ children }: { children: ReactNode }) {
+  const { role, isInternal } = useAuth();
+
+  if (!isSupabaseConfigured || (isInternal && role === 'admin')) {
+    return <>{children}</>;
+  }
+
+  return <Navigate to="/clients" replace />;
 }
 
 function RequireSignedIn({ children }: { children: ReactNode }) {
