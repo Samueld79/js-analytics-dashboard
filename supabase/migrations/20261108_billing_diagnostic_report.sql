@@ -203,6 +203,29 @@ from public.clients c
 where c.status = 'active'
 on conflict (client_id) do nothing;
 
+-- ============================================================
+-- 7) Anon SELECT en client_notes, SOLO para visibility = 'client'.
+-- Necesario para que "Qué hicimos este mes" / "Plan próximo mes" (Fase
+-- 2.3) funcione en /portal/:id — confirmé que esa ruta es pública de
+-- verdad (App.tsx la excluye del gate de auth, ClientDetailPage.tsx se
+-- renderiza sin RequireClientAccess ahí), así que un visitante real sin
+-- login hace la consulta con la anon key, sin auth.uid(). La política
+-- existente de client_notes_select (schema.sql línea 1044-1052) es
+-- TO authenticated únicamente, así que hoy esa sección siempre quedaría
+-- vacía para un visitante anónimo real.
+-- Mismo patrón de riesgo que las políticas anon ya existentes en
+-- portal_daily_entries / daily_sales / portal_ad_daily_metrics (ver
+-- src/services/portal.ts, sección "Public page reads"): scope por
+-- columna de negocio (acá, visibility), no por un secreto por request.
+-- No toca ni reemplaza la política existente para authenticated.
+-- ============================================================
+drop policy if exists client_notes_select_anon on public.client_notes;
+create policy client_notes_select_anon
+on public.client_notes
+for select
+to anon
+using (visibility = 'client');
+
 commit;
 
 -- ============================================================
@@ -221,6 +244,11 @@ commit;
 
 -- select name, slug, status from public.clients where slug in ('capital-store', 'legend-perfumeria', 'oral-estetica');
 -- -- debe devolver las 3 filas nuevas
+
+-- set local role anon;
+-- select id from public.client_notes where visibility = 'internal' limit 1;
+-- -- debe dar 0 filas (nunca una nota interna) aunque existan notas internas
+-- reset role;
 
 -- ============================================================
 -- PENDIENTE — RLS de ad_campaign_metrics (hallazgo confirmado, ver nota al
