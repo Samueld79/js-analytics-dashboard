@@ -15,36 +15,22 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { motion, type Transition } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { ClientAvatar } from '../components/ClientAvatar';
 import { ClientFileModal } from '../components/ClientFileModal';
 import { ClientSatisfactionCard } from '../components/ClientSatisfactionCard';
 import { HistoricalMonthlyModal } from '../components/HistoricalMonthlyModal';
 import { SalesModal } from '../components/SalesModal';
+import { MonthlyReport } from '../components/report/MonthlyReport';
+import { ClientBillingSummary } from '../components/billing/ClientBillingSummary';
+import { ClientDiagnosticTab } from '../components/diagnostics/ClientDiagnosticTab';
 import { useAuth } from '../hooks/useAuth';
 import { useCampaignSummary } from '../hooks/useData';
 import { useClientWorkspace } from '../hooks/useClientWorkspace';
-import {
-  aggregateCampaignMetricsByCampaign,
-  aggregateCampaignMetricsByObjective,
-  inferObjectiveFromName,
-  sumCampaignMonthAggregates,
-} from '../services/adCampaignMetrics';
-import { formatCop, formatNumber, toFiniteNumber } from '../lib/utils';
+import { aggregateCampaignMetricsByObjective } from '../services/adCampaignMetrics';
+import { formatCop, formatNumber } from '../lib/utils';
 import { getMonthKey, getMonthLabel } from '../utils/monthLabel';
 import { CHART, TOOLTIP_STYLE } from '../lib/chartColors';
-
-// Portal-only formatter: always shows 2 decimal places (punto miles, coma decimales).
-// Does NOT replace the global formatCop — this is only for the public client portal.
-function formatCopFull(value: unknown): string {
-  const amount = toFiniteNumber(value);
-  if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(2).replace('.', ',')} MM`;
-  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(2).replace('.', ',')}M`;
-  return `$${amount.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-const FADE = { duration: 0.3, ease: 'easeOut' } as Transition;
 
 // Maps inferred objective label → color for Pie chart
 // All colors chosen to have good contrast on both light and dark backgrounds.
@@ -83,7 +69,10 @@ export function ClientDetailPage() {
     addSocialMonthlyMetric,
     addFile,
     strategies,
+    reload,
   } = useClientWorkspace(id, 400);
+
+  const [activeTab, setActiveTab] = useState<'resumen' | 'facturacion' | 'diagnostico'>('resumen');
 
   // Single source: ad_campaign_metrics (1 year of history; wait until client UUID is available)
   const { rows: campaignRows, byMonth: campaignByMonth } = useCampaignSummary(client?.id, 365);
@@ -95,9 +84,10 @@ export function ClientDetailPage() {
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
   const [showHistoricalModal, setShowHistoricalModal] = useState(false);
-  const [tableOpen, setTableOpen] = useState(false);
 
-  // Rows filtered to active period (for campaign table / pie)
+  // Rows filtered to active period — solo alimenta el Pie de "Mix de
+  // campañas" (Inversión/Mensajes/campaña-por-campaña del mes ya viven en
+  // MonthlyReport).
   const periodRows = useMemo(
     () =>
       activePeriod === 'all' || activePeriod === ''
@@ -106,23 +96,9 @@ export function ClientDetailPage() {
     [campaignRows, activePeriod],
   );
 
-  const campaignsByCampaign = useMemo(
-    () => aggregateCampaignMetricsByCampaign(periodRows),
-    [periodRows],
-  );
-
   const campaignsByObjective = useMemo(
     () => aggregateCampaignMetricsByObjective(periodRows),
     [periodRows],
-  );
-
-  // KPI aggregate for selected period
-  const periodKpi = useMemo(
-    () =>
-      activePeriod === 'all'
-        ? sumCampaignMonthAggregates(campaignByMonth, 'all')
-        : (campaignByMonth.find((m) => m.month === activePeriod) ?? null),
-    [campaignByMonth, activePeriod],
   );
 
   // Area chart: all historical months
@@ -134,18 +110,6 @@ export function ClientDetailPage() {
         .map((m) => ({ month: m.month, Inversión: m.spend, Mensajes: m.messages })),
     [campaignByMonth],
   );
-
-  // ROAS for selected period (ventas / spend)
-  const periodSales = useMemo(() => {
-    if (activePeriod === 'all') return sales.reduce((s, r) => s + r.total_sales, 0);
-    return sales.filter((r) => r.date.startsWith(activePeriod)).reduce((s, r) => s + r.total_sales, 0);
-  }, [sales, activePeriod]);
-
-  const periodRoas = useMemo(() => {
-    const spend = periodKpi?.spend ?? 0;
-    if (spend <= 0 || periodSales <= 0) return null;
-    return periodSales / spend;
-  }, [periodKpi, periodSales]);
 
   // Bar chart: year view combining campaign spend + manual sales
   const salesByMonth = useMemo(() => {
@@ -234,27 +198,7 @@ export function ClientDetailPage() {
           </div>
         </div>
 
-        {/* Period selector */}
         <div className="portal-header-actions">
-          {campaignByMonth.length > 0 && (
-            <div className="portal-period-pills">
-              {campaignByMonth.map((m) => (
-                <button
-                  key={m.month}
-                  onClick={() => setSelectedPeriod(m.month)}
-                  className={`portal-period-pill${activePeriod === m.month ? ' active' : ''}`}
-                >
-                  {getMonthLabel(m.month)}
-                </button>
-              ))}
-              <button
-                onClick={() => setSelectedPeriod('all')}
-                className={`portal-period-pill${activePeriod === 'all' ? ' active' : ''}`}
-              >
-                Total año
-              </button>
-            </div>
-          )}
           {canLoadHistory && (
             <button className="btn-secondary" onClick={() => setShowHistoricalModal(true)}>
               + Cargar histórico
@@ -273,38 +217,55 @@ export function ClientDetailPage() {
         </div>
       </div>
 
-      {/* ── KPI Grid ── */}
-      <div className="portal-kpi-grid">
-        {[
-          { label: 'Ventas Totales', value: periodSales > 0 ? formatCopFull(periodSales) : 'N/D', sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
-          { label: 'Inversión', value: formatCop(periodKpi?.spend ?? 0), sub: activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod) },
-          { label: 'Mensajes', value: formatNumber(periodKpi?.messages ?? 0), sub: 'conversaciones iniciadas' },
-          { label: 'Alcance', value: formatNumber(periodKpi?.reach ?? 0), sub: 'personas únicas' },
-          { label: 'Impresiones', value: formatNumber(periodKpi?.impressions ?? 0), sub: 'veces mostrado' },
-          { label: 'ROAS', value: periodRoas != null ? `${periodRoas.toFixed(1)}x` : 'N/D', sub: 'retorno sobre inversión' },
-          { label: 'Frecuencia', value: periodKpi && periodKpi.frequency > 0 ? periodKpi.frequency.toFixed(2) : '—', sub: 'imp. por persona' },
-        ].map((card, i) => (
-          <motion.div
-            key={card.label}
-            className="card-glass portal-kpi-card"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...FADE, delay: i * 0.06 } as Transition}
-          >
-            <p className="portal-kpi-label">{card.label}</p>
-            <p className="portal-kpi-value">{card.value}</p>
-            <p className="portal-kpi-sub">{card.sub}</p>
-          </motion.div>
-        ))}
-      </div>
-
-      {showInternalTools && client && (
-        <div style={{ marginTop: 16 }}>
-          <ClientSatisfactionCard clientId={client.id} salesByMonth={salesByMonth} />
+      {/* Tabs internos — Resumen / Facturación (solo admin) / Diagnóstico.
+          En /portal/:id y /cliente/:slug no se muestran: showInternalTools
+          ya es false ahí (portalMode), así que el visitante público solo ve
+          el contenido de "Resumen" (MonthlyReport + gráficos), nunca
+          facturación ni diagnóstico. */}
+      {showInternalTools && (
+        <div className="portal-period-pills no-print" style={{ padding: '0 24px 16px' }}>
+          <button onClick={() => setActiveTab('resumen')} className={`portal-period-pill${activeTab === 'resumen' ? ' active' : ''}`}>
+            Resumen
+          </button>
+          {role === 'admin' && (
+            <button onClick={() => setActiveTab('facturacion')} className={`portal-period-pill${activeTab === 'facturacion' ? ' active' : ''}`}>
+              Facturación
+            </button>
+          )}
+          <button onClick={() => setActiveTab('diagnostico')} className={`portal-period-pill${activeTab === 'diagnostico' ? ' active' : ''}`}>
+            Diagnóstico
+          </button>
         </div>
       )}
 
-      {/* ── Charts Row ── */}
+      {(!showInternalTools || activeTab === 'resumen') && (
+        <>
+          <MonthlyReport client={client} campaignRows={campaignRows} campaignByMonth={campaignByMonth} sales={sales} />
+
+          {showInternalTools && client && (
+            <div style={{ marginTop: 16 }}>
+              <ClientSatisfactionCard clientId={client.id} salesByMonth={salesByMonth} />
+            </div>
+          )}
+
+          {/* ── Charts Row ── */}
+          <div className="portal-period-pills" style={{ margin: '16px 0 8px' }}>
+            {campaignByMonth.map((m) => (
+              <button
+                key={m.month}
+                onClick={() => setSelectedPeriod(m.month)}
+                className={`portal-period-pill${activePeriod === m.month ? ' active' : ''}`}
+              >
+                {getMonthLabel(m.month)}
+              </button>
+            ))}
+            <button
+              onClick={() => setSelectedPeriod('all')}
+              className={`portal-period-pill${activePeriod === 'all' ? ' active' : ''}`}
+            >
+              Total año
+            </button>
+          </div>
       <div className="portal-charts-grid">
         {/* Area chart: spend + messages over all historical months */}
         <div className="card-glass card-padded">
@@ -428,68 +389,6 @@ export function ClientDetailPage() {
         </div>
       </div>
 
-      {/* ── Campaign Table (collapsible) ── */}
-      {campaignsByCampaign.length > 0 && (
-        <div className="card-glass card-padded">
-          <div
-            className="portal-table-toggle"
-            onClick={() => setTableOpen((o) => !o)}
-          >
-            <span>
-              Campañas — {activePeriod === 'all' ? 'Total año' : getMonthLabel(activePeriod)}
-              {' '}({campaignsByCampaign.length})
-            </span>
-            <span className="portal-table-chevron">{tableOpen ? '▲' : '▼'}</span>
-          </div>
-          {tableOpen && (
-            <table className="portal-campaign-table">
-              <thead>
-                <tr>
-                  {['Campaña', 'Objetivo', 'Inversión', 'Resultados', 'Estado'].map((h, i) => (
-                    <th key={h} className={i >= 2 && i <= 3 ? 'num-col' : ''}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {campaignsByCampaign.map((c) => {
-                  const obj = objectiveInfo(inferObjectiveFromName(c.campaignName));
-                  const results =
-                    c.messages > 0
-                      ? `${formatNumber(c.messages)} msgs`
-                      : c.leads > 0
-                        ? `${formatNumber(c.leads)} leads`
-                        : c.purchases > 0
-                          ? `${formatNumber(c.purchases)} compras`
-                          : `${formatNumber(c.clicks)} clics`;
-                  return (
-                    <tr key={c.campaignId}>
-                      <td className="portal-campaign-name">{c.campaignName}</td>
-                      <td>
-                        <span
-                          className="portal-objective-badge"
-                          style={{ background: `${obj.color}22`, color: obj.color }}
-                        >
-                          {obj.label}
-                        </span>
-                      </td>
-                      <td className="num-col">{formatCop(c.spend)}</td>
-                      <td className="num-col" style={{ color: 'var(--fg-muted)' }}>{results}</td>
-                      <td>
-                        <span className={c.effectiveStatus === 'ACTIVE' ? 'portal-status-active' : 'portal-status-inactive'}>
-                          {c.effectiveStatus ?? '—'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
       {/* ── Year Line Chart: Inversión vs Ventas ── */}
       {yearBarData.length > 0 && (
         <div className="card-glass card-padded">
@@ -552,6 +451,24 @@ export function ClientDetailPage() {
               />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      )}
+        </>
+      )}
+
+      {showInternalTools && role === 'admin' && activeTab === 'facturacion' && (
+        <div style={{ padding: '0 24px' }}>
+          <ClientBillingSummary clientId={client.id} />
+        </div>
+      )}
+
+      {showInternalTools && activeTab === 'diagnostico' && (
+        <div style={{ padding: '0 24px' }}>
+          <ClientDiagnosticTab
+            clientId={client.id}
+            clientHasWhatsappApi={client.has_whatsapp_api}
+            onWhatsappApiActivated={() => void reload()}
+          />
         </div>
       )}
 
