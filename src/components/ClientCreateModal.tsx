@@ -32,11 +32,15 @@ export function ClientCreateModal({ saving = false, onClose, onSave }: Props) {
     drive_folder_url: '',
     ad_account_id: '',
     notes: '',
+    monthly_ad_budget: '',
+    has_whatsapp_api: false,
   });
 
   const canSave = useMemo(() => Boolean(form.name.trim()), [form.name]);
 
-  function setField(field: keyof typeof form, value: string) {
+  type TextField = Exclude<keyof typeof form, 'has_whatsapp_api'>;
+
+  function setField(field: TextField, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -44,6 +48,7 @@ export function ClientCreateModal({ saving = false, onClose, onSave }: Props) {
     if (!canSave || saving) return;
 
     setErrorMessage('');
+    const adBudget = form.monthly_ad_budget.trim();
     const result = await onSave({
       name: form.name.trim(),
       slug: form.slug.trim() || null,
@@ -57,6 +62,9 @@ export function ClientCreateModal({ saving = false, onClose, onSave }: Props) {
       main_city: form.main_city.trim() || null,
       target_cities: parseCities(form.target_cities),
       notes: form.notes.trim() || null,
+      monthly_ad_budget: adBudget ? Number(adBudget) : null,
+      has_whatsapp_api: form.has_whatsapp_api,
+      whatsapp_api_since: form.has_whatsapp_api ? new Date().toISOString().split('T')[0] : null,
       created_by: null,
     });
 
@@ -167,6 +175,34 @@ export function ClientCreateModal({ saving = false, onClose, onSave }: Props) {
                 onChange={(event) => setField('ad_account_id', event.target.value)}
                 placeholder="act_123456789"
               />
+            </div>
+          </div>
+
+          <div className="form-row-2">
+            <div className="form-field">
+              <label>Presupuesto mensual de pauta (COP)</label>
+              <input
+                className="form-input"
+                type="number"
+                min={0}
+                value={form.monthly_ad_budget}
+                onChange={(event) => setField('monthly_ad_budget', event.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+
+            <div className="form-field">
+              <label>¿Tiene API de WhatsApp?</label>
+              <label className="toggle-switch" style={{ marginTop: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={form.has_whatsapp_api}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, has_whatsapp_api: event.target.checked }))
+                  }
+                />
+                <span className="toggle-slider" />
+              </label>
             </div>
           </div>
 
