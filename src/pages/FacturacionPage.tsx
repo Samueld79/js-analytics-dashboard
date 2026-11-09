@@ -189,7 +189,7 @@ export function FacturacionPage() {
       <div className="portal-kpi-grid" style={{ marginBottom: 20 }}>
         {[
           { label: 'Ingresos mensuales agencia', value: formatCopExact(totals.monthlyRevenue), sub: 'suma de fees definidos' },
-          { label: 'Inversión en pauta bajo gestión', value: formatCopExact(totals.adSpendUnderManagement), sub: 'presupuesto mensual, 11 clientes activos' },
+          { label: 'Inversión en pauta bajo gestión', value: formatCopExact(totals.adSpendUnderManagement), sub: `presupuesto mensual, ${activeClients.length} cliente${activeClients.length === 1 ? '' : 's'} activo${activeClients.length === 1 ? '' : 's'}` },
           { label: 'Fee promedio', value: totals.avgFee != null ? formatCopExact(totals.avgFee) : '—', sub: 'solo clientes con fee definido' },
           { label: 'Fees pendientes por definir', value: String(totals.feesPending), sub: 'de ' + activeClients.length + ' activos' },
         ].map((card) => (
