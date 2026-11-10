@@ -1,7 +1,10 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
 import {
+  listBillingInvoices,
+  listBillingIssuers,
   listClientBilling,
   listClientBillingPayments,
   upsertClientBilling,
@@ -9,19 +12,33 @@ import {
 } from '../services/billing';
 import { updateClientAdBudget } from '../services/clients';
 import type {
+  BillingInvoice,
+  BillingInvoiceIssuerKey,
+  BillingIssuer,
   BillingPaymentFrequency,
   BillingPaymentMonthStatus,
   BillingPaymentPeriod,
   BillingPaymentReceiver,
   Client,
   ClientBilling,
+  ClientBillingInput,
   ClientBillingPayment,
 } from '../lib/supabase';
 import { formatCopExact } from '../lib/utils';
 import { getMonthLabel } from '../utils/monthLabel';
+import {
+  PAY_DAYS_PRESET_LABELS,
+  PAY_DAYS_PRESET_VALUES,
+  type PayDaysPreset,
+  periodLabel,
+  periodsForFrequency,
+  presetForPayDays,
+} from '../lib/billingPeriods';
+import { InvoiceGenerateModal } from '../components/billing/InvoiceGenerateModal';
 
 type StatusFilter = 'active' | 'all';
 type ReceiverFilter = 'all' | BillingPaymentReceiver;
+type RowSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const RECEIVER_LABELS: Record<BillingPaymentReceiver, string> = {
   samuel: 'Samuel',
@@ -35,10 +52,9 @@ const FREQUENCY_LABELS: Record<BillingPaymentFrequency, string> = {
   mensual: 'Mensual',
 };
 
-const PERIOD_LABELS: Record<BillingPaymentPeriod, string> = {
-  mes: 'Mes completo',
-  q1: '1 – 15',
-  q2: '16 – 30',
+const ISSUER_LABELS: Record<BillingInvoiceIssuerKey, string> = {
+  samuel: 'Samuel',
+  juanca: 'Juanca',
 };
 
 // Siempre el 1ro del mes actual en America/Bogota (no la zona del navegador
@@ -64,57 +80,166 @@ function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// mensual/anticipado => un solo cobro ('mes'). quincenal => dos ('q1','q2'),
-// cada uno por fee/2. Cambiar de modalidad nunca borra pagos ya guardados
-// del otro esquema, solo deja de mostrarlos (ver prompt de negocio).
-function periodsForFrequency(freq: BillingPaymentFrequency | null | undefined): BillingPaymentPeriod[] {
-  return freq === 'quincenal' ? ['q1', 'q2'] : ['mes'];
-}
-
 function paymentKey(clientId: string, period: BillingPaymentPeriod): string {
   return `${clientId}:${period}`;
 }
 
-// Fila editable local — solo fee + presupuesto de pauta (que vive en
-// clients, ver migración original). Un "Guardar" por fila persiste ambas.
+function invoiceKey(clientId: string, month: string, period: BillingPaymentPeriod): string {
+  return `${clientId}:${month}:${period}`;
+}
+
+function periodAmountFor(fee: number | null | undefined, periodsCount: number): number | null {
+  if (fee == null) return null;
+  return periodsCount === 2 ? fee / 2 : fee;
+}
+
+// Fila editable local — campos de texto con autoguardado (debounce/blur).
+// custom_pay_day solo se usa cuando el preset de "Día(s) de pago" es 'custom'.
 type EditableRow = {
   client_id: string;
   monthly_fee: string;
   monthly_ad_budget: string;
+  custom_pay_day: string;
 };
 
 function toEditableRow(clientId: string, budget: number | null | undefined, billing?: ClientBilling): EditableRow {
+  const preset = presetForPayDays(billing?.pay_days);
+  const singleCustomDay = preset === 'custom' && billing?.pay_days?.length === 1 ? billing.pay_days[0] : null;
   return {
     client_id: clientId,
     monthly_fee: billing?.monthly_fee != null ? String(billing.monthly_fee) : '',
     monthly_ad_budget: budget != null ? String(budget) : '',
+    custom_pay_day: singleCustomDay != null ? String(singleCustomDay) : '',
   };
 }
 
 export function FacturacionPage() {
+  const navigate = useNavigate();
   const { clients, loading: loadingClients, reload: reloadClients } = useClients();
   const [billingByClient, setBillingByClient] = useState<Map<string, ClientBilling>>(new Map());
   const [payments, setPayments] = useState<ClientBillingPayment[]>([]);
+  const [issuers, setIssuers] = useState<BillingIssuer[]>([]);
+  const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [loadingBilling, setLoadingBilling] = useState(true);
   const [rows, setRows] = useState<Map<string, EditableRow>>(new Map());
-  const [savingId, setSavingId] = useState<string | null>(null);
   const [togglingPaymentKey, setTogglingPaymentKey] = useState<string | null>(null);
   const [togglingPartnerKey, setTogglingPartnerKey] = useState<string | null>(null);
   const [errorByClient, setErrorByClient] = useState<Map<string, string>>(new Map());
+  const [rowStatus, setRowStatusState] = useState<Map<string, RowSaveStatus>>(new Map());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [receiverFilter, setReceiverFilter] = useState<ReceiverFilter>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => getBogotaCurrentMonth());
-  const [updatingFieldId, setUpdatingFieldId] = useState<string | null>(null);
   const [expandedClientIds, setExpandedClientIds] = useState<Set<string>>(new Set());
-  // Filas editadas por el usuario y aún no guardadas — el useEffect de abajo
-  // nunca las pisa con lo que llegue de billingByClient/clients.
-  const dirtyRowIdsRef = useRef<Set<string>>(new Set());
+  const [customDayModeIds, setCustomDayModeIds] = useState<Set<string>>(new Set());
+  const [invoiceModalFor, setInvoiceModalFor] = useState<{
+    client: Client;
+    period: BillingPaymentPeriod;
+    amount: number;
+    issuerKey: BillingInvoiceIssuerKey;
+    issuer: BillingIssuer | undefined;
+    payDays: number[] | null | undefined;
+  } | null>(null);
+
+  // Espejo en ref de billingByClient: saveBillingPatch necesita el valor más
+  // reciente al momento de ejecutarse (no el capturado en el closure de
+  // cuando se llamó), porque puede quedar encolado detrás de otro guardado.
+  const billingByClientRef = useRef<Map<string, ClientBilling>>(new Map());
+  useEffect(() => {
+    billingByClientRef.current = billingByClient;
+  }, [billingByClient]);
+
+  // Campos editados por el usuario y aún no guardados — por campo, no por
+  // fila completa: así guardar el presupuesto no pisa un fee a medio
+  // escribir en la misma fila, y viceversa.
+  const dirtyFeeIdsRef = useRef<Set<string>>(new Set());
+  const dirtyBudgetIdsRef = useRef<Set<string>>(new Set());
+  const dirtyCustomDayIdsRef = useRef<Set<string>>(new Set());
+
+  // Debounce (800ms) por campo+cliente.
+  const debounceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // "Guardado ✓" se apaga solo a los 2s.
+  const statusHideTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Cola/bandera por client_id para evitar guardados concurrentes — un canal
+  // para client_billing (fee/receptor/modalidad/días/emisor) y otro para el
+  // presupuesto de pauta (vive en clients), independientes entre sí.
+  const pendingBillingPatchRef = useRef<Map<string, Partial<ClientBillingInput>>>(new Map());
+  const billingInFlightRef = useRef<Set<string>>(new Set());
+  const pendingBudgetRef = useRef<Map<string, number | null>>(new Map());
+  const budgetInFlightRef = useRef<Set<string>>(new Set());
+  // Última acción fallida por cliente, para el botón "Reintentar".
+  const retryRef = useRef<Map<string, () => void>>(new Map());
+
+  useEffect(() => {
+    const debounceTimers = debounceTimersRef.current;
+    const statusHideTimers = statusHideTimersRef.current;
+    return () => {
+      for (const t of debounceTimers.values()) clearTimeout(t);
+      for (const t of statusHideTimers.values()) clearTimeout(t);
+    };
+  }, []);
+
+  function setRowStatus(clientId: string, status: RowSaveStatus) {
+    setRowStatusState((current) => new Map(current).set(clientId, status));
+    const existingTimer = statusHideTimersRef.current.get(clientId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      statusHideTimersRef.current.delete(clientId);
+    }
+    if (status === 'saved') {
+      const timer = setTimeout(() => {
+        setRowStatusState((current) => {
+          if (current.get(clientId) !== 'saved') return current;
+          const next = new Map(current);
+          next.set(clientId, 'idle');
+          return next;
+        });
+        statusHideTimersRef.current.delete(clientId);
+      }, 2000);
+      statusHideTimersRef.current.set(clientId, timer);
+    }
+  }
+
+  function setRowError(clientId: string, message: string | null) {
+    setErrorByClient((current) => {
+      const next = new Map(current);
+      if (message) next.set(clientId, message);
+      else next.delete(clientId);
+      return next;
+    });
+  }
+
+  function scheduleDebouncedSave(key: string, run: () => void) {
+    const existing = debounceTimersRef.current.get(key);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      debounceTimersRef.current.delete(key);
+      run();
+    }, 800);
+    debounceTimersRef.current.set(key, timer);
+  }
+
+  function cancelDebouncedSave(key: string) {
+    const existing = debounceTimersRef.current.get(key);
+    if (existing) {
+      clearTimeout(existing);
+      debounceTimersRef.current.delete(key);
+    }
+  }
 
   async function loadBilling() {
     setLoadingBilling(true);
-    const [billing, pays] = await Promise.all([listClientBilling(), listClientBillingPayments()]);
-    setBillingByClient(new Map(billing.map((b) => [b.client_id, b])));
+    const [billing, pays, issuersList, invoicesList] = await Promise.all([
+      listClientBilling(),
+      listClientBillingPayments(),
+      listBillingIssuers(),
+      listBillingInvoices(),
+    ]);
+    const billingMap = new Map(billing.map((b) => [b.client_id, b]));
+    setBillingByClient(billingMap);
+    billingByClientRef.current = billingMap;
     setPayments(pays);
+    setIssuers(issuersList);
+    setInvoices(invoicesList);
     setLoadingBilling(false);
   }
 
@@ -131,17 +256,25 @@ export function FacturacionPage() {
     [clients, statusFilter, receiverFilter, billingByClient],
   );
 
-  // Inicializa/resincroniza las filas editables cuando llegan clientes o
-  // facturación. Una fila sin editar se recalcula siempre (así no queda
-  // vacía si billingByClient llega después que clients); una fila "sucia"
-  // (con ediciones del usuario sin guardar) nunca se pisa.
+  // Inicializa/resincroniza las filas editables. Cada campo se recalcula
+  // salvo que esté "sucio" (editado sin guardar todavía) — por campo, no
+  // por fila completa (ver refs de dirty arriba).
   useEffect(() => {
     setRows((current) => {
       const next = new Map(current);
       for (const client of visibleClients) {
-        if (!next.has(client.id) || !dirtyRowIdsRef.current.has(client.id)) {
-          next.set(client.id, toEditableRow(client.id, client.monthly_ad_budget, billingByClient.get(client.id)));
+        const prevRow = next.get(client.id);
+        const fresh = toEditableRow(client.id, client.monthly_ad_budget, billingByClient.get(client.id));
+        if (!prevRow) {
+          next.set(client.id, fresh);
+          continue;
         }
+        next.set(client.id, {
+          client_id: client.id,
+          monthly_fee: dirtyFeeIdsRef.current.has(client.id) ? prevRow.monthly_fee : fresh.monthly_fee,
+          monthly_ad_budget: dirtyBudgetIdsRef.current.has(client.id) ? prevRow.monthly_ad_budget : fresh.monthly_ad_budget,
+          custom_pay_day: dirtyCustomDayIdsRef.current.has(client.id) ? prevRow.custom_pay_day : fresh.custom_pay_day,
+        });
       }
       return next;
     });
@@ -159,11 +292,21 @@ export function FacturacionPage() {
     return paymentByClientPeriod.get(paymentKey(clientId, period));
   }
 
-  // Totales del mes. "El socio" = Juanca, visto desde esta app (de Samuel):
-  // si el receptor es 'juanca' el 100% del cobro es su parte a reenviar; si
-  // es 'compartido', la mitad; si es 'samuel' (o sin receptor), nada. Sin
-  // una columna de "quién cobra" por cliente en la BD no hay forma de saber
-  // el caso real de cada cliente, así que esta es la convención usada.
+  const invoicesByKey = useMemo(() => {
+    const map = new Map<string, BillingInvoice>();
+    for (const inv of invoices) {
+      map.set(invoiceKey(inv.client_id, inv.month.slice(0, 10), inv.period), inv);
+    }
+    return map;
+  }, [invoices]);
+
+  const issuersByKey = useMemo(() => new Map(issuers.map((i) => [i.key, i])), [issuers]);
+
+  // Totales del mes. "El socio" ya no es una convención fija: ahora se
+  // calcula con invoice_issuer (quién emite/cobra) contra payment_receiver
+  // (a quién pertenece el fee). Si compartido, la mitad es del NO-emisor;
+  // si el receptor es samuel/juanca y emite el otro, el 100% es del
+  // receptor; si receptor == emisor, no hay nada que pasar.
   const totals = useMemo(() => {
     let feeExpected = 0;
     let collected = 0;
@@ -173,7 +316,8 @@ export function FacturacionPage() {
     let feeUndefined = 0;
     let adSpendUnderManagement = 0;
     let receiverUnassigned = 0;
-    let partnerPending = 0;
+    let owedBySamuelToJuanca = 0;
+    let owedByJuancaToSamuel = 0;
     const byReceiver: Record<BillingPaymentReceiver, { expected: number; collected: number }> = {
       samuel: { expected: 0, collected: 0 },
       juanca: { expected: 0, collected: 0 },
@@ -191,10 +335,11 @@ export function FacturacionPage() {
       }
 
       const receiver = billing?.payment_receiver ?? null;
+      const issuer = billing?.invoice_issuer ?? null;
       if (!receiver) receiverUnassigned += 1;
 
       const periods = periodsForFrequency(billing?.payment_frequency);
-      const periodAmount = periods.length === 2 ? fee / 2 : fee;
+      const periodAmount = periodAmountFor(fee, periods.length) ?? 0;
 
       for (const period of periods) {
         feeExpected += periodAmount;
@@ -226,9 +371,15 @@ export function FacturacionPage() {
           }
         }
 
-        const partnerShare = receiver === 'juanca' ? periodAmount : receiver === 'compartido' ? periodAmount / 2 : 0;
-        if (isPaid && partnerShare > 0 && !payment?.partner_paid) {
-          partnerPending += partnerShare;
+        if (isPaid && !payment?.partner_paid && issuer && receiver) {
+          if (receiver === 'compartido') {
+            const share = periodAmount / 2;
+            if (issuer === 'samuel') owedBySamuelToJuanca += share;
+            else owedByJuancaToSamuel += share;
+          } else if (receiver !== issuer) {
+            if (issuer === 'samuel') owedBySamuelToJuanca += periodAmount;
+            else owedByJuancaToSamuel += periodAmount;
+          }
         }
       }
     }
@@ -243,13 +394,17 @@ export function FacturacionPage() {
       adSpendUnderManagement,
       byReceiver,
       receiverUnassigned,
-      partnerPending,
+      owedBySamuelToJuanca,
+      owedByJuancaToSamuel,
+      partnerPending: owedBySamuelToJuanca + owedByJuancaToSamuel,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleClients, billingByClient, paymentByClientPeriod]);
 
   function updateRow(clientId: string, patch: Partial<EditableRow>) {
-    dirtyRowIdsRef.current.add(clientId);
+    if ('monthly_fee' in patch) dirtyFeeIdsRef.current.add(clientId);
+    if ('monthly_ad_budget' in patch) dirtyBudgetIdsRef.current.add(clientId);
+    if ('custom_pay_day' in patch) dirtyCustomDayIdsRef.current.add(clientId);
     setRows((current) => {
       const next = new Map(current);
       const existing = next.get(clientId);
@@ -258,13 +413,167 @@ export function FacturacionPage() {
     });
   }
 
-  function setRowError(clientId: string, message: string | null) {
-    setErrorByClient((current) => {
-      const next = new Map(current);
-      if (message) next.set(clientId, message);
-      else next.delete(clientId);
+  // Guarda un parche sobre client_billing, encolando si ya hay un guardado
+  // en vuelo para ese cliente (se fusiona con lo pendiente, nunca se pierde
+  // un cambio). SIEMPRE envía el registro completo (mezclando sobre el
+  // último valor conocido) porque Postgrest upsert solo toca las columnas
+  // presentes en el payload.
+  async function saveBillingPatch(clientId: string, patch: Partial<ClientBillingInput>) {
+    const merged = { ...(pendingBillingPatchRef.current.get(clientId) ?? {}), ...patch };
+    pendingBillingPatchRef.current.set(clientId, merged);
+    if (billingInFlightRef.current.has(clientId)) return;
+
+    billingInFlightRef.current.add(clientId);
+    setRowStatus(clientId, 'saving');
+    setRowError(clientId, null);
+
+    let hadError = false;
+
+    while (pendingBillingPatchRef.current.has(clientId)) {
+      const toSend = pendingBillingPatchRef.current.get(clientId)!;
+      pendingBillingPatchRef.current.delete(clientId);
+
+      const existing = billingByClientRef.current.get(clientId);
+      const payload: ClientBillingInput = {
+        client_id: clientId,
+        monthly_fee: existing?.monthly_fee ?? null,
+        currency: existing?.currency ?? 'COP',
+        payment_receiver: existing?.payment_receiver ?? null,
+        payment_frequency: existing?.payment_frequency ?? null,
+        pay_days: existing?.pay_days ?? null,
+        invoice_issuer: existing?.invoice_issuer ?? null,
+        ...toSend,
+      };
+
+      const result = await upsertClientBilling(payload);
+      if (result.error) {
+        hadError = true;
+        setRowError(clientId, result.error);
+        // deja lo que faltó en la cola para que "Reintentar" lo retome
+        pendingBillingPatchRef.current.set(clientId, { ...toSend, ...(pendingBillingPatchRef.current.get(clientId) ?? {}) });
+        break;
+      }
+
+      if (result.data) {
+        const saved = result.data as ClientBilling;
+        billingByClientRef.current.set(clientId, saved);
+        setBillingByClient((current) => new Map(current).set(clientId, saved));
+      }
+      if ('monthly_fee' in toSend) dirtyFeeIdsRef.current.delete(clientId);
+      if ('pay_days' in toSend) dirtyCustomDayIdsRef.current.delete(clientId);
+    }
+
+    billingInFlightRef.current.delete(clientId);
+    setRowStatus(clientId, hadError ? 'error' : 'saved');
+    if (hadError) retryRef.current.set(clientId, () => void saveBillingPatch(clientId, {}));
+    else retryRef.current.delete(clientId);
+  }
+
+  async function saveAdBudget(clientId: string, value: number | null) {
+    pendingBudgetRef.current.set(clientId, value);
+    if (budgetInFlightRef.current.has(clientId)) return;
+
+    budgetInFlightRef.current.add(clientId);
+    setRowStatus(clientId, 'saving');
+    setRowError(clientId, null);
+
+    let hadError = false;
+    let lastSent: number | null = value;
+
+    while (pendingBudgetRef.current.has(clientId)) {
+      const toSend = pendingBudgetRef.current.get(clientId) ?? null;
+      pendingBudgetRef.current.delete(clientId);
+      lastSent = toSend;
+
+      const result = await updateClientAdBudget(clientId, toSend);
+      if (result.error) {
+        hadError = true;
+        setRowError(clientId, result.error);
+        pendingBudgetRef.current.set(clientId, toSend);
+        break;
+      }
+    }
+
+    if (!hadError) {
+      dirtyBudgetIdsRef.current.delete(clientId);
+      await reloadClients();
+    }
+
+    budgetInFlightRef.current.delete(clientId);
+    setRowStatus(clientId, hadError ? 'error' : 'saved');
+    if (hadError) retryRef.current.set(clientId, () => void saveAdBudget(clientId, lastSent));
+    else retryRef.current.delete(clientId);
+  }
+
+  function handleFeeChange(clientId: string, value: string) {
+    updateRow(clientId, { monthly_fee: value });
+    scheduleDebouncedSave(`${clientId}:fee`, () => commitFee(clientId, value));
+  }
+
+  function handleFeeBlur(clientId: string, value: string) {
+    cancelDebouncedSave(`${clientId}:fee`);
+    commitFee(clientId, value);
+  }
+
+  function commitFee(clientId: string, rawValue: string) {
+    const nextStr = rawValue.trim();
+    if (nextStr && Number.isNaN(Number(nextStr))) return;
+    const committed = billingByClientRef.current.get(clientId)?.monthly_fee;
+    const committedStr = committed != null ? String(committed) : '';
+    if (nextStr === committedStr) return;
+    void saveBillingPatch(clientId, { monthly_fee: nextStr ? Number(nextStr) : null });
+  }
+
+  function handleBudgetChange(client: Client, value: string) {
+    updateRow(client.id, { monthly_ad_budget: value });
+    scheduleDebouncedSave(`${client.id}:budget`, () => commitBudget(client, value));
+  }
+
+  function handleBudgetBlur(client: Client, value: string) {
+    cancelDebouncedSave(`${client.id}:budget`);
+    commitBudget(client, value);
+  }
+
+  function commitBudget(client: Client, rawValue: string) {
+    const nextStr = rawValue.trim();
+    if (nextStr && Number.isNaN(Number(nextStr))) return;
+    const committedStr = client.monthly_ad_budget != null ? String(client.monthly_ad_budget) : '';
+    if (nextStr === committedStr) return;
+    void saveAdBudget(client.id, nextStr ? Number(nextStr) : null);
+  }
+
+  function handleCustomDayChange(clientId: string, value: string) {
+    updateRow(clientId, { custom_pay_day: value });
+    scheduleDebouncedSave(`${clientId}:customDay`, () => commitCustomDay(clientId, value));
+  }
+
+  function handleCustomDayBlur(clientId: string, value: string) {
+    cancelDebouncedSave(`${clientId}:customDay`);
+    commitCustomDay(clientId, value);
+  }
+
+  function commitCustomDay(clientId: string, rawValue: string) {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return;
+    const day = Number(trimmed);
+    if (!Number.isInteger(day) || day < 1 || day > 31) return;
+    const committed = billingByClientRef.current.get(clientId)?.pay_days;
+    if (committed && committed.length === 1 && committed[0] === day) return;
+    void saveBillingPatch(clientId, { pay_days: [day] });
+  }
+
+  function handlePayDaysPresetChange(clientId: string, preset: PayDaysPreset) {
+    if (preset === 'custom') {
+      setCustomDayModeIds((current) => new Set(current).add(clientId));
+      return;
+    }
+    setCustomDayModeIds((current) => {
+      if (!current.has(clientId)) return current;
+      const next = new Set(current);
+      next.delete(clientId);
       return next;
     });
+    void saveBillingPatch(clientId, { pay_days: PAY_DAYS_PRESET_VALUES[preset] });
   }
 
   function toggleExpanded(clientId: string) {
@@ -274,70 +583,6 @@ export function FacturacionPage() {
       else next.add(clientId);
       return next;
     });
-  }
-
-  async function handleSave(clientId: string) {
-    const row = rows.get(clientId);
-    if (!row) return;
-
-    setSavingId(clientId);
-    setRowError(clientId, null);
-
-    const billingResult = await upsertClientBilling({
-      client_id: clientId,
-      monthly_fee: row.monthly_fee.trim() ? Number(row.monthly_fee) : null,
-      currency: 'COP',
-    });
-
-    if (billingResult.error) {
-      setRowError(clientId, billingResult.error);
-      setSavingId(null);
-      return;
-    }
-
-    const budgetResult = await updateClientAdBudget(
-      clientId,
-      row.monthly_ad_budget.trim() ? Number(row.monthly_ad_budget) : null,
-    );
-
-    if (budgetResult.error) {
-      setRowError(clientId, budgetResult.error);
-      setSavingId(null);
-      return;
-    }
-
-    if (billingResult.data) {
-      setBillingByClient((current) => new Map(current).set(clientId, billingResult.data as ClientBilling));
-    }
-    dirtyRowIdsRef.current.delete(clientId);
-    await reloadClients();
-    setSavingId(null);
-  }
-
-  // Guardado inmediato al cambiar receptor/modalidad — no espera al botón
-  // "Guardar" de la fila (ese sigue siendo solo para fee/presupuesto).
-  async function handleUpdateBillingField(
-    clientId: string,
-    patch: { payment_receiver?: BillingPaymentReceiver | null; payment_frequency?: BillingPaymentFrequency | null },
-  ) {
-    const existing = billingByClient.get(clientId);
-    setUpdatingFieldId(clientId);
-    setRowError(clientId, null);
-
-    const result = await upsertClientBilling({
-      client_id: clientId,
-      monthly_fee: existing?.monthly_fee ?? null,
-      currency: existing?.currency ?? 'COP',
-      payment_receiver: patch.payment_receiver !== undefined ? patch.payment_receiver : existing?.payment_receiver ?? null,
-      payment_frequency: patch.payment_frequency !== undefined ? patch.payment_frequency : existing?.payment_frequency ?? null,
-    });
-
-    if (result.error) {
-      setRowError(clientId, result.error);
-    } else if (result.data) {
-      setBillingByClient((current) => new Map(current).set(clientId, result.data as ClientBilling));
-    }
-    setUpdatingFieldId(null);
   }
 
   function replacePayment(saved: ClientBillingPayment) {
@@ -399,6 +644,12 @@ export function FacturacionPage() {
     setTogglingPartnerKey(null);
   }
 
+  function handleInvoiceCreated(invoice: BillingInvoice) {
+    setInvoices((current) => [invoice, ...current]);
+    setInvoiceModalFor(null);
+    navigate(`/admin/cuentas-de-cobro/${invoice.id}`);
+  }
+
   function renderPeriodControl(client: Client, period: BillingPaymentPeriod, billing: ClientBilling | undefined, compact: boolean) {
     const payment = paymentFor(client.id, period);
     const isPaid = payment?.status === 'pagado';
@@ -407,11 +658,25 @@ export function FacturacionPage() {
     const isTogglingPartner = togglingPartnerKey === key;
     const hasReceiver = !!billing?.payment_receiver;
 
+    const amount = periodAmountFor(billing?.monthly_fee, periodsForFrequency(billing?.payment_frequency).length);
+    const issuerKey = billing?.invoice_issuer ?? null;
+    const issuer = issuerKey ? issuersByKey.get(issuerKey) : undefined;
+    const issuerReady = !!issuer?.legal_name && !!issuer?.account_number;
+    const existingInvoice = invoicesByKey.get(invoiceKey(client.id, selectedMonth, period));
+    const invoiceDisabled = amount == null || !issuerKey || !issuerReady;
+    const invoiceTitle = !issuerKey
+      ? 'Asigna un emisor primero'
+      : !issuerReady
+        ? 'Completa los datos del emisor'
+        : amount == null
+          ? 'Falta el fee'
+          : undefined;
+
     return (
-      <div key={period} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 150 }}>
+      <div key={period} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160 }}>
         {!compact && (
           <span className="meta-chip" style={{ fontSize: '0.56rem', width: 'fit-content' }}>
-            {PERIOD_LABELS[period]}
+            {periodLabel(period, billing?.pay_days)}
           </span>
         )}
         <button
@@ -456,6 +721,37 @@ export function FacturacionPage() {
                   : 'Pagado al socio'}
           </button>
         )}
+
+        {existingInvoice ? (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Link
+              to={`/admin/cuentas-de-cobro/${existingInvoice.id}`}
+              className="btn-secondary"
+              style={{ fontSize: '0.56rem', textDecoration: 'none', padding: '3px 8px' }}
+            >
+              Ver/reimprimir #{String(existingInvoice.invoice_number).padStart(5, '0')}
+            </Link>
+            <button
+              className="btn-ghost"
+              disabled={invoiceDisabled}
+              title={invoiceTitle}
+              style={{ fontSize: '0.56rem', padding: '3px 8px' }}
+              onClick={() => issuerKey && amount != null && setInvoiceModalFor({ client, period, amount, issuerKey, issuer, payDays: billing?.pay_days })}
+            >
+              Emitir otra
+            </button>
+          </div>
+        ) : (
+          <button
+            className="btn-secondary"
+            disabled={invoiceDisabled}
+            title={invoiceTitle}
+            style={{ fontSize: '0.56rem', padding: '3px 8px' }}
+            onClick={() => issuerKey && amount != null && setInvoiceModalFor({ client, period, amount, issuerKey, issuer, payDays: billing?.pay_days })}
+          >
+            Cuenta de cobro
+          </button>
+        )}
       </div>
     );
   }
@@ -467,8 +763,11 @@ export function FacturacionPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Facturación</h1>
-          <p className="page-subtitle">Honorarios y presupuesto de pauta · solo visible para admins</p>
+          <p className="page-subtitle">Honorarios, presupuesto de pauta y cuentas de cobro · solo visible para admins</p>
         </div>
+        <Link to="/admin/emisores" className="btn-secondary" style={{ textDecoration: 'none' }}>
+          Datos de emisores
+        </Link>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 24px 16px', flexWrap: 'wrap' }}>
@@ -548,7 +847,9 @@ export function FacturacionPage() {
           { label: 'Esperado — Juanca', value: formatCopExact(totals.byReceiver.juanca.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.juanca.collected)}` },
           { label: 'Esperado — Compartido', value: formatCopExact(totals.byReceiver.compartido.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.compartido.collected)} (ya incluido 50/50 arriba)` },
           { label: 'Sin receptor asignado', value: String(totals.receiverUnassigned), sub: `de ${visibleClients.length} mostrados` },
-          { label: 'Pendiente por pasar al socio', value: formatCopExact(totals.partnerPending), sub: 'cobros ya pagados, sin repartir' },
+          { label: 'Pendiente por pasar al socio', value: formatCopExact(totals.partnerPending), sub: 'cobros pagados, sin repartir' },
+          { label: 'Samuel le debe a Juanca', value: formatCopExact(totals.owedBySamuelToJuanca), sub: 'según quién emite/cobra' },
+          { label: 'Juanca le debe a Samuel', value: formatCopExact(totals.owedByJuancaToSamuel), sub: 'según quién emite/cobra' },
         ].map((card) => (
           <div key={card.label} className="card-glass portal-kpi-card">
             <p className="portal-kpi-label">{card.label}</p>
@@ -565,10 +866,10 @@ export function FacturacionPage() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', minWidth: 980, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {['Cliente', 'Fee mensual (COP)', 'Presupuesto pauta (COP)', 'Recibe', 'Modalidad', `Estado de pago — ${getMonthLabel(selectedMonth)}`, ''].map((h) => (
+                  {['Cliente', 'Fee mensual (COP)', 'Presupuesto pauta (COP)', 'Recibe', 'Modalidad', 'Día(s) de pago', 'Emite / cobra', `Estado de pago — ${getMonthLabel(selectedMonth)}`].map((h) => (
                     <th
                       key={h}
                       className="number-label"
@@ -584,12 +885,18 @@ export function FacturacionPage() {
                   const row = rows.get(client.id);
                   if (!row) return null;
                   const rowError = errorByClient.get(client.id);
+                  const status = rowStatus.get(client.id) ?? 'idle';
                   const billing = billingByClient.get(client.id);
-                  const isUpdatingField = updatingFieldId === client.id;
                   const periods = periodsForFrequency(billing?.payment_frequency);
                   const isQuincenal = periods.length === 2;
                   const isExpanded = expandedClientIds.has(client.id);
                   const paidPeriods = periods.filter((p) => paymentFor(client.id, p)?.status === 'pagado').length;
+                  const effectivePreset: PayDaysPreset = customDayModeIds.has(client.id)
+                    ? 'custom'
+                    : presetForPayDays(billing?.pay_days);
+                  const issuerKey = billing?.invoice_issuer ?? null;
+                  const issuer = issuerKey ? issuersByKey.get(issuerKey) : undefined;
+                  const issuerIncomplete = !!issuerKey && (!issuer?.legal_name || !issuer?.account_number);
 
                   return (
                     <Fragment key={client.id}>
@@ -599,11 +906,28 @@ export function FacturacionPage() {
                           {client.status !== 'active' && (
                             <span className="meta-chip" style={{ marginLeft: 6, fontSize: '0.56rem' }}>{client.status}</span>
                           )}
-                          {rowError && (
-                            <p style={{ margin: '4px 0 0', fontSize: '0.64rem', color: 'var(--danger)', whiteSpace: 'normal', maxWidth: 220 }}>
-                              {rowError}
-                            </p>
-                          )}
+                          <div style={{ marginTop: 4 }}>
+                            {status === 'saving' && (
+                              <span style={{ fontSize: '0.6rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>Guardando…</span>
+                            )}
+                            {status === 'saved' && (
+                              <span style={{ fontSize: '0.6rem', color: 'var(--success)', fontFamily: 'JetBrains Mono' }}>Guardado ✓</span>
+                            )}
+                            {status === 'error' && rowError && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                                <p style={{ margin: 0, fontSize: '0.64rem', color: 'var(--danger)', whiteSpace: 'normal', maxWidth: 220 }}>
+                                  {rowError}
+                                </p>
+                                <button
+                                  className="btn-ghost"
+                                  style={{ fontSize: '0.58rem', padding: '2px 8px' }}
+                                  onClick={() => retryRef.current.get(client.id)?.()}
+                                >
+                                  Reintentar
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td style={{ padding: '6px 12px' }}>
                           <input
@@ -611,7 +935,8 @@ export function FacturacionPage() {
                             type="number"
                             min={0}
                             value={row.monthly_fee}
-                            onChange={(e) => updateRow(client.id, { monthly_fee: e.target.value })}
+                            onChange={(e) => handleFeeChange(client.id, e.target.value)}
+                            onBlur={(e) => handleFeeBlur(client.id, e.target.value)}
                             placeholder="—"
                             style={{ width: 130 }}
                           />
@@ -622,7 +947,8 @@ export function FacturacionPage() {
                             type="number"
                             min={0}
                             value={row.monthly_ad_budget}
-                            onChange={(e) => updateRow(client.id, { monthly_ad_budget: e.target.value })}
+                            onChange={(e) => handleBudgetChange(client, e.target.value)}
+                            onBlur={(e) => handleBudgetBlur(client, e.target.value)}
                             placeholder="—"
                             style={{ width: 130 }}
                           />
@@ -630,24 +956,12 @@ export function FacturacionPage() {
                         <td style={{ padding: '6px 12px' }}>
                           <select
                             value={billing?.payment_receiver ?? ''}
-                            disabled={isUpdatingField}
                             onChange={(e) =>
-                              void handleUpdateBillingField(client.id, {
+                              void saveBillingPatch(client.id, {
                                 payment_receiver: (e.target.value || null) as BillingPaymentReceiver | null,
                               })
                             }
-                            style={{
-                              height: '34px',
-                              padding: '0 8px',
-                              background: 'var(--color-bg-input)',
-                              border: '1px solid var(--color-border)',
-                              borderRadius: '4px',
-                              color: billing?.payment_receiver ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
-                              fontFamily: 'JetBrains Mono',
-                              fontSize: '0.7rem',
-                              outline: 'none',
-                              cursor: 'pointer',
-                            }}
+                            style={selectStyle(!!billing?.payment_receiver)}
                           >
                             <option value="">Sin asignar</option>
                             {(Object.keys(RECEIVER_LABELS) as BillingPaymentReceiver[]).map((value) => (
@@ -660,24 +974,12 @@ export function FacturacionPage() {
                         <td style={{ padding: '6px 12px' }}>
                           <select
                             value={billing?.payment_frequency ?? ''}
-                            disabled={isUpdatingField}
                             onChange={(e) =>
-                              void handleUpdateBillingField(client.id, {
+                              void saveBillingPatch(client.id, {
                                 payment_frequency: (e.target.value || null) as BillingPaymentFrequency | null,
                               })
                             }
-                            style={{
-                              height: '34px',
-                              padding: '0 8px',
-                              background: 'var(--color-bg-input)',
-                              border: '1px solid var(--color-border)',
-                              borderRadius: '4px',
-                              color: billing?.payment_frequency ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
-                              fontFamily: 'JetBrains Mono',
-                              fontSize: '0.7rem',
-                              outline: 'none',
-                              cursor: 'pointer',
-                            }}
+                            style={selectStyle(!!billing?.payment_frequency)}
                           >
                             <option value="">—</option>
                             {(Object.keys(FREQUENCY_LABELS) as BillingPaymentFrequency[]).map((value) => (
@@ -686,6 +988,59 @@ export function FacturacionPage() {
                               </option>
                             ))}
                           </select>
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <select
+                            value={effectivePreset}
+                            onChange={(e) => handlePayDaysPresetChange(client.id, e.target.value as PayDaysPreset)}
+                            style={selectStyle(true)}
+                          >
+                            {(Object.keys(PAY_DAYS_PRESET_LABELS) as PayDaysPreset[]).map((value) => (
+                              <option key={value} value={value}>
+                                {PAY_DAYS_PRESET_LABELS[value]}
+                              </option>
+                            ))}
+                          </select>
+                          {effectivePreset === 'custom' && (
+                            <input
+                              className="form-input"
+                              type="number"
+                              min={1}
+                              max={31}
+                              placeholder="Día (1-31)"
+                              value={row.custom_pay_day}
+                              onChange={(e) => handleCustomDayChange(client.id, e.target.value)}
+                              onBlur={(e) => handleCustomDayBlur(client.id, e.target.value)}
+                              style={{ width: 110, marginTop: 6 }}
+                            />
+                          )}
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <select
+                            value={issuerKey ?? ''}
+                            onChange={(e) =>
+                              void saveBillingPatch(client.id, {
+                                invoice_issuer: (e.target.value || null) as BillingInvoiceIssuerKey | null,
+                              })
+                            }
+                            style={selectStyle(!!issuerKey)}
+                          >
+                            <option value="">Sin asignar</option>
+                            {(Object.keys(ISSUER_LABELS) as BillingInvoiceIssuerKey[]).map((value) => (
+                              <option key={value} value={value}>
+                                {ISSUER_LABELS[value]}
+                              </option>
+                            ))}
+                          </select>
+                          {issuerIncomplete && (
+                            <Link
+                              to="/admin/emisores"
+                              className="meta-chip"
+                              style={{ display: 'block', marginTop: 4, color: 'var(--warning)', textDecoration: 'none', width: 'fit-content' }}
+                            >
+                              Completa los datos del emisor
+                            </Link>
+                          )}
                         </td>
                         <td style={{ padding: '6px 12px' }}>
                           {isQuincenal ? (
@@ -701,19 +1056,10 @@ export function FacturacionPage() {
                             renderPeriodControl(client, periods[0], billing, true)
                           )}
                         </td>
-                        <td style={{ padding: '6px 12px' }}>
-                          <button
-                            className="btn-secondary"
-                            disabled={savingId === client.id}
-                            onClick={() => void handleSave(client.id)}
-                          >
-                            {savingId === client.id ? 'Guardando...' : 'Guardar'}
-                          </button>
-                        </td>
                       </tr>
                       {isQuincenal && isExpanded && (
                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td colSpan={7} style={{ padding: '4px 12px 14px 12px', background: 'var(--surface-2)' }}>
+                          <td colSpan={8} style={{ padding: '4px 12px 14px 12px', background: 'var(--surface-2)' }}>
                             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                               {periods.map((period) => renderPeriodControl(client, period, billing, false))}
                             </div>
@@ -726,7 +1072,7 @@ export function FacturacionPage() {
 
                 {visibleClients.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.72rem' }}>
+                    <td colSpan={8} style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.72rem' }}>
                       No hay clientes para este filtro.
                     </td>
                   </tr>
@@ -736,6 +1082,81 @@ export function FacturacionPage() {
           </div>
         )}
       </div>
+
+      <div className="card-glass" style={{ margin: '0 24px 24px', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 16px 0' }}>
+          <h2 className="number-label" style={{ fontSize: '0.72rem', color: 'var(--fg)' }}>Cuentas de cobro emitidas</h2>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['Número', 'Emisor', 'Cliente', 'Mes / periodo', 'Total', 'Fecha', ''].map((h) => (
+                  <th key={h} className="number-label" style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 400, whiteSpace: 'nowrap', fontSize: '0.6rem', color: 'var(--fg-muted)' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => {
+                const client = clients.find((c) => c.id === invoice.client_id);
+                return (
+                  <tr key={invoice.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono', fontSize: '0.74rem' }}>#{String(invoice.invoice_number).padStart(5, '0')}</td>
+                    <td style={{ padding: '9px 12px', fontSize: '0.74rem' }}>{ISSUER_LABELS[invoice.issuer_key]}</td>
+                    <td style={{ padding: '9px 12px', fontSize: '0.74rem' }}>{client?.name ?? '—'}</td>
+                    <td style={{ padding: '9px 12px', fontSize: '0.74rem' }}>{getMonthLabel(invoice.month)} · {periodLabel(invoice.period, billingByClient.get(invoice.client_id)?.pay_days)}</td>
+                    <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono', fontSize: '0.74rem' }}>{formatCopExact(invoice.total)}</td>
+                    <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'var(--fg-muted)' }}>{invoice.issue_date}</td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <Link to={`/admin/cuentas-de-cobro/${invoice.id}`} className="btn-secondary" style={{ fontSize: '0.64rem', textDecoration: 'none' }}>
+                        Ver / reimprimir
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+              {invoices.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ padding: '32px 24px', textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.72rem' }}>
+                    Todavía no se ha emitido ninguna cuenta de cobro.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {invoiceModalFor && (
+        <InvoiceGenerateModal
+          client={invoiceModalFor.client}
+          period={invoiceModalFor.period}
+          month={selectedMonth}
+          defaultAmount={invoiceModalFor.amount}
+          issuerKey={invoiceModalFor.issuerKey}
+          issuer={invoiceModalFor.issuer}
+          payDays={invoiceModalFor.payDays}
+          onClose={() => setInvoiceModalFor(null)}
+          onCreated={handleInvoiceCreated}
+        />
+      )}
     </div>
   );
+}
+
+function selectStyle(hasValue: boolean): CSSProperties {
+  return {
+    height: '34px',
+    padding: '0 8px',
+    background: 'var(--color-bg-input)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '4px',
+    color: hasValue ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
+    fontFamily: 'JetBrains Mono',
+    fontSize: '0.7rem',
+    outline: 'none',
+    cursor: 'pointer',
+  };
 }

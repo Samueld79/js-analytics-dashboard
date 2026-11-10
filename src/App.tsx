@@ -25,6 +25,8 @@ import { StrategiesPage } from './pages/StrategiesPage';
 import { DashboardClientPage } from './pages/DashboardClientPage';
 import { PortalClientAdminPage } from './pages/PortalClientAdminPage';
 import { FacturacionPage } from './pages/FacturacionPage';
+import { BillingIssuersPage } from './pages/BillingIssuersPage';
+import { InvoicePrintPage } from './pages/InvoicePrintPage';
 import { ReportesPage } from './pages/ReportesPage';
 // import { SatisfactionPage } from './pages/SatisfactionPage';
 import { ClientPortalPublicPage } from './pages/ClientPortalPublicPage';
@@ -115,6 +117,8 @@ function AppContent() {
       {/* <Route path="/calendar" element={<RequireInternal><CalendarPage /></RequireInternal>} /> */}
       <Route path="/portal-cliente" element={<RequireInternal><PortalClientAdminPage /></RequireInternal>} />
       <Route path="/admin/facturacion" element={<RequireAgencyAdmin><FacturacionPage /></RequireAgencyAdmin>} />
+      <Route path="/admin/emisores" element={<RequireAgencyAdmin><BillingIssuersPage /></RequireAgencyAdmin>} />
+      <Route path="/admin/cuentas-de-cobro/:invoiceId" element={<RequireAgencyAdmin><InvoicePrintPage /></RequireAgencyAdmin>} />
       <Route path="/admin/reportes" element={<RequireInternal><ReportesPage /></RequireInternal>} />
       {/* <Route path="/satisfaccion" element={<RequireInternal><SatisfactionPage /></RequireInternal>} /> */}
       {/* <Route path="/alerts" element={<RequireInternal><AlertsPage /></RequireInternal>} /> */}

@@ -3,6 +3,12 @@ import {
   isSupabaseConfigured,
   SUPABASE_MISSING_MESSAGE,
   supabase,
+  type BillingInvoice,
+  type BillingInvoiceIssuerKey,
+  type BillingInvoiceItem,
+  type BillingIssuer,
+  type BillingIssuerInput,
+  type BillingPaymentPeriod,
   type ClientBilling,
   type ClientBillingInput,
   type ClientBillingPayment,
@@ -89,4 +95,124 @@ export async function upsertClientBillingPayment(
   }
 
   return { data: (data ?? null) as ClientBillingPayment | null, error: null };
+}
+
+// ── Emisores de cuenta de cobro (billing_issuers) — SOLO admin ─────────────
+// Nunca loguear ni imprimir el contenido de estas filas (NIT, cuenta, etc.):
+// solo se usan para pasarlos a la vista imprimible / al formulario.
+
+export async function listBillingIssuers(): Promise<BillingIssuer[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase.from('billing_issuers').select('*');
+  if (error) {
+    console.error('[billing] listBillingIssuers', error);
+    return [];
+  }
+
+  return (data ?? []) as BillingIssuer[];
+}
+
+export async function upsertBillingIssuer(
+  input: BillingIssuerInput,
+): Promise<ServiceMutationResult<BillingIssuer>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const { data, error } = await supabase
+    .from('billing_issuers')
+    .upsert(input, { onConflict: 'key' })
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[billing] upsertBillingIssuer', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo guardar el emisor.') };
+  }
+
+  return { data: (data ?? null) as BillingIssuer | null, error: null };
+}
+
+// ── Cuentas de cobro emitidas (billing_invoices) — SOLO admin ──────────────
+
+export async function listBillingInvoices(): Promise<BillingInvoice[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('billing_invoices')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[billing] listBillingInvoices', error);
+    return [];
+  }
+
+  return (data ?? []) as BillingInvoice[];
+}
+
+export async function getBillingInvoice(id: string): Promise<BillingInvoice | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  const { data, error } = await supabase.from('billing_invoices').select('*').eq('id', id).maybeSingle();
+  if (error) {
+    console.error('[billing] getBillingInvoice', error);
+    return null;
+  }
+
+  return (data ?? null) as BillingInvoice | null;
+}
+
+// Numera SIEMPRE con el RPC take_invoice_number (consecutivo atómico por
+// emisor) — nunca calcular el número de cuenta de cobro en el cliente.
+export async function createBillingInvoice(params: {
+  clientId: string;
+  issuerKey: BillingInvoiceIssuerKey;
+  month: string;
+  period: BillingPaymentPeriod;
+  items: BillingInvoiceItem[];
+  total: number;
+}): Promise<ServiceMutationResult<BillingInvoice>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const { data: invoiceNumber, error: rpcError } = await supabase.rpc('take_invoice_number', {
+    p_issuer: params.issuerKey,
+  });
+
+  if (rpcError || invoiceNumber == null) {
+    console.error('[billing] take_invoice_number', rpcError);
+    return { data: null, error: getErrorMessage(rpcError, 'No se pudo generar el número de la cuenta de cobro.') };
+  }
+
+  const created_by = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from('billing_invoices')
+    .insert({
+      client_id: params.clientId,
+      issuer_key: params.issuerKey,
+      invoice_number: invoiceNumber,
+      month: params.month,
+      period: params.period,
+      items: params.items,
+      total: params.total,
+      created_by,
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[billing] createBillingInvoice', error);
+    return {
+      data: null,
+      error: getErrorMessage(
+        error,
+        `Se generó el número de cuenta de cobro #${invoiceNumber} pero no se pudo guardar. Avisa para revisar el consecutivo antes de reintentar.`,
+      ),
+    };
+  }
+
+  return { data: (data ?? null) as BillingInvoice | null, error: null };
 }

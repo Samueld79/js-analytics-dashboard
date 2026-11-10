@@ -1,15 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listClientBilling, listClientBillingPayments } from '../../services/billing';
-import type {
-  BillingPaymentFrequency,
-  BillingPaymentPeriod,
-  BillingPaymentReceiver,
-  ClientBilling,
-  ClientBillingPayment,
-} from '../../lib/supabase';
+import type { BillingInvoiceIssuerKey, BillingPaymentFrequency, BillingPaymentReceiver, ClientBilling, ClientBillingPayment } from '../../lib/supabase';
 import { formatCopExact } from '../../lib/utils';
 import { getMonthLabel } from '../../utils/monthLabel';
+import { periodLabel, periodsForFrequency } from '../../lib/billingPeriods';
 
 const RECEIVER_LABELS: Record<BillingPaymentReceiver, string> = {
   samuel: 'Samuel',
@@ -23,10 +18,9 @@ const FREQUENCY_LABELS: Record<BillingPaymentFrequency, string> = {
   mensual: 'Mensual',
 };
 
-const PERIOD_LABELS: Record<BillingPaymentPeriod, string> = {
-  mes: 'mes completo',
-  q1: '1–15',
-  q2: '16–30',
+const ISSUER_LABELS: Record<BillingInvoiceIssuerKey, string> = {
+  samuel: 'Samuel',
+  juanca: 'Juanca',
 };
 
 function lastSixMonths(): string[] {
@@ -37,10 +31,6 @@ function lastSixMonths(): string[] {
     months.push(d.toISOString().slice(0, 10));
   }
   return months;
-}
-
-function periodsForFrequency(freq: BillingPaymentFrequency | null | undefined): BillingPaymentPeriod[] {
-  return freq === 'quincenal' ? ['q1', 'q2'] : ['mes'];
 }
 
 // Bloque resumido — SOLO se monta cuando el llamador ya confirmó role==='admin'
@@ -108,6 +98,9 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
         <span className="meta-chip">
           Modalidad: {billing?.payment_frequency ? FREQUENCY_LABELS[billing.payment_frequency] : '—'}
         </span>
+        <span className="meta-chip">
+          Emite: {billing?.invoice_issuer ? ISSUER_LABELS[billing.invoice_issuer] : 'Sin asignar'}
+        </span>
       </div>
 
       {receiver === 'compartido' && perPeriodAmount != null && (
@@ -129,7 +122,7 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
                 return (
                   <span
                     key={period}
-                    title={`${getMonthLabel(month)} · ${PERIOD_LABELS[period]} · ${paid ? 'Pagado' : 'Pendiente'}${paid ? (payment?.partner_paid ? ' · Pagado al socio' : ' · Pendiente de pasar al socio') : ''}`}
+                    title={`${getMonthLabel(month)} · ${periodLabel(period, billing?.pay_days)} · ${paid ? 'Pagado' : 'Pendiente'}${paid ? (payment?.partner_paid ? ' · Pagado al socio' : ' · Pendiente de pasar al socio') : ''}`}
                     style={{
                       position: 'relative',
                       display: 'block',

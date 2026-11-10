@@ -2203,4 +2203,139 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
   .monthly-report-charts-grid, .portal-kpi-grid {
     grid-template-columns: 1fr 1fr !important;
   }
+
+  /* Cuenta de cobro: hoja A4 a color, todo lo demás de la app oculto. */
+  .invoice-print-toolbar { display: none !important; }
+  .invoice-print-page { padding: 0 !important; display: block !important; }
+  .invoice-sheet { box-shadow: none !important; width: auto; min-height: auto; }
+  .invoice-sheet,
+  .invoice-sheet-topbar,
+  .invoice-footer,
+  .invoice-number-box,
+  .invoice-total-box,
+  .invoice-items-table th {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  @page { size: A4; margin: 0; }
 }
+
+/* ============================================================
+   SECTION 25: Cuenta de cobro (vista imprimible)
+   ============================================================ */
+.invoice-print-page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.invoice-print-toolbar {
+  width: 100%;
+  max-width: 210mm;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.invoice-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: 0 0 0 1px var(--border), 0 20px 50px oklch(0 0 0 / 0.35);
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.invoice-sheet-topbar {
+  height: 14px;
+  background: oklch(0.14 0.025 250);
+  flex-shrink: 0;
+}
+
+.invoice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 28px 40px 16px;
+  gap: 24px;
+}
+
+.invoice-logo-block { display: flex; flex-direction: column; gap: 10px; }
+.invoice-logo { height: 40px; width: auto; object-fit: contain; }
+.invoice-logo-placeholder { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.1rem; color: #1a1a1a; }
+.invoice-issuer-block p { margin: 0; font-size: 0.72rem; color: #333; line-height: 1.5; }
+
+.invoice-header-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.invoice-date { margin: 0; font-size: 0.78rem; color: #555; }
+.invoice-title { margin: 0; font-size: 1.1rem; letter-spacing: 0.04em; color: #1a1a1a; }
+.invoice-number-box {
+  background: #e4e4e4;
+  color: #1a1a1a;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.invoice-billed-to { padding: 8px 40px 20px; font-size: 0.85rem; color: #1a1a1a; margin: 0; }
+.invoice-billed-to span { color: #777; margin-right: 6px; }
+
+.invoice-items-table { width: calc(100% - 80px); margin: 0 40px 24px; border-collapse: collapse; font-size: 0.8rem; }
+.invoice-items-table th {
+  text-align: left;
+  padding: 8px 10px;
+  background: #f2f2f2;
+  color: #555;
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.invoice-items-table td { padding: 10px; border-bottom: 1px solid #e0e0e0; color: #1a1a1a; }
+.invoice-items-table td:last-child, .invoice-items-table th:last-child { text-align: right; }
+
+.invoice-totals { display: flex; justify-content: flex-end; gap: 16px; margin: 0 40px 24px; }
+.invoice-total-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  background: #f7f7f7;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 10px 18px;
+  min-width: 150px;
+}
+.invoice-total-box span { font-size: 0.64rem; color: #777; text-transform: uppercase; letter-spacing: 0.04em; }
+.invoice-total-box strong { font-size: 1.05rem; color: #1a1a1a; }
+
+.invoice-payment-details { margin: 0 40px 28px; font-size: 0.76rem; color: #333; }
+.invoice-section-label { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em; color: #777; margin: 0 0 6px; }
+.invoice-payment-details p { margin: 0 0 4px; }
+
+.invoice-signature-box {
+  margin: 0 40px 36px;
+  width: 220px;
+  height: 70px;
+  border-bottom: 1px solid #999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+  font-size: 0.66rem;
+  color: #999;
+}
+
+.invoice-footer {
+  margin-top: auto;
+  background: oklch(0.14 0.025 250);
+  color: #d8d8d8;
+  padding: 14px 40px;
+  font-size: 0.62rem;
+  line-height: 1.5;
+}
+.invoice-footer p { margin: 0; }
