@@ -136,6 +136,9 @@ export type ClientInput = Omit<
 
 export type BillingPaymentReceiver = 'samuel' | 'juanca' | 'compartido';
 export type BillingPaymentFrequency = 'anticipado' | 'quincenal' | 'mensual';
+// Quién emite la cuenta de cobro y cobra el dinero (distinto de a quién
+// pertenece el fee, ver payment_receiver). 'compartido' no aplica aquí.
+export type BillingInvoiceIssuerKey = 'samuel' | 'juanca';
 
 export type ClientBilling = {
   client_id: string;
@@ -143,6 +146,9 @@ export type ClientBilling = {
   currency: string;
   payment_receiver?: BillingPaymentReceiver | null;
   payment_frequency?: BillingPaymentFrequency | null;
+  // Días del mes en que se cobra (ej. [15] o [1,15]). Ver src/lib/billingPeriods.ts.
+  pay_days?: number[] | null;
+  invoice_issuer?: BillingInvoiceIssuerKey | null;
   updated_by?: string | null;
   updated_at: string;
   created_at: string;
@@ -150,7 +156,13 @@ export type ClientBilling = {
 
 export type ClientBillingInput = Pick<
   ClientBilling,
-  'client_id' | 'monthly_fee' | 'currency' | 'payment_receiver' | 'payment_frequency'
+  | 'client_id'
+  | 'monthly_fee'
+  | 'currency'
+  | 'payment_receiver'
+  | 'payment_frequency'
+  | 'pay_days'
+  | 'invoice_issuer'
 >;
 
 // ── Estado de pago mensual (client_billing_payments) — solo admin ──────────────
@@ -178,6 +190,56 @@ export type ClientBillingPaymentInput = Pick<
   ClientBillingPayment,
   'client_id' | 'month' | 'period' | 'status' | 'paid_at' | 'partner_paid' | 'partner_paid_at'
 >;
+
+// ── Emisores de cuenta de cobro (billing_issuers) — SOLO admin ─────────────
+// Datos personales de Samuel/Juanca (NIT, cuenta bancaria, etc.). NUNCA
+// hardcodear estos valores en el código: siempre se leen de esta tabla con
+// sesión de admin (RLS). Este repo es público.
+
+export type BillingIssuer = {
+  key: BillingInvoiceIssuerKey;
+  legal_name: string | null;
+  nit: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  bank_name: string | null;
+  account_type: string | null;
+  account_number: string | null;
+  brand_label: string | null;
+  next_invoice_number: number;
+  updated_at: string;
+};
+
+export type BillingIssuerInput = Partial<
+  Pick<
+    BillingIssuer,
+    'legal_name' | 'nit' | 'email' | 'phone' | 'address' | 'bank_name' | 'account_type' | 'account_number' | 'brand_label'
+  >
+> & { key: BillingInvoiceIssuerKey };
+
+// ── Cuentas de cobro emitidas (billing_invoices) — SOLO admin ──────────────
+
+export type BillingInvoiceItem = {
+  qty: number;
+  description: string;
+  value: number | null;
+};
+
+export type BillingInvoice = {
+  id: string;
+  client_id: string;
+  issuer_key: BillingInvoiceIssuerKey;
+  invoice_number: number;
+  issue_date: string;
+  valid_days: number;
+  month: string;
+  period: BillingPaymentPeriod;
+  items: BillingInvoiceItem[];
+  total: number;
+  created_by?: string | null;
+  created_at: string;
+};
 
 // ── Pre-Diagnóstico (client_diagnostics) — interno (is_internal_user) ──────────
 

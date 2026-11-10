@@ -41,6 +41,10 @@ const COP_FORMATTER = new Intl.NumberFormat('es-CO', {
 
 export const formatCopExact = (value: unknown): string => COP_FORMATTER.format(toFiniteNumber(value));
 
+// Solo dígitos con puntos de miles, sin símbolo de moneda — para las cifras
+// dentro de la cuenta de cobro impresa (ej. "1.600.000").
+export const formatCopPlain = (value: unknown): string => Math.round(toFiniteNumber(value)).toLocaleString('es-CO');
+
 export const formatCop = (value: unknown): string => {
   const amount = toFiniteNumber(value);
   if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1).replace('.', ',')} MM`;
