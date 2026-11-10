@@ -122,7 +122,7 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
                 return (
                   <span
                     key={period}
-                    title={`${getMonthLabel(month)} · ${periodLabel(period, billing?.pay_days)} · ${paid ? 'Pagado' : 'Pendiente'}${paid ? (payment?.partner_paid ? ' · Pagado al socio' : ' · Pendiente de pasar al socio') : ''}`}
+                    title={`${getMonthLabel(month)} · ${periodLabel(period, billing?.pay_days)} · ${paid ? 'Pagado' : 'Pendiente'}${paid && receiver === 'compartido' ? (payment?.partner_paid ? ' · 50% ya repartido' : ' · 50% pendiente de repartir') : ''}`}
                     style={{
                       position: 'relative',
                       display: 'block',
@@ -132,7 +132,7 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
                       background: paid ? 'var(--success)' : 'var(--warning)',
                     }}
                   >
-                    {paid && payment?.partner_paid && (
+                    {paid && receiver === 'compartido' && payment?.partner_paid && (
                       <span
                         style={{
                           position: 'absolute',
@@ -157,7 +157,7 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
         ))}
       </div>
       <p style={{ fontSize: '0.56rem', color: 'var(--fg-muted)', marginTop: 8 }}>
-        ● pagado · ● pendiente · <span style={{ color: 'var(--cyan)' }}>●</span> punto azul = ya se le pasó al socio
+        ● pagado · ● pendiente · <span style={{ color: 'var(--cyan)' }}>●</span> punto azul = 50% ya repartido (solo clientes compartidos)
       </p>
     </div>
   );
