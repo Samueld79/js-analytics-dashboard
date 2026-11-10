@@ -62,3 +62,55 @@ export function presetForPayDays(payDays: number[] | null | undefined): PayDaysP
   if (sorted.length === 2 && sorted[0] === 1 && sorted[1] === 15) return '1-15';
   return 'custom';
 }
+
+// ── Texto de periodo y fecha por defecto para cuentas de cobro ─────────────
+
+const MONTH_NAMES_ES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+function lastDayOfMonth(year: number, monthIndex0: number): number {
+  return new Date(Date.UTC(year, monthIndex0 + 1, 0)).getUTCDate();
+}
+
+// "del 1 al 15 de noviembre de 2026" / "del 16 al 30 de noviembre de 2026" /
+// "del 1 al 30 de noviembre de 2026" (mes completo) — para la descripción
+// por defecto de "Servicios de Growth Marketing" en la cuenta de cobro.
+export function periodDateRangeText(month: string, period: BillingPaymentPeriod): string {
+  const [y, m] = month.split('-').map(Number);
+  const monthName = MONTH_NAMES_ES[m - 1];
+  const lastDay = lastDayOfMonth(y, m - 1);
+  if (period === 'q1') return `del 1 al 15 de ${monthName} de ${y}`;
+  if (period === 'q2') return `del 16 al ${lastDay} de ${monthName} de ${y}`;
+  return `del 1 al ${lastDay} de ${monthName} de ${y}`;
+}
+
+// Versión corta para tablas, ej. "1–15 nov 2026" / "16–30 nov 2026".
+export function periodRangeShort(month: string, period: BillingPaymentPeriod): string {
+  const [y, m] = month.split('-').map(Number);
+  const lastDay = lastDayOfMonth(y, m - 1);
+  const monthAbbr = MONTH_NAMES_ES[m - 1].slice(0, 3);
+  if (period === 'q1') return `1–15 ${monthAbbr} ${y}`;
+  if (period === 'q2') return `16–${lastDay} ${monthAbbr} ${y}`;
+  return `1–${lastDay} ${monthAbbr} ${y}`;
+}
+
+// Fecha por defecto de la cuenta de cobro (issue_date), editable en el
+// modal: q1 -> día 1, q2 -> día 15, 'mes' -> el primer pay_day si existe,
+// o el día 1 (cubre tanto anticipado como mensual sin pay_days definido).
+export function defaultIssueDateForPeriod(
+  month: string,
+  period: BillingPaymentPeriod,
+  payDays: number[] | null | undefined,
+): string {
+  const [y, m] = month.split('-').map(Number);
+  let day: number;
+  if (period === 'q1') day = 1;
+  else if (period === 'q2') day = 15;
+  else {
+    const sorted = sortedPayDays(payDays);
+    day = sorted.length > 0 ? sorted[0] : 1;
+  }
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
