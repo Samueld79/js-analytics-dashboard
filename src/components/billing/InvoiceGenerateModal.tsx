@@ -3,7 +3,7 @@ import { createBillingInvoice } from '../../services/billing';
 import type { BillingInvoice, BillingInvoiceIssuerKey, BillingInvoiceItem, BillingIssuer, BillingPaymentPeriod, Client } from '../../lib/supabase';
 import { formatCopPlain } from '../../lib/utils';
 import { getMonthLabel } from '../../utils/monthLabel';
-import { periodLabel } from '../../lib/billingPeriods';
+import { defaultIssueDateForPeriod, periodDateRangeText, periodLabel } from '../../lib/billingPeriods';
 
 interface Props {
   client: Client;
@@ -19,15 +19,16 @@ interface Props {
 
 const ISSUER_LABELS: Record<BillingInvoiceIssuerKey, string> = { samuel: 'Samuel', juanca: 'Juanca' };
 
-function defaultItems(amount: number): BillingInvoiceItem[] {
+function defaultItems(amount: number, month: string, period: BillingPaymentPeriod): BillingInvoiceItem[] {
   return [
     { qty: 1, description: 'Actividades como Trafficker / Estratega en Meta Ads e Instagram', value: null },
-    { qty: 1, description: 'Servicios de Growth Marketing', value: amount },
+    { qty: 1, description: `Servicios de Growth Marketing ${periodDateRangeText(month, period)}`, value: amount },
   ];
 }
 
 export function InvoiceGenerateModal({ client, period, month, defaultAmount, issuerKey, issuer, payDays, onClose, onCreated }: Props) {
-  const [items, setItems] = useState<BillingInvoiceItem[]>(() => defaultItems(defaultAmount));
+  const [items, setItems] = useState<BillingInvoiceItem[]>(() => defaultItems(defaultAmount, month, period));
+  const [issueDate, setIssueDate] = useState(() => defaultIssueDateForPeriod(month, period, payDays));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -57,6 +58,7 @@ export function InvoiceGenerateModal({ client, period, month, defaultAmount, iss
       period,
       items,
       total,
+      issueDate,
     });
 
     if (result.error) {
@@ -86,6 +88,11 @@ export function InvoiceGenerateModal({ client, period, month, defaultAmount, iss
         </div>
 
         <div className="modal-body">
+          <div className="form-field" style={{ marginBottom: 16, maxWidth: 200 }}>
+            <label style={{ fontSize: '0.64rem' }}>Fecha de la cuenta</label>
+            <input className="form-input" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+          </div>
+
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>

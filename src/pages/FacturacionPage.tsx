@@ -33,10 +33,12 @@ import {
   PAY_DAYS_PRESET_VALUES,
   type PayDaysPreset,
   periodLabel,
+  periodRangeShort,
   periodsForFrequency,
   presetForPayDays,
 } from '../lib/billingPeriods';
 import { InvoiceGenerateModal } from '../components/billing/InvoiceGenerateModal';
+import { BulkInvoiceModal } from '../components/billing/BulkInvoiceModal';
 
 type StatusFilter = 'active' | 'all';
 type ReceiverFilter = 'all' | BillingPaymentReceiver;
@@ -151,6 +153,9 @@ export function FacturacionPage() {
   } | null>(null);
   const [settling, setSettling] = useState(false);
   const [settleError, setSettleError] = useState<string | null>(null);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [invoiceMonthFilter, setInvoiceMonthFilter] = useState<string>('all');
+  const [invoiceIssuerFilter, setInvoiceIssuerFilter] = useState<'all' | BillingInvoiceIssuerKey>('all');
 
   // Espejo en ref de billingByClient: saveBillingPatch necesita el valor más
   // reciente al momento de ejecutarse (no el capturado en el closure de
@@ -313,6 +318,21 @@ export function FacturacionPage() {
   }, [invoices]);
 
   const issuersByKey = useMemo(() => new Map(issuers.map((i) => [i.key, i])), [issuers]);
+
+  const invoiceMonthOptions = useMemo(() => {
+    const months = new Set(invoices.map((inv) => inv.month.slice(0, 10)));
+    return Array.from(months).sort((a, b) => b.localeCompare(a));
+  }, [invoices]);
+
+  const filteredInvoices = useMemo(
+    () =>
+      invoices.filter((inv) => {
+        if (invoiceMonthFilter !== 'all' && inv.month.slice(0, 10) !== invoiceMonthFilter) return false;
+        if (invoiceIssuerFilter !== 'all' && inv.issuer_key !== invoiceIssuerFilter) return false;
+        return true;
+      }),
+    [invoices, invoiceMonthFilter, invoiceIssuerFilter],
+  );
 
   // Totales del mes. "El socio" ya no es una convención fija: ahora se
   // calcula con invoice_issuer (quién emite/cobra) contra payment_receiver
@@ -785,6 +805,10 @@ export function FacturacionPage() {
     navigate(`/admin/cuentas-de-cobro/${invoice.id}`);
   }
 
+  function handleInvoicesIssuedInBulk(newInvoices: BillingInvoice[]) {
+    setInvoices((current) => [...newInvoices, ...current]);
+  }
+
   function renderPeriodControl(client: Client, period: BillingPaymentPeriod, billing: ClientBilling | undefined, compact: boolean) {
     const payment = paymentFor(client.id, period);
     const isPaid = payment?.status === 'pagado';
@@ -946,6 +970,10 @@ export function FacturacionPage() {
             <ChevronRight size={14} />
           </button>
         </div>
+
+        <button className="btn-secondary" onClick={() => setBulkModalOpen(true)}>
+          Generar cuentas de cobro del mes
+        </button>
 
         <select
           value={statusFilter}
@@ -1287,14 +1315,31 @@ export function FacturacionPage() {
       </div>
 
       <div className="card-glass" style={{ margin: '0 24px 24px', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 16px 0' }}>
+        <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <h2 className="number-label" style={{ fontSize: '0.72rem', color: 'var(--fg)' }}>Cuentas de cobro emitidas</h2>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select value={invoiceMonthFilter} onChange={(e) => setInvoiceMonthFilter(e.target.value)} style={selectStyle(invoiceMonthFilter !== 'all')}>
+              <option value="all">Todos los meses</option>
+              {invoiceMonthOptions.map((month) => (
+                <option key={month} value={month}>{getMonthLabel(month)}</option>
+              ))}
+            </select>
+            <select
+              value={invoiceIssuerFilter}
+              onChange={(e) => setInvoiceIssuerFilter(e.target.value as 'all' | BillingInvoiceIssuerKey)}
+              style={selectStyle(invoiceIssuerFilter !== 'all')}
+            >
+              <option value="all">Todos los emisores</option>
+              <option value="samuel">Samuel</option>
+              <option value="juanca">Juanca</option>
+            </select>
+          </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Número', 'Emisor', 'Cliente', 'Mes / periodo', 'Total', 'Fecha', ''].map((h) => (
+                {['Número', 'Emisor', 'Cliente', 'Mes', 'Periodo', 'Total', 'Fecha', ''].map((h) => (
                   <th key={h} className="number-label" style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 400, whiteSpace: 'nowrap', fontSize: '0.6rem', color: 'var(--fg-muted)' }}>
                     {h}
                   </th>
@@ -1302,14 +1347,16 @@ export function FacturacionPage() {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((invoice) => {
+              {filteredInvoices.map((invoice) => {
                 const client = clients.find((c) => c.id === invoice.client_id);
+                const month = invoice.month.slice(0, 10);
                 return (
                   <tr key={invoice.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono', fontSize: '0.74rem' }}>#{String(invoice.invoice_number).padStart(5, '0')}</td>
                     <td style={{ padding: '9px 12px', fontSize: '0.74rem' }}>{ISSUER_LABELS[invoice.issuer_key]}</td>
                     <td style={{ padding: '9px 12px', fontSize: '0.74rem' }}>{client?.name ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: '0.74rem' }}>{getMonthLabel(invoice.month)} · {periodLabel(invoice.period, billingByClient.get(invoice.client_id)?.pay_days)}</td>
+                    <td style={{ padding: '9px 12px', fontSize: '0.74rem' }}>{getMonthLabel(month)}</td>
+                    <td style={{ padding: '9px 12px', fontSize: '0.74rem', fontFamily: 'JetBrains Mono' }}>{periodRangeShort(month, invoice.period)}</td>
                     <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono', fontSize: '0.74rem' }}>{formatCopExact(invoice.total)}</td>
                     <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'var(--fg-muted)' }}>{invoice.issue_date}</td>
                     <td style={{ padding: '9px 12px' }}>
@@ -1320,10 +1367,10 @@ export function FacturacionPage() {
                   </tr>
                 );
               })}
-              {invoices.length === 0 && (
+              {filteredInvoices.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: '32px 24px', textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.72rem' }}>
-                    Todavía no se ha emitido ninguna cuenta de cobro.
+                  <td colSpan={8} style={{ padding: '32px 24px', textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono', fontSize: '0.72rem' }}>
+                    {invoices.length === 0 ? 'Todavía no se ha emitido ninguna cuenta de cobro.' : 'No hay cuentas de cobro para este filtro.'}
                   </td>
                 </tr>
               )}
@@ -1343,6 +1390,18 @@ export function FacturacionPage() {
           payDays={invoiceModalFor.payDays}
           onClose={() => setInvoiceModalFor(null)}
           onCreated={handleInvoiceCreated}
+        />
+      )}
+
+      {bulkModalOpen && (
+        <BulkInvoiceModal
+          month={selectedMonth}
+          clients={clients}
+          billingByClient={billingByClient}
+          issuersByKey={issuersByKey}
+          invoicesByKey={invoicesByKey}
+          onClose={() => setBulkModalOpen(false)}
+          onIssued={handleInvoicesIssuedInBulk}
         />
       )}
     </div>

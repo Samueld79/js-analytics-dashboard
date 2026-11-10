@@ -200,6 +200,7 @@ export async function createBillingInvoice(params: {
   period: BillingPaymentPeriod;
   items: BillingInvoiceItem[];
   total: number;
+  issueDate?: string;
 }): Promise<ServiceMutationResult<BillingInvoice>> {
   if (!isSupabaseConfigured || !supabase) {
     return { data: null, error: SUPABASE_MISSING_MESSAGE };
@@ -225,6 +226,7 @@ export async function createBillingInvoice(params: {
       period: params.period,
       items: params.items,
       total: params.total,
+      ...(params.issueDate ? { issue_date: params.issueDate } : {}),
       created_by,
     })
     .select('*')
