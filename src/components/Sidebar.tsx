@@ -21,6 +21,8 @@ import {
   Sun,
   Moon,
   Share2,
+  Receipt,
+  FileBarChart,
 } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { useAuth } from '../hooks/useAuth';
@@ -43,10 +45,15 @@ const INTERNAL_NAV: NavItem[] = [
   // { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/sales', icon: TrendingUp, label: 'Ventas' },
   { to: '/portal-cliente', icon: Share2, label: 'Portal Cliente' },
+  { to: '/admin/reportes', icon: FileBarChart, label: 'Reportes' },
   // { to: '/satisfaccion', icon: Smile, label: 'Satisfacción' },
   // { to: '/alerts', icon: Bell, label: 'Alertas', badge: true },
   // { to: '/ai-tools', icon: Sparkles, label: 'Área de Trabajo' },
 ];
+
+// Solo admins — RLS de client_billing exige is_agency_admin(). No se agrega
+// a INTERNAL_NAV para que team/strategist/operator/partner ni vean el link.
+const ADMIN_NAV_ITEM: NavItem = { to: '/admin/facturacion', icon: Receipt, label: 'Facturación' };
 
 const CLIENT_NAV: NavItem[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -84,7 +91,9 @@ export function Sidebar() {
   });
 
   const nav = isInternal
-    ? INTERNAL_NAV
+    ? role === 'admin'
+      ? [...INTERNAL_NAV, ADMIN_NAV_ITEM]
+      : INTERNAL_NAV
     : defaultClientId
       ? CLIENT_NAV
       : [];

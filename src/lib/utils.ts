@@ -30,6 +30,17 @@ function toSafeInteger(value: unknown): number {
   return Math.round(parsed);
 }
 
+// Formato COP exacto (sin abreviar a K/M) — para cifras de facturación donde
+// la precisión importa más que la compacidad. formatCop (abajo) sigue siendo
+// el formato compacto usado en el resto del dashboard.
+const COP_FORMATTER = new Intl.NumberFormat('es-CO', {
+  style: 'currency',
+  currency: 'COP',
+  maximumFractionDigits: 0,
+});
+
+export const formatCopExact = (value: unknown): string => COP_FORMATTER.format(toFiniteNumber(value));
+
 export const formatCop = (value: unknown): string => {
   const amount = toFiniteNumber(value);
   if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1).replace('.', ',')} MM`;

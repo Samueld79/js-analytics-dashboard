@@ -72,6 +72,8 @@ function toClientPayload(input: ClientInput, createdBy: string | null) {
     main_city: normalizeOptionalText(input.main_city),
     target_cities: normalizeTargetCities(input.target_cities),
     notes: normalizeOptionalText(input.notes),
+    has_whatsapp_api: input.has_whatsapp_api ?? false,
+    monthly_ad_budget: input.monthly_ad_budget ?? null,
     created_by: input.created_by ?? createdBy,
   };
 }
@@ -138,6 +140,65 @@ export async function setClientDashboardHidden(
   }
 
   return { data: { dashboard_hidden: hidden }, error: null };
+}
+
+export async function setClientWhatsappApi(
+  clientId: string,
+  hasApi: boolean,
+): Promise<ServiceMutationResult<{ has_whatsapp_api: boolean; whatsapp_api_since: string | null }>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  // Al activar, se fija whatsapp_api_since = hoy. Al desactivar, no se borra
+  // la fecha (queda como registro de cuándo se activó la última vez).
+  const payload = hasApi
+    ? { has_whatsapp_api: true, whatsapp_api_since: new Date().toISOString().split('T')[0] }
+    : { has_whatsapp_api: false };
+
+  const { data, error } = await supabase
+    .from('clients')
+    .update(payload)
+    .eq('id', clientId)
+    .select('has_whatsapp_api, whatsapp_api_since')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[clients] setClientWhatsappApi', error);
+    return {
+      data: null,
+      error: getErrorMessage(error, 'No se pudo actualizar el estado de API de WhatsApp.'),
+    };
+  }
+
+  return {
+    data: (data as { has_whatsapp_api: boolean; whatsapp_api_since: string | null } | null) ?? null,
+    error: null,
+  };
+}
+
+export async function updateClientAdBudget(
+  clientId: string,
+  monthlyAdBudget: number | null,
+): Promise<ServiceMutationResult<{ monthly_ad_budget: number | null }>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const { error } = await supabase
+    .from('clients')
+    .update({ monthly_ad_budget: monthlyAdBudget })
+    .eq('id', clientId);
+
+  if (error) {
+    console.error('[clients] updateClientAdBudget', error);
+    return {
+      data: null,
+      error: getErrorMessage(error, 'No se pudo actualizar el presupuesto de pauta.'),
+    };
+  }
+
+  return { data: { monthly_ad_budget: monthlyAdBudget }, error: null };
 }
 
 export async function listClients(): Promise<Client[]> {

@@ -109,6 +109,11 @@ export type Client = {
   notes?: string | null;
   monthly_goal?: number | null;
   dashboard_hidden?: boolean | null;
+  // No sensibles para el equipo interno (ClientsPage), pero NUNCA se leen
+  // ni se muestran en /portal/:id ni /cliente/:slug — ver MonthlyReport.
+  has_whatsapp_api: boolean;
+  whatsapp_api_since?: string | null;
+  monthly_ad_budget?: number | null;
   last_optimization_at?: string | null;
   last_sales_entry_at?: string | null;
   created_at: string;
@@ -123,6 +128,120 @@ export type ClientInput = Omit<
   target_cities?: string[] | null;
   created_by?: string | null;
 };
+
+// ── Facturación interna (client_billing) — solo admin, nunca pública ───────────
+// Simplificada: solo fee mensual (el resto — día de cobro, contrato, "incluye
+// pauta", notas, estado de pago único — se quitó, ver client_billing_payments
+// más abajo para el control de pago mes a mes).
+
+export type BillingPaymentReceiver = 'samuel' | 'juanca' | 'compartido';
+export type BillingPaymentFrequency = 'anticipado' | 'quincenal' | 'mensual';
+
+export type ClientBilling = {
+  client_id: string;
+  monthly_fee: number | null;
+  currency: string;
+  payment_receiver?: BillingPaymentReceiver | null;
+  payment_frequency?: BillingPaymentFrequency | null;
+  updated_by?: string | null;
+  updated_at: string;
+  created_at: string;
+};
+
+export type ClientBillingInput = Pick<
+  ClientBilling,
+  'client_id' | 'monthly_fee' | 'currency' | 'payment_receiver' | 'payment_frequency'
+>;
+
+// ── Estado de pago mensual (client_billing_payments) — solo admin ──────────────
+// Una fila por (client_id, month); month siempre es el día 1 del mes
+// (America/Bogota). Sin fila para un mes => se trata como 'pendiente' en la UI.
+
+export type BillingPaymentMonthStatus = 'pagado' | 'pendiente';
+// 'mes' = un solo cobro mensual (anticipado/mensual). 'q1'/'q2' = quincenas
+// 1-15 y 16-30, solo para payment_frequency = 'quincenal'.
+export type BillingPaymentPeriod = 'mes' | 'q1' | 'q2';
+
+export type ClientBillingPayment = {
+  client_id: string;
+  month: string;
+  period: BillingPaymentPeriod;
+  status: BillingPaymentMonthStatus;
+  paid_at: string | null;
+  partner_paid: boolean;
+  partner_paid_at: string | null;
+  updated_by?: string | null;
+  updated_at: string;
+};
+
+export type ClientBillingPaymentInput = Pick<
+  ClientBillingPayment,
+  'client_id' | 'month' | 'period' | 'status' | 'paid_at' | 'partner_paid' | 'partner_paid_at'
+>;
+
+// ── Pre-Diagnóstico (client_diagnostics) — interno (is_internal_user) ──────────
+
+export type DiagnosticAdBudgetRange = 'lt_500k' | '500k_1_5m' | '1_5m_3m' | '3m_5m' | 'gt_5m';
+export type DiagnosticWillingToScale = 'si_rentable' | 'depende' | 'no_fijo';
+export type DiagnosticPriorAdvertising = 'si_buenos' | 'si_regulares_malos' | 'nunca';
+export type DiagnosticSalesTeam = 'equipo_dedicado' | 'dueno' | 'compartido' | 'no_tienen';
+export type DiagnosticResponseTime = 'lt_30min' | '30min_2h' | 'mismo_dia' | 'gt_1_dia';
+export type DiagnosticContentCreator = 'interno' | 'externo' | 'dueno' | 'no_tienen';
+export type DiagnosticAudiovisualMaterial = 'bastante' | 'necesita_refresco' | 'muy_poco' | 'nada';
+export type DiagnosticOperationalCapacity = 'listos' | 'ajustes_menores' | 'necesitan_tiempo';
+export type DiagnosticTopSalesChannel = 'punto_fisico' | 'redes_whatsapp' | 'web_ecommerce' | 'otro';
+export type DiagnosticDataDriven = 'totalmente' | 'con_confianza' | 'paso_a_paso';
+
+export const DIAGNOSTIC_SERVICE_CHANNELS = [
+  'whatsapp_personal',
+  'whatsapp_business',
+  'api',
+  'dm_instagram',
+  'llamadas',
+  'formulario_web',
+  'presencial',
+] as const;
+export type DiagnosticServiceChannel = (typeof DIAGNOSTIC_SERVICE_CHANNELS)[number];
+
+export type ClientDiagnostic = {
+  id: string;
+  client_id: string;
+  diagnostic_date: string | null;
+  company_contact: string | null;
+  main_objective: string | null;
+  expected_3_months: string | null;
+  avg_monthly_sales_cop: number | null;
+  avg_ticket_cop: number | null;
+  avg_daily_sales: number | null;
+  avg_margin: string | null;
+  ad_budget_range: DiagnosticAdBudgetRange | null;
+  willing_to_scale: DiagnosticWillingToScale | null;
+  prior_advertising: DiagnosticPriorAdvertising | null;
+  prior_platforms: string | null;
+  months_in_market: number | null;
+  prior_ad_spend_notes: string | null;
+  sales_team: DiagnosticSalesTeam | null;
+  service_channels: DiagnosticServiceChannel[];
+  response_time: DiagnosticResponseTime | null;
+  content_creator: DiagnosticContentCreator | null;
+  content_pieces_per_month: number | null;
+  audiovisual_material: DiagnosticAudiovisualMaterial | null;
+  operational_capacity: DiagnosticOperationalCapacity | null;
+  top_sales_channel: DiagnosticTopSalesChannel | null;
+  top_sales_channel_other: string | null;
+  data_driven: DiagnosticDataDriven | null;
+  upcoming_dates: string | null;
+  motivation: string | null;
+  extra_notes: string | null;
+  created_by?: string | null;
+  updated_at: string;
+  created_at: string;
+};
+
+export type ClientDiagnosticInput = Omit<
+  ClientDiagnostic,
+  'id' | 'updated_at' | 'created_at' | 'created_by'
+>;
 
 export type AdAccountStatus = 'active' | 'paused' | 'archived';
 export type MetaSyncStatus = 'ok' | 'stale' | 'no_data';
@@ -955,6 +1074,23 @@ export type Alert = {
   metadata?: Record<string, unknown>;
   created_at: string;
   updated_at?: string;
+};
+
+export type ClientNoteType = 'general' | 'performance' | 'sales' | 'strategy' | 'creative' | 'meeting';
+export type ClientNoteVisibility = 'internal' | 'client';
+
+export type ClientNote = {
+  id: string;
+  client_id: string;
+  strategy_id?: string | null;
+  note_type: ClientNoteType;
+  visibility: ClientNoteVisibility;
+  title: string | null;
+  body: string;
+  pinned: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ClientMemory = {

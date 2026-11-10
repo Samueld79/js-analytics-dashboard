@@ -11,8 +11,10 @@ import {
 import { getMonthLabel } from '../utils/monthLabel';
 import { ChevronDown, ExternalLink, Plus, Search, Users } from 'lucide-react';
 import { formatCop, formatNumber } from '../lib/utils';
+import { setClientWhatsappApi } from '../services/clients';
 
 type StatusFilter = 'all' | 'active' | 'paused';
+type ApiFilter = 'all' | 'with_api' | 'without_api';
 
 export function ClientsPage() {
   const { clients, loading, saving, error, createClient, reload } = useClients();
@@ -22,7 +24,9 @@ export function ClientsPage() {
   const { alerts } = useAlerts();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [apiFilter, setApiFilter] = useState<ApiFilter>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [togglingApiId, setTogglingApiId] = useState<string | null>(null);
 
   // Period selector — null = auto-select most recent
   const [selectedPeriod, setSelectedPeriod] = useState<string | 'all' | null>(null);
@@ -96,10 +100,21 @@ export function ClientsPage() {
           statusFilter === 'all' ||
           (statusFilter === 'active' && c.status === 'active') ||
           (statusFilter === 'paused' && c.status === 'paused');
-        return matchesSearch && matchesStatus;
+        const matchesApi =
+          apiFilter === 'all' ||
+          (apiFilter === 'with_api' && c.has_whatsapp_api) ||
+          (apiFilter === 'without_api' && !c.has_whatsapp_api);
+        return matchesSearch && matchesStatus && matchesApi;
       }),
-    [clients, search, statusFilter],
+    [clients, search, statusFilter, apiFilter],
   );
+
+  async function handleToggleWhatsappApi(clientId: string, next: boolean) {
+    setTogglingApiId(clientId);
+    const result = await setClientWhatsappApi(clientId, next);
+    if (!result.error) await reload();
+    setTogglingApiId(null);
+  }
 
   return (
     <div className="page-content dashboard-v3">
@@ -215,6 +230,27 @@ export function ClientsPage() {
           <option value="active">Activos</option>
           <option value="paused">Pausados</option>
         </select>
+        <select
+          value={apiFilter}
+          onChange={(e) => setApiFilter(e.target.value as ApiFilter)}
+          style={{
+            height: '36px',
+            padding: '0 12px',
+            background: 'var(--color-bg-input)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '4px',
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'JetBrains Mono',
+            fontSize: '0.72rem',
+            letterSpacing: '0.05em',
+            outline: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="all">API WhatsApp: todos</option>
+          <option value="with_api">Con API</option>
+          <option value="without_api">Sin API</option>
+        </select>
       </div>
 
       {error && (
@@ -254,18 +290,20 @@ export function ClientsPage() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', minWidth: 720, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <table style={{ width: '100%', minWidth: 960, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: 200 }} />
                 <col style={{ width: 110 }} />
                 <col style={{ width: 160 }} />
                 <col style={{ width: 70 }} />
                 <col style={{ width: 100 }} />
+                <col style={{ width: 140 }} />
+                <col style={{ width: 130 }} />
                 <col style={{ width: 80 }} />
               </colgroup>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  {['Cliente', 'Inversión', 'Alcance', 'CPM', 'Actualizado', 'Portal'].map(
+                  {['Cliente', 'Inversión', 'Alcance', 'CPM', 'Actualizado', 'Presupuesto pauta', 'API WhatsApp', 'Portal'].map(
                     (h) => (
                       <th
                         key={h}
@@ -383,6 +421,58 @@ export function ClientsPage() {
                         </div>
                       </td>
 
+                      {/* Presupuesto de pauta + % consumido en el mes activo */}
+                      <td style={{ padding: '9px 14px' }}>
+                        {client.monthly_ad_budget ? (
+                          <div style={{ minWidth: 100 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.64rem', color: 'var(--color-text-secondary)' }}>
+                                {formatCop(client.monthly_ad_budget)}
+                              </span>
+                              <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>
+                                {kpi ? `${Math.round(Math.min(999, (kpi.spend / client.monthly_ad_budget) * 100))}%` : '—'}
+                              </span>
+                            </div>
+                            <div style={{ width: '100%', height: 4, background: 'var(--color-bg-input)', borderRadius: 999, overflow: 'hidden' }}>
+                              <div
+                                style={{
+                                  width: `${kpi ? Math.min(100, (kpi.spend / client.monthly_ad_budget) * 100) : 0}%`,
+                                  height: '100%',
+                                  background: kpi && kpi.spend > client.monthly_ad_budget ? 'hsl(0,84%,60%)' : 'var(--color-accent-cyan)',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'hsl(215,15%,35%)' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* API WhatsApp — badge + toggle editable para internos */}
+                      <td style={{ padding: '9px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            className="status-pill"
+                            style={
+                              client.has_whatsapp_api
+                                ? { background: 'hsl(145 100% 45% / 0.12)', color: 'hsl(145,100%,45%)', border: '1px solid hsl(145 100% 45% / 0.2)' }
+                                : { background: 'hsl(215 15% 38% / 0.15)', color: 'hsl(215,15%,52%)', border: '1px solid rgba(255,255,255,0.07)' }
+                            }
+                          >
+                            {client.has_whatsapp_api ? 'API ✓' : 'Sin API'}
+                          </span>
+                          <label className="toggle-switch" title="Activar/desactivar API de WhatsApp">
+                            <input
+                              type="checkbox"
+                              checked={client.has_whatsapp_api}
+                              disabled={togglingApiId === client.id}
+                              onChange={(e) => void handleToggleWhatsappApi(client.id, e.target.checked)}
+                            />
+                            <span className="toggle-slider" />
+                          </label>
+                        </div>
+                      </td>
+
                       {/* Portal — dedicated column, always visible */}
                       <td style={{ padding: '9px 14px' }}>
                         <a
@@ -401,7 +491,7 @@ export function ClientsPage() {
 
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ padding: '48px 24px', textAlign: 'center' }}>
+                    <td colSpan={8} style={{ padding: '48px 24px', textAlign: 'center' }}>
                       <div
                         style={{
                           display: 'flex',
@@ -419,7 +509,7 @@ export function ClientsPage() {
                             margin: 0,
                           }}
                         >
-                          {search || statusFilter !== 'all'
+                          {search || statusFilter !== 'all' || apiFilter !== 'all'
                             ? 'Sin resultados para este filtro'
                             : 'No hay clientes registrados'}
                         </p>
