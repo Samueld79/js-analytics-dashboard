@@ -656,8 +656,6 @@ export function FacturacionPage() {
     const key = paymentKey(client.id, period);
     const isToggling = togglingPaymentKey === key;
     const isTogglingPartner = togglingPartnerKey === key;
-    const hasReceiver = !!billing?.payment_receiver;
-
     const amount = periodAmountFor(billing?.monthly_fee, periodsForFrequency(billing?.payment_frequency).length);
     const issuerKey = billing?.invoice_issuer ?? null;
     const issuer = issuerKey ? issuersByKey.get(issuerKey) : undefined;
@@ -698,29 +696,47 @@ export function FacturacionPage() {
         {isPaid && payment?.paid_at && (
           <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>{payment.paid_at}</span>
         )}
-        {isPaid && (
-          <button
-            className="btn-ghost"
-            disabled={!hasReceiver || isTogglingPartner}
-            onClick={() => void handleTogglePartnerPaid(client.id, period)}
-            title={hasReceiver ? 'Click para marcar/desmarcar como pasado al socio' : 'Sin receptor asignado — no se puede calcular qué pasarle'}
-            style={{
-              fontSize: '0.58rem',
-              padding: '3px 8px',
-              opacity: hasReceiver ? 1 : 0.5,
-              cursor: hasReceiver ? 'pointer' : 'not-allowed',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {!hasReceiver
-              ? 'Sin receptor'
-              : isTogglingPartner
-                ? 'Guardando...'
-                : payment?.partner_paid
-                  ? `Pagado al socio ✓${payment.partner_paid_at ? ` (${payment.partner_paid_at})` : ''}`
-                  : 'Pagado al socio'}
-          </button>
-        )}
+        {/* Solo hay "parte del socio" que repartir cuando el fee es compartido
+            50/50 — si el receptor es samuel o juanca, el 100% ya es suyo y no
+            hay nada que pasar. */}
+        {isPaid && billing?.payment_receiver === 'compartido' && (() => {
+          const partnerName = issuerKey === 'juanca' ? 'Samuel' : issuerKey === 'samuel' ? 'Juanca' : null;
+          const halfAmount = amount != null ? amount / 2 : null;
+          const canToggle = !!partnerName;
+
+          return (
+            <button
+              className="btn-ghost"
+              disabled={!canToggle || isTogglingPartner}
+              onClick={() => void handleTogglePartnerPaid(client.id, period)}
+              title={canToggle ? 'Click para marcar/desmarcar' : 'Asigna quién cobra (Emite / cobra) primero'}
+              style={{
+                fontSize: '0.58rem',
+                padding: '3px 8px',
+                opacity: canToggle ? 1 : 0.5,
+                cursor: canToggle ? 'pointer' : 'not-allowed',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 2,
+              }}
+            >
+              <span>
+                {!canToggle
+                  ? 'Falta definir quién cobra'
+                  : isTogglingPartner
+                    ? 'Guardando...'
+                    : payment?.partner_paid
+                      ? `Pasado a ${partnerName} ✓${payment.partner_paid_at ? ` (${payment.partner_paid_at})` : ''}`
+                      : `Ya le pasé a ${partnerName} su 50%`}
+              </span>
+              {halfAmount != null && (
+                <span style={{ fontSize: '0.54rem', color: 'var(--fg-muted)' }}>{formatCopExact(halfAmount)}</span>
+              )}
+            </button>
+          );
+        })()}
 
         {existingInvoice ? (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
