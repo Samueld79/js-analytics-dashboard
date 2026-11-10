@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
 import {
@@ -106,6 +106,9 @@ export function FacturacionPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(() => getBogotaCurrentMonth());
   const [updatingFieldId, setUpdatingFieldId] = useState<string | null>(null);
   const [expandedClientIds, setExpandedClientIds] = useState<Set<string>>(new Set());
+  // Filas editadas por el usuario y aún no guardadas — el useEffect de abajo
+  // nunca las pisa con lo que llegue de billingByClient/clients.
+  const dirtyRowIdsRef = useRef<Set<string>>(new Set());
 
   async function loadBilling() {
     setLoadingBilling(true);
@@ -128,13 +131,15 @@ export function FacturacionPage() {
     [clients, statusFilter, receiverFilter, billingByClient],
   );
 
-  // Inicializa las filas editables cuando llegan clientes/facturación, sin
-  // pisar ediciones en curso del usuario.
+  // Inicializa/resincroniza las filas editables cuando llegan clientes o
+  // facturación. Una fila sin editar se recalcula siempre (así no queda
+  // vacía si billingByClient llega después que clients); una fila "sucia"
+  // (con ediciones del usuario sin guardar) nunca se pisa.
   useEffect(() => {
     setRows((current) => {
       const next = new Map(current);
       for (const client of visibleClients) {
-        if (!next.has(client.id)) {
+        if (!next.has(client.id) || !dirtyRowIdsRef.current.has(client.id)) {
           next.set(client.id, toEditableRow(client.id, client.monthly_ad_budget, billingByClient.get(client.id)));
         }
       }
@@ -244,6 +249,7 @@ export function FacturacionPage() {
   }, [visibleClients, billingByClient, paymentByClientPeriod]);
 
   function updateRow(clientId: string, patch: Partial<EditableRow>) {
+    dirtyRowIdsRef.current.add(clientId);
     setRows((current) => {
       const next = new Map(current);
       const existing = next.get(clientId);
@@ -303,6 +309,7 @@ export function FacturacionPage() {
     if (billingResult.data) {
       setBillingByClient((current) => new Map(current).set(clientId, billingResult.data as ClientBilling));
     }
+    dirtyRowIdsRef.current.delete(clientId);
     await reloadClients();
     setSavingId(null);
   }
