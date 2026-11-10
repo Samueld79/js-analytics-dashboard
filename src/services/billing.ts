@@ -97,6 +97,33 @@ export async function upsertClientBillingPayment(
   return { data: (data ?? null) as ClientBillingPayment | null, error: null };
 }
 
+// Liquidación en lote del saldo entre socios — un solo upsert con todos los
+// cobros compartidos que se marcan partner_paid=true de una vez (ver
+// "Liquidar saldo" en FacturacionPage), en vez de una petición por fila.
+export async function upsertClientBillingPaymentsBatch(
+  inputs: ClientBillingPaymentInput[],
+): Promise<ServiceMutationResult<ClientBillingPayment[]>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+  if (inputs.length === 0) return { data: [], error: null };
+
+  const updated_by = await getCurrentUserId();
+  const payload = inputs.map((input) => ({ ...input, updated_by }));
+
+  const { data, error } = await supabase
+    .from('client_billing_payments')
+    .upsert(payload, { onConflict: 'client_id,month,period' })
+    .select('*');
+
+  if (error) {
+    console.error('[billing] upsertClientBillingPaymentsBatch', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo liquidar el saldo.') };
+  }
+
+  return { data: (data ?? []) as ClientBillingPayment[], error: null };
+}
+
 // ── Emisores de cuenta de cobro (billing_issuers) — SOLO admin ─────────────
 // Nunca loguear ni imprimir el contenido de estas filas (NIT, cuenta, etc.):
 // solo se usan para pasarlos a la vista imprimible / al formulario.

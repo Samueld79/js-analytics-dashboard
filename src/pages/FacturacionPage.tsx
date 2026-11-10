@@ -9,6 +9,7 @@ import {
   listClientBillingPayments,
   upsertClientBilling,
   upsertClientBillingPayment,
+  upsertClientBillingPaymentsBatch,
 } from '../services/billing';
 import { updateClientAdBudget } from '../services/clients';
 import type {
@@ -23,6 +24,7 @@ import type {
   ClientBilling,
   ClientBillingInput,
   ClientBillingPayment,
+  ClientBillingPaymentInput,
 } from '../lib/supabase';
 import { formatCopExact } from '../lib/utils';
 import { getMonthLabel } from '../utils/monthLabel';
@@ -88,6 +90,14 @@ function invoiceKey(clientId: string, month: string, period: BillingPaymentPerio
   return `${clientId}:${month}:${period}`;
 }
 
+// Igual que invoiceKey pero a partir de un ClientBillingPayment ya
+// guardado — usado para fusionar el resultado de una liquidación en lote
+// (que toca cobros de cualquier mes, no solo selectedMonth) de vuelta en
+// el estado `payments`.
+function paymentIdentityKey(p: ClientBillingPayment): string {
+  return invoiceKey(p.client_id, p.month.slice(0, 10), p.period);
+}
+
 function periodAmountFor(fee: number | null | undefined, periodsCount: number): number | null {
   if (fee == null) return null;
   return periodsCount === 2 ? fee / 2 : fee;
@@ -139,6 +149,8 @@ export function FacturacionPage() {
     issuer: BillingIssuer | undefined;
     payDays: number[] | null | undefined;
   } | null>(null);
+  const [settling, setSettling] = useState(false);
+  const [settleError, setSettleError] = useState<string | null>(null);
 
   // Espejo en ref de billingByClient: saveBillingPatch necesita el valor más
   // reciente al momento de ejecutarse (no el capturado en el closure de
@@ -400,6 +412,129 @@ export function FacturacionPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleClients, billingByClient, paymentByClientPeriod]);
+
+  // Saldo neto acumulado entre socios: a diferencia de `totals` (que mira
+  // solo selectedMonth y visibleClients), este recorre TODOS los cobros
+  // compartidos pagados de TODOS los meses con partner_paid=false, sin
+  // filtro de mes/estado/receptor — lo no liquidado se arrastra. Usa la
+  // configuración ACTUAL del cliente (receptor/modalidad/emisor/fee): no
+  // hay snapshot histórico de esos campos por cobro, así que si cambiaron
+  // después de un cobro viejo sin liquidar, se recalcula con el valor de
+  // hoy (misma limitación que el resto de esta página).
+  const netBalance = useMemo(() => {
+    let owedBySamuelToJuanca = 0;
+    let owedByJuancaToSamuel = 0;
+    const settlementCandidates: {
+      client_id: string;
+      month: string;
+      period: BillingPaymentPeriod;
+      paid_at: string | null;
+      half: number;
+      direction: 'samuel_to_juanca' | 'juanca_to_samuel';
+    }[] = [];
+
+    for (const payment of payments) {
+      if (payment.status !== 'pagado' || payment.partner_paid) continue;
+      const billing = billingByClient.get(payment.client_id);
+      if (!billing || billing.payment_receiver !== 'compartido' || !billing.invoice_issuer) continue;
+      if (billing.monthly_fee == null) continue;
+
+      const periods = periodsForFrequency(billing.payment_frequency);
+      if (!periods.includes(payment.period)) continue;
+
+      const half = (periodAmountFor(billing.monthly_fee, periods.length) ?? 0) / 2;
+      const direction = billing.invoice_issuer === 'samuel' ? 'samuel_to_juanca' : 'juanca_to_samuel';
+      if (direction === 'samuel_to_juanca') owedBySamuelToJuanca += half;
+      else owedByJuancaToSamuel += half;
+
+      settlementCandidates.push({
+        client_id: payment.client_id,
+        month: payment.month.slice(0, 10),
+        period: payment.period,
+        paid_at: payment.paid_at,
+        half,
+        direction,
+      });
+    }
+
+    return {
+      owedBySamuelToJuanca,
+      owedByJuancaToSamuel,
+      net: owedBySamuelToJuanca - owedByJuancaToSamuel,
+      settlementCandidates,
+    };
+  }, [payments, billingByClient]);
+
+  // Historial de liquidaciones derivado de partner_paid_at — sin tabla
+  // nueva: agrupa los cobros compartidos ya repartidos por fecha y muestra
+  // el neto de cada fecha (puede mezclar ambas direcciones si ese día se
+  // liquidaron cobros de los dos emisores).
+  const settlementHistory = useMemo(() => {
+    const byDate = new Map<string, { samuelToJuanca: number; juancaToSamuel: number }>();
+
+    for (const payment of payments) {
+      if (!payment.partner_paid || !payment.partner_paid_at) continue;
+      const billing = billingByClient.get(payment.client_id);
+      if (!billing || billing.payment_receiver !== 'compartido' || !billing.invoice_issuer) continue;
+      if (billing.monthly_fee == null) continue;
+
+      const periods = periodsForFrequency(billing.payment_frequency);
+      if (!periods.includes(payment.period)) continue;
+
+      const half = (periodAmountFor(billing.monthly_fee, periods.length) ?? 0) / 2;
+      const entry = byDate.get(payment.partner_paid_at) ?? { samuelToJuanca: 0, juancaToSamuel: 0 };
+      if (billing.invoice_issuer === 'samuel') entry.samuelToJuanca += half;
+      else entry.juancaToSamuel += half;
+      byDate.set(payment.partner_paid_at, entry);
+    }
+
+    return Array.from(byDate.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, { samuelToJuanca, juancaToSamuel }]) => ({ date, net: samuelToJuanca - juancaToSamuel }));
+  }, [payments, billingByClient]);
+
+  async function handleSettleBalance() {
+    const candidates = netBalance.settlementCandidates;
+    if (candidates.length === 0) return;
+
+    const who =
+      netBalance.net > 0
+        ? `Samuel le debe a Juanca ${formatCopExact(netBalance.net)}`
+        : netBalance.net < 0
+          ? `Juanca le debe a Samuel ${formatCopExact(Math.abs(netBalance.net))}`
+          : 'Están a mano ($0)';
+    const confirmed = window.confirm(
+      `${who}.\n\nEsto marcará ${candidates.length} cobro${candidates.length === 1 ? '' : 's'} compartido${candidates.length === 1 ? '' : 's'} como repartido${candidates.length === 1 ? '' : 's'} (partner_paid = true, hoy). ¿Confirmas la liquidación?`,
+    );
+    if (!confirmed) return;
+
+    setSettling(true);
+    setSettleError(null);
+
+    const today = todayIsoDate();
+    const payloads: ClientBillingPaymentInput[] = candidates.map((c) => ({
+      client_id: c.client_id,
+      month: c.month,
+      period: c.period,
+      status: 'pagado',
+      paid_at: c.paid_at,
+      partner_paid: true,
+      partner_paid_at: today,
+    }));
+
+    const result = await upsertClientBillingPaymentsBatch(payloads);
+    if (result.error) {
+      setSettleError(result.error);
+    } else if (result.data) {
+      const saved = result.data;
+      setPayments((current) => {
+        const byKey = new Map(current.map((p) => [paymentIdentityKey(p), p] as const));
+        for (const s of saved) byKey.set(paymentIdentityKey(s), s);
+        return Array.from(byKey.values());
+      });
+    }
+    setSettling(false);
+  }
 
   function updateRow(clientId: string, patch: Partial<EditableRow>) {
     if ('monthly_fee' in patch) dirtyFeeIdsRef.current.add(clientId);
@@ -728,7 +863,7 @@ export function FacturacionPage() {
                   : isTogglingPartner
                     ? 'Guardando...'
                     : payment?.partner_paid
-                      ? `Pasado a ${partnerName} ✓${payment.partner_paid_at ? ` (${payment.partner_paid_at})` : ''}`
+                      ? `Incluido en la liquidación ✓${payment.partner_paid_at ? ` (${payment.partner_paid_at})` : ''}`
                       : `Ya le pasé a ${partnerName} su 50%`}
               </span>
               {halfAmount != null && (
@@ -873,6 +1008,58 @@ export function FacturacionPage() {
             <p className="portal-kpi-sub">{card.sub}</p>
           </div>
         ))}
+      </div>
+
+      <div className="card-glass card-padded" style={{ margin: '0 24px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <p className="number-label" style={{ fontSize: '0.64rem', color: 'var(--fg-muted)' }}>Saldo neto entre socios (acumulado, todos los meses)</p>
+            <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 600, color: 'var(--fg)' }}>
+              {netBalance.net > 0
+                ? `Samuel le debe a Juanca ${formatCopExact(netBalance.net)}`
+                : netBalance.net < 0
+                  ? `Juanca le debe a Samuel ${formatCopExact(Math.abs(netBalance.net))}`
+                  : 'Están a mano'}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.68rem', color: 'var(--fg-muted)' }}>
+              Samuel debe {formatCopExact(netBalance.owedBySamuelToJuanca)} · Juanca debe {formatCopExact(netBalance.owedByJuancaToSamuel)}
+            </p>
+            <p style={{ margin: '8px 0 0', fontSize: '0.64rem', color: 'var(--fg-muted)' }}>
+              Referencia de {getMonthLabel(selectedMonth)}: Samuel debe {formatCopExact(totals.owedBySamuelToJuanca)} · Juanca debe {formatCopExact(totals.owedByJuancaToSamuel)}
+            </p>
+          </div>
+          <button
+            className="btn-primary"
+            disabled={netBalance.settlementCandidates.length === 0 || settling}
+            onClick={() => void handleSettleBalance()}
+          >
+            {settling ? 'Liquidando...' : 'Liquidar saldo'}
+          </button>
+        </div>
+
+        {settleError && (
+          <p style={{ marginTop: 12, fontSize: '0.74rem', color: 'var(--danger)' }}>{settleError}</p>
+        )}
+
+        {settlementHistory.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <p style={{ fontSize: '0.6rem', color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+              Historial de liquidaciones
+            </p>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {settlementHistory.map(({ date, net }) => (
+                <li key={date} style={{ fontSize: '0.7rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>
+                  {date} —{' '}
+                  {net > 0
+                    ? `Samuel le pagó a Juanca ${formatCopExact(net)}`
+                    : net < 0
+                      ? `Juanca le pagó a Samuel ${formatCopExact(Math.abs(net))}`
+                      : 'quedaron a mano'}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="card-glass" style={{ margin: '0 24px 24px', overflow: 'hidden' }}>
