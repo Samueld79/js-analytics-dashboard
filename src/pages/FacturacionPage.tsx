@@ -32,6 +32,7 @@ import {
   PAY_DAYS_PRESET_LABELS,
   PAY_DAYS_PRESET_VALUES,
   type PayDaysPreset,
+  payDayForPeriod,
   periodLabel,
   periodRangeShort,
   periodsForFrequency,
@@ -39,6 +40,8 @@ import {
 } from '../lib/billingPeriods';
 import { InvoiceGenerateModal } from '../components/billing/InvoiceGenerateModal';
 import { BulkInvoiceModal } from '../components/billing/BulkInvoiceModal';
+import { IncomeDashboard } from '../components/billing/dashboard/IncomeDashboard';
+import type { DueItem, TrendMonth } from '../components/billing/dashboard/types';
 
 type StatusFilter = 'active' | 'all';
 type ReceiverFilter = 'all' | BillingPaymentReceiver;
@@ -73,6 +76,22 @@ function getBogotaCurrentMonth(): string {
   const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
   const month = parts.find((p) => p.type === 'month')?.value ?? '01';
   return `${year}-${month}-01`;
+}
+
+// Fecha de "hoy" en America/Bogota (no UTC ni la zona del navegador) — para
+// el dashboard de ingresos (vencidos/próximos), consistente con
+// getBogotaCurrentMonth de arriba.
+function getBogotaTodayIso(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+  const day = parts.find((p) => p.type === 'day')?.value ?? '01';
+  return `${year}-${month}-${day}`;
 }
 
 function shiftMonth(monthStr: string, delta: number): string {
@@ -146,6 +165,7 @@ export function FacturacionPage() {
   const [invoiceModalFor, setInvoiceModalFor] = useState<{
     client: Client;
     period: BillingPaymentPeriod;
+    month: string;
     amount: number;
     issuerKey: BillingInvoiceIssuerKey;
     issuer: BillingIssuer | undefined;
@@ -512,6 +532,117 @@ export function FacturacionPage() {
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([date, { samuelToJuanca, juancaToSamuel }]) => ({ date, net: samuelToJuanca - juancaToSamuel }));
   }, [payments, billingByClient]);
+
+  // ── Data del dashboard de ingresos (sección superior) ──────────────────
+  // "Hoy" y "mes actual" se fijan una vez por montaje (no por render) —
+  // suficiente para una página que el admin abre y usa en una sesión.
+  const todayIso = useMemo(() => getBogotaTodayIso(), []);
+  const currentMonthNow = useMemo(() => getBogotaCurrentMonth(), []);
+
+  // Tendencia de 6 meses terminando en selectedMonth (no en el mes real):
+  // así mover el selector de mes desliza también la ventana histórica del
+  // dashboard. Usa fees/modalidad ACTUALES para todos los meses (ver nota
+  // "Meses anteriores calculados con los fees actuales" en el gráfico).
+  const monthlyTrend = useMemo<TrendMonth[]>(() => {
+    const months = Array.from({ length: 6 }, (_, i) => shiftMonth(selectedMonth, i - 5));
+
+    return months.map((month) => {
+      let expected = 0;
+      let collected = 0;
+
+      for (const client of visibleClients) {
+        const billing = billingByClient.get(client.id);
+        if (billing?.monthly_fee == null) continue;
+        const periods = periodsForFrequency(billing.payment_frequency);
+        const periodAmount = periodAmountFor(billing.monthly_fee, periods.length) ?? 0;
+
+        for (const period of periods) {
+          expected += periodAmount;
+          const payment = payments.find(
+            (p) => p.client_id === client.id && p.month.slice(0, 10) === month && p.period === period,
+          );
+          if (payment?.status === 'pagado') collected += periodAmount;
+        }
+      }
+
+      return { monthKey: month, label: getMonthLabel(month).slice(0, 3), expected, collected };
+    });
+  }, [selectedMonth, visibleClients, billingByClient, payments]);
+
+  // Cobros pendientes (reales, de hoy en adelante — independientes del mes
+  // seleccionado arriba) de currentMonthNow y el mes siguiente, con su
+  // fecha de vencimiento ya resuelta. "Por cobrar ahora" filtra al mes
+  // actual real; "Próximos 7 días" filtra por ventana de fecha sobre esta
+  // misma lista (para no perder cobros que caen justo al cruzar de mes).
+  const dueItems = useMemo<DueItem[]>(() => {
+    const nextMonthNow = shiftMonth(currentMonthNow, 1);
+    const items: DueItem[] = [];
+
+    for (const client of visibleClients) {
+      const billing = billingByClient.get(client.id);
+      if (billing?.monthly_fee == null) continue;
+      const periods = periodsForFrequency(billing.payment_frequency);
+      const periodAmount = periodAmountFor(billing.monthly_fee, periods.length) ?? 0;
+      const issuerKey = billing.invoice_issuer ?? null;
+      const issuer = issuerKey ? issuersByKey.get(issuerKey) : undefined;
+
+      for (const month of [currentMonthNow, nextMonthNow]) {
+        for (const period of periods) {
+          const payment = payments.find(
+            (p) => p.client_id === client.id && p.month.slice(0, 10) === month && p.period === period,
+          );
+          if (payment?.status === 'pagado') continue;
+
+          const day = payDayForPeriod(period, billing.pay_days);
+          if (day == null) continue;
+          const dueDate = `${month.slice(0, 7)}-${String(day).padStart(2, '0')}`;
+          const existing = invoicesByKey.get(invoiceKey(client.id, month, period));
+
+          items.push({
+            client,
+            period,
+            month,
+            dueDate,
+            amount: periodAmount,
+            payDays: billing.pay_days,
+            issuerKey,
+            issuer,
+            existingInvoiceId: existing?.id ?? null,
+          });
+        }
+      }
+    }
+
+    return items.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  }, [visibleClients, billingByClient, payments, issuersByKey, invoicesByKey, currentMonthNow]);
+
+  const dueNowItems = useMemo(() => dueItems.filter((item) => item.month === currentMonthNow), [dueItems, currentMonthNow]);
+
+  const next7Items = useMemo(() => {
+    const start = new Date(`${todayIso}T00:00:00Z`).getTime();
+    const end = start + 7 * 86_400_000;
+    return dueItems.filter((item) => {
+      const t = new Date(`${item.dueDate}T00:00:00Z`).getTime();
+      return t >= start && t <= end;
+    });
+  }, [dueItems, todayIso]);
+
+  function handleRequestInvoiceFromDashboard(item: DueItem) {
+    if (item.existingInvoiceId) {
+      navigate(`/admin/cuentas-de-cobro/${item.existingInvoiceId}`);
+      return;
+    }
+    if (!item.issuerKey) return;
+    setInvoiceModalFor({
+      client: item.client,
+      period: item.period,
+      month: item.month,
+      amount: item.amount,
+      issuerKey: item.issuerKey,
+      issuer: item.issuer,
+      payDays: item.payDays,
+    });
+  }
 
   async function handleSettleBalance() {
     const candidates = netBalance.settlementCandidates;
@@ -911,7 +1042,7 @@ export function FacturacionPage() {
               disabled={invoiceDisabled}
               title={invoiceTitle}
               style={{ fontSize: '0.56rem', padding: '3px 8px' }}
-              onClick={() => issuerKey && amount != null && setInvoiceModalFor({ client, period, amount, issuerKey, issuer, payDays: billing?.pay_days })}
+              onClick={() => issuerKey && amount != null && setInvoiceModalFor({ client, period, month: selectedMonth, amount, issuerKey, issuer, payDays: billing?.pay_days })}
             >
               Emitir otra
             </button>
@@ -922,7 +1053,7 @@ export function FacturacionPage() {
             disabled={invoiceDisabled}
             title={invoiceTitle}
             style={{ fontSize: '0.56rem', padding: '3px 8px' }}
-            onClick={() => issuerKey && amount != null && setInvoiceModalFor({ client, period, amount, issuerKey, issuer, payDays: billing?.pay_days })}
+            onClick={() => issuerKey && amount != null && setInvoiceModalFor({ client, period, month: selectedMonth, amount, issuerKey, issuer, payDays: billing?.pay_days })}
           >
             Cuenta de cobro
           </button>
@@ -1015,79 +1146,21 @@ export function FacturacionPage() {
         </div>
       </div>
 
-      <div className="portal-kpi-grid" style={{ marginBottom: 20 }}>
-        {[
-          { label: 'Fee total esperado', value: formatCopExact(totals.feeExpected), sub: getMonthLabel(selectedMonth) },
-          { label: 'Cobrado', value: formatCopExact(totals.collected), sub: `${totals.paidCount} cobro${totals.paidCount === 1 ? '' : 's'} pagado${totals.paidCount === 1 ? '' : 's'}` },
-          { label: 'Por cobrar', value: formatCopExact(totals.pending), sub: `${totals.pendingCount} cobro${totals.pendingCount === 1 ? '' : 's'} pendiente${totals.pendingCount === 1 ? '' : 's'}` },
-          { label: 'Fee sin definir', value: String(totals.feeUndefined), sub: `de ${visibleClients.length} mostrados` },
-          { label: 'Inversión en pauta bajo gestión', value: formatCopExact(totals.adSpendUnderManagement), sub: `presupuesto mensual, ${visibleClients.length} cliente${visibleClients.length === 1 ? '' : 's'}` },
-          { label: 'Esperado — Samuel', value: formatCopExact(totals.byReceiver.samuel.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.samuel.collected)}` },
-          { label: 'Esperado — Juanca', value: formatCopExact(totals.byReceiver.juanca.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.juanca.collected)}` },
-          { label: 'Esperado — Compartido', value: formatCopExact(totals.byReceiver.compartido.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.compartido.collected)} (ya incluido 50/50 arriba)` },
-          { label: 'Sin receptor asignado', value: String(totals.receiverUnassigned), sub: `de ${visibleClients.length} mostrados` },
-          { label: 'Pendiente por pasar al socio', value: formatCopExact(totals.partnerPending), sub: 'cobros pagados, sin repartir' },
-          { label: 'Samuel le debe a Juanca', value: formatCopExact(totals.owedBySamuelToJuanca), sub: 'según quién emite/cobra' },
-          { label: 'Juanca le debe a Samuel', value: formatCopExact(totals.owedByJuancaToSamuel), sub: 'según quién emite/cobra' },
-        ].map((card) => (
-          <div key={card.label} className="card-glass portal-kpi-card">
-            <p className="portal-kpi-label">{card.label}</p>
-            <p className="portal-kpi-value">{card.value}</p>
-            <p className="portal-kpi-sub">{card.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="card-glass card-padded" style={{ margin: '0 24px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <p className="number-label" style={{ fontSize: '0.64rem', color: 'var(--fg-muted)' }}>Saldo neto entre socios (acumulado, todos los meses)</p>
-            <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 600, color: 'var(--fg)' }}>
-              {netBalance.net > 0
-                ? `Samuel le debe a Juanca ${formatCopExact(netBalance.net)}`
-                : netBalance.net < 0
-                  ? `Juanca le debe a Samuel ${formatCopExact(Math.abs(netBalance.net))}`
-                  : 'Están a mano'}
-            </p>
-            <p style={{ margin: '4px 0 0', fontSize: '0.68rem', color: 'var(--fg-muted)' }}>
-              Samuel debe {formatCopExact(netBalance.owedBySamuelToJuanca)} · Juanca debe {formatCopExact(netBalance.owedByJuancaToSamuel)}
-            </p>
-            <p style={{ margin: '8px 0 0', fontSize: '0.64rem', color: 'var(--fg-muted)' }}>
-              Referencia de {getMonthLabel(selectedMonth)}: Samuel debe {formatCopExact(totals.owedBySamuelToJuanca)} · Juanca debe {formatCopExact(totals.owedByJuancaToSamuel)}
-            </p>
-          </div>
-          <button
-            className="btn-primary"
-            disabled={netBalance.settlementCandidates.length === 0 || settling}
-            onClick={() => void handleSettleBalance()}
-          >
-            {settling ? 'Liquidando...' : 'Liquidar saldo'}
-          </button>
-        </div>
-
-        {settleError && (
-          <p style={{ marginTop: 12, fontSize: '0.74rem', color: 'var(--danger)' }}>{settleError}</p>
-        )}
-
-        {settlementHistory.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <p style={{ fontSize: '0.6rem', color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-              Historial de liquidaciones
-            </p>
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {settlementHistory.map(({ date, net }) => (
-                <li key={date} style={{ fontSize: '0.7rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>
-                  {date} —{' '}
-                  {net > 0
-                    ? `Samuel le pagó a Juanca ${formatCopExact(net)}`
-                    : net < 0
-                      ? `Juanca le pagó a Samuel ${formatCopExact(Math.abs(net))}`
-                      : 'quedaron a mano'}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+      <div style={{ padding: '0 24px' }}>
+        <IncomeDashboard
+          monthLabel={getMonthLabel(selectedMonth)}
+          totals={totals}
+          netBalance={netBalance}
+          settlementHistory={settlementHistory}
+          settling={settling}
+          settleError={settleError}
+          onSettle={() => void handleSettleBalance()}
+          trend={monthlyTrend}
+          dueNowItems={dueNowItems}
+          next7Items={next7Items}
+          todayIso={todayIso}
+          onRequestInvoice={handleRequestInvoiceFromDashboard}
+        />
       </div>
 
       <div className="card-glass" style={{ margin: '0 24px 24px', overflow: 'hidden' }}>
@@ -1383,7 +1456,7 @@ export function FacturacionPage() {
         <InvoiceGenerateModal
           client={invoiceModalFor.client}
           period={invoiceModalFor.period}
-          month={selectedMonth}
+          month={invoiceModalFor.month}
           defaultAmount={invoiceModalFor.amount}
           issuerKey={invoiceModalFor.issuerKey}
           issuer={invoiceModalFor.issuer}
