@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listClientBilling, listClientBillingPayments } from '../../services/billing';
-import type { BillingPaymentFrequency, BillingPaymentReceiver, ClientBilling, ClientBillingPayment } from '../../lib/supabase';
+import type {
+  BillingPaymentFrequency,
+  BillingPaymentPeriod,
+  BillingPaymentReceiver,
+  ClientBilling,
+  ClientBillingPayment,
+} from '../../lib/supabase';
 import { formatCopExact } from '../../lib/utils';
 import { getMonthLabel } from '../../utils/monthLabel';
 
@@ -17,6 +23,12 @@ const FREQUENCY_LABELS: Record<BillingPaymentFrequency, string> = {
   mensual: 'Mensual',
 };
 
+const PERIOD_LABELS: Record<BillingPaymentPeriod, string> = {
+  mes: 'mes completo',
+  q1: '1–15',
+  q2: '16–30',
+};
+
 function lastSixMonths(): string[] {
   const now = new Date();
   const months: string[] = [];
@@ -25,6 +37,10 @@ function lastSixMonths(): string[] {
     months.push(d.toISOString().slice(0, 10));
   }
   return months;
+}
+
+function periodsForFrequency(freq: BillingPaymentFrequency | null | undefined): BillingPaymentPeriod[] {
+  return freq === 'quincenal' ? ['q1', 'q2'] : ['mes'];
 }
 
 // Bloque resumido — SOLO se monta cuando el llamador ya confirmó role==='admin'
@@ -60,7 +76,12 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
   }
 
   const months = lastSixMonths();
-  const paymentByMonth = new Map(payments.map((p) => [p.month.slice(0, 10), p]));
+  const paymentByMonthPeriod = new Map(payments.map((p) => [`${p.month.slice(0, 10)}:${p.period}`, p]));
+  const periods = periodsForFrequency(billing?.payment_frequency);
+  const isQuincenal = periods.length === 2;
+  const fee = billing?.monthly_fee ?? null;
+  const perPeriodAmount = fee != null ? (isQuincenal ? fee / 2 : fee) : null;
+  const receiver = billing?.payment_receiver ?? null;
 
   return (
     <div className="card-glass card-padded">
@@ -80,39 +101,71 @@ export function ClientBillingSummary({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <span className="meta-chip">
-          Recibe: {billing?.payment_receiver ? RECEIVER_LABELS[billing.payment_receiver] : 'Sin asignar'}
+          Recibe: {receiver ? RECEIVER_LABELS[receiver] : 'Sin asignar'}
         </span>
         <span className="meta-chip">
           Modalidad: {billing?.payment_frequency ? FREQUENCY_LABELS[billing.payment_frequency] : '—'}
         </span>
       </div>
 
+      {receiver === 'compartido' && perPeriodAmount != null && (
+        <p style={{ fontSize: '0.64rem', color: 'var(--fg-muted)', marginBottom: 16 }}>
+          Reparto 50/50{isQuincenal ? ' por quincena' : ''}: Samuel {formatCopExact(perPeriodAmount / 2)} · Juanca {formatCopExact(perPeriodAmount / 2)}
+        </p>
+      )}
+
       <p style={{ fontSize: '0.64rem', color: 'var(--fg-muted)', marginBottom: 6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
         Últimos 6 meses
       </p>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        {months.map((month) => {
-          const paid = paymentByMonth.get(month)?.status === 'pagado';
-          return (
-            <div key={month} title={`${getMonthLabel(month)} · ${paid ? 'Pagado' : 'Pendiente'}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <span
-                style={{
-                  display: 'block',
-                  width: 10,
-                  height: 10,
-                  borderRadius: '50%',
-                  background: paid ? 'var(--success)' : 'var(--warning)',
-                }}
-              />
-              <span style={{ fontSize: '0.56rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>
-                {getMonthLabel(month).slice(0, 3)}
-              </span>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        {months.map((month) => (
+          <div key={month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {periods.map((period) => {
+                const payment = paymentByMonthPeriod.get(`${month}:${period}`);
+                const paid = payment?.status === 'pagado';
+                return (
+                  <span
+                    key={period}
+                    title={`${getMonthLabel(month)} · ${PERIOD_LABELS[period]} · ${paid ? 'Pagado' : 'Pendiente'}${paid ? (payment?.partner_paid ? ' · Pagado al socio' : ' · Pendiente de pasar al socio') : ''}`}
+                    style={{
+                      position: 'relative',
+                      display: 'block',
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      background: paid ? 'var(--success)' : 'var(--warning)',
+                    }}
+                  >
+                    {paid && payment?.partner_paid && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: -3,
+                          right: -3,
+                          width: 5,
+                          height: 5,
+                          borderRadius: '50%',
+                          background: 'var(--cyan)',
+                          border: '1px solid var(--surface)',
+                        }}
+                      />
+                    )}
+                  </span>
+                );
+              })}
             </div>
-          );
-        })}
+            <span style={{ fontSize: '0.56rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>
+              {getMonthLabel(month).slice(0, 3)}
+            </span>
+          </div>
+        ))}
       </div>
+      <p style={{ fontSize: '0.56rem', color: 'var(--fg-muted)', marginTop: 8 }}>
+        ● pagado · ● pendiente · <span style={{ color: 'var(--cyan)' }}>●</span> punto azul = ya se le pasó al socio
+      </p>
     </div>
   );
 }

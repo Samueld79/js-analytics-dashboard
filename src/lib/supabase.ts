@@ -158,17 +158,26 @@ export type ClientBillingInput = Pick<
 // (America/Bogota). Sin fila para un mes => se trata como 'pendiente' en la UI.
 
 export type BillingPaymentMonthStatus = 'pagado' | 'pendiente';
+// 'mes' = un solo cobro mensual (anticipado/mensual). 'q1'/'q2' = quincenas
+// 1-15 y 16-30, solo para payment_frequency = 'quincenal'.
+export type BillingPaymentPeriod = 'mes' | 'q1' | 'q2';
 
 export type ClientBillingPayment = {
   client_id: string;
   month: string;
+  period: BillingPaymentPeriod;
   status: BillingPaymentMonthStatus;
   paid_at: string | null;
+  partner_paid: boolean;
+  partner_paid_at: string | null;
   updated_by?: string | null;
   updated_at: string;
 };
 
-export type ClientBillingPaymentInput = Pick<ClientBillingPayment, 'client_id' | 'month' | 'status' | 'paid_at'>;
+export type ClientBillingPaymentInput = Pick<
+  ClientBillingPayment,
+  'client_id' | 'month' | 'period' | 'status' | 'paid_at' | 'partner_paid' | 'partner_paid_at'
+>;
 
 // ── Pre-Diagnóstico (client_diagnostics) — interno (is_internal_user) ──────────
 

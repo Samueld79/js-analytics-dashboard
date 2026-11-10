@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
 import {
   listClientBilling,
@@ -11,7 +11,9 @@ import { updateClientAdBudget } from '../services/clients';
 import type {
   BillingPaymentFrequency,
   BillingPaymentMonthStatus,
+  BillingPaymentPeriod,
   BillingPaymentReceiver,
+  Client,
   ClientBilling,
   ClientBillingPayment,
 } from '../lib/supabase';
@@ -31,6 +33,12 @@ const FREQUENCY_LABELS: Record<BillingPaymentFrequency, string> = {
   anticipado: 'Pago anticipado',
   quincenal: 'Quincenal',
   mensual: 'Mensual',
+};
+
+const PERIOD_LABELS: Record<BillingPaymentPeriod, string> = {
+  mes: 'Mes completo',
+  q1: '1 – 15',
+  q2: '16 – 30',
 };
 
 // Siempre el 1ro del mes actual en America/Bogota (no la zona del navegador
@@ -56,6 +64,17 @@ function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// mensual/anticipado => un solo cobro ('mes'). quincenal => dos ('q1','q2'),
+// cada uno por fee/2. Cambiar de modalidad nunca borra pagos ya guardados
+// del otro esquema, solo deja de mostrarlos (ver prompt de negocio).
+function periodsForFrequency(freq: BillingPaymentFrequency | null | undefined): BillingPaymentPeriod[] {
+  return freq === 'quincenal' ? ['q1', 'q2'] : ['mes'];
+}
+
+function paymentKey(clientId: string, period: BillingPaymentPeriod): string {
+  return `${clientId}:${period}`;
+}
+
 // Fila editable local — solo fee + presupuesto de pauta (que vive en
 // clients, ver migración original). Un "Guardar" por fila persiste ambas.
 type EditableRow = {
@@ -79,12 +98,14 @@ export function FacturacionPage() {
   const [loadingBilling, setLoadingBilling] = useState(true);
   const [rows, setRows] = useState<Map<string, EditableRow>>(new Map());
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [togglingPaymentId, setTogglingPaymentId] = useState<string | null>(null);
+  const [togglingPaymentKey, setTogglingPaymentKey] = useState<string | null>(null);
+  const [togglingPartnerKey, setTogglingPartnerKey] = useState<string | null>(null);
   const [errorByClient, setErrorByClient] = useState<Map<string, string>>(new Map());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [receiverFilter, setReceiverFilter] = useState<ReceiverFilter>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => getBogotaCurrentMonth());
   const [updatingFieldId, setUpdatingFieldId] = useState<string | null>(null);
+  const [expandedClientIds, setExpandedClientIds] = useState<Set<string>>(new Set());
 
   async function loadBilling() {
     setLoadingBilling(true);
@@ -121,18 +142,23 @@ export function FacturacionPage() {
     });
   }, [visibleClients, billingByClient]);
 
-  const paymentByClientForMonth = useMemo(() => {
+  const paymentByClientPeriod = useMemo(() => {
     const map = new Map<string, ClientBillingPayment>();
     for (const p of payments) {
-      if (p.month.slice(0, 10) === selectedMonth) map.set(p.client_id, p);
+      if (p.month.slice(0, 10) === selectedMonth) map.set(paymentKey(p.client_id, p.period), p);
     }
     return map;
   }, [payments, selectedMonth]);
 
-  function paymentStatusFor(clientId: string): BillingPaymentMonthStatus {
-    return paymentByClientForMonth.get(clientId)?.status ?? 'pendiente';
+  function paymentFor(clientId: string, period: BillingPaymentPeriod) {
+    return paymentByClientPeriod.get(paymentKey(clientId, period));
   }
 
+  // Totales del mes. "El socio" = Juanca, visto desde esta app (de Samuel):
+  // si el receptor es 'juanca' el 100% del cobro es su parte a reenviar; si
+  // es 'compartido', la mitad; si es 'samuel' (o sin receptor), nada. Sin
+  // una columna de "quién cobra" por cliente en la BD no hay forma de saber
+  // el caso real de cada cliente, así que esta es la convención usada.
   const totals = useMemo(() => {
     let feeExpected = 0;
     let collected = 0;
@@ -142,6 +168,7 @@ export function FacturacionPage() {
     let feeUndefined = 0;
     let adSpendUnderManagement = 0;
     let receiverUnassigned = 0;
+    let partnerPending = 0;
     const byReceiver: Record<BillingPaymentReceiver, { expected: number; collected: number }> = {
       samuel: { expected: 0, collected: 0 },
       juanca: { expected: 0, collected: 0 },
@@ -157,23 +184,48 @@ export function FacturacionPage() {
         feeUndefined += 1;
         continue;
       }
-      feeExpected += fee;
-      const isPaid = paymentStatusFor(client.id) === 'pagado';
-      if (isPaid) {
-        collected += fee;
-        paidCount += 1;
-      } else {
-        pending += fee;
-        pendingCount += 1;
-      }
 
-      const receiver = billing?.payment_receiver;
-      if (!receiver) {
-        receiverUnassigned += 1;
-        continue;
+      const receiver = billing?.payment_receiver ?? null;
+      if (!receiver) receiverUnassigned += 1;
+
+      const periods = periodsForFrequency(billing?.payment_frequency);
+      const periodAmount = periods.length === 2 ? fee / 2 : fee;
+
+      for (const period of periods) {
+        feeExpected += periodAmount;
+        const payment = paymentFor(client.id, period);
+        const isPaid = payment?.status === 'pagado';
+
+        if (isPaid) {
+          collected += periodAmount;
+          paidCount += 1;
+        } else {
+          pending += periodAmount;
+          pendingCount += 1;
+        }
+
+        if (receiver === 'samuel') {
+          byReceiver.samuel.expected += periodAmount;
+          if (isPaid) byReceiver.samuel.collected += periodAmount;
+        } else if (receiver === 'juanca') {
+          byReceiver.juanca.expected += periodAmount;
+          if (isPaid) byReceiver.juanca.collected += periodAmount;
+        } else if (receiver === 'compartido') {
+          byReceiver.compartido.expected += periodAmount;
+          byReceiver.samuel.expected += periodAmount / 2;
+          byReceiver.juanca.expected += periodAmount / 2;
+          if (isPaid) {
+            byReceiver.compartido.collected += periodAmount;
+            byReceiver.samuel.collected += periodAmount / 2;
+            byReceiver.juanca.collected += periodAmount / 2;
+          }
+        }
+
+        const partnerShare = receiver === 'juanca' ? periodAmount : receiver === 'compartido' ? periodAmount / 2 : 0;
+        if (isPaid && partnerShare > 0 && !payment?.partner_paid) {
+          partnerPending += partnerShare;
+        }
       }
-      byReceiver[receiver].expected += fee;
-      if (isPaid) byReceiver[receiver].collected += fee;
     }
 
     return {
@@ -186,9 +238,10 @@ export function FacturacionPage() {
       adSpendUnderManagement,
       byReceiver,
       receiverUnassigned,
+      partnerPending,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleClients, billingByClient, paymentByClientForMonth]);
+  }, [visibleClients, billingByClient, paymentByClientPeriod]);
 
   function updateRow(clientId: string, patch: Partial<EditableRow>) {
     setRows((current) => {
@@ -204,6 +257,15 @@ export function FacturacionPage() {
       const next = new Map(current);
       if (message) next.set(clientId, message);
       else next.delete(clientId);
+      return next;
+    });
+  }
+
+  function toggleExpanded(clientId: string) {
+    setExpandedClientIds((current) => {
+      const next = new Set(current);
+      if (next.has(clientId)) next.delete(clientId);
+      else next.add(clientId);
       return next;
     });
   }
@@ -271,28 +333,124 @@ export function FacturacionPage() {
     setUpdatingFieldId(null);
   }
 
-  async function handleTogglePayment(clientId: string) {
-    const next: BillingPaymentMonthStatus = paymentStatusFor(clientId) === 'pagado' ? 'pendiente' : 'pagado';
-    setTogglingPaymentId(clientId);
+  function replacePayment(saved: ClientBillingPayment) {
+    setPayments((current) => [
+      ...current.filter(
+        (p) => !(p.client_id === saved.client_id && p.month.slice(0, 10) === selectedMonth && p.period === saved.period),
+      ),
+      saved,
+    ]);
+  }
+
+  async function handleTogglePayment(clientId: string, period: BillingPaymentPeriod) {
+    const current = paymentFor(clientId, period);
+    const next: BillingPaymentMonthStatus = current?.status === 'pagado' ? 'pendiente' : 'pagado';
+    const key = paymentKey(clientId, period);
+    setTogglingPaymentKey(key);
     setRowError(clientId, null);
+
+    // Al volver a pendiente también se limpia "pagado al socio": si el
+    // cliente no ha pagado, no tiene sentido marcar nada como repartido.
+    const goingToPending = next === 'pendiente';
 
     const result = await upsertClientBillingPayment({
       client_id: clientId,
       month: selectedMonth,
+      period,
       status: next,
       paid_at: next === 'pagado' ? todayIsoDate() : null,
+      partner_paid: goingToPending ? false : current?.partner_paid ?? false,
+      partner_paid_at: goingToPending ? null : current?.partner_paid_at ?? null,
     });
 
-    if (result.error) {
-      setRowError(clientId, result.error);
-    } else if (result.data) {
-      const saved = result.data;
-      setPayments((current) => [
-        ...current.filter((p) => !(p.client_id === clientId && p.month.slice(0, 10) === selectedMonth)),
-        saved,
-      ]);
-    }
-    setTogglingPaymentId(null);
+    if (result.error) setRowError(clientId, result.error);
+    else if (result.data) replacePayment(result.data);
+    setTogglingPaymentKey(null);
+  }
+
+  async function handleTogglePartnerPaid(clientId: string, period: BillingPaymentPeriod) {
+    const current = paymentFor(clientId, period);
+    if (!current || current.status !== 'pagado') return;
+
+    const key = paymentKey(clientId, period);
+    setTogglingPartnerKey(key);
+    setRowError(clientId, null);
+
+    const nextPartnerPaid = !current.partner_paid;
+    const result = await upsertClientBillingPayment({
+      client_id: clientId,
+      month: selectedMonth,
+      period,
+      status: 'pagado',
+      paid_at: current.paid_at,
+      partner_paid: nextPartnerPaid,
+      partner_paid_at: nextPartnerPaid ? todayIsoDate() : null,
+    });
+
+    if (result.error) setRowError(clientId, result.error);
+    else if (result.data) replacePayment(result.data);
+    setTogglingPartnerKey(null);
+  }
+
+  function renderPeriodControl(client: Client, period: BillingPaymentPeriod, billing: ClientBilling | undefined, compact: boolean) {
+    const payment = paymentFor(client.id, period);
+    const isPaid = payment?.status === 'pagado';
+    const key = paymentKey(client.id, period);
+    const isToggling = togglingPaymentKey === key;
+    const isTogglingPartner = togglingPartnerKey === key;
+    const hasReceiver = !!billing?.payment_receiver;
+
+    return (
+      <div key={period} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 150 }}>
+        {!compact && (
+          <span className="meta-chip" style={{ fontSize: '0.56rem', width: 'fit-content' }}>
+            {PERIOD_LABELS[period]}
+          </span>
+        )}
+        <button
+          className="status-pill"
+          disabled={isToggling}
+          onClick={() => void handleTogglePayment(client.id, period)}
+          title="Click para alternar pagado/pendiente"
+          style={{
+            cursor: 'pointer',
+            display: 'block',
+            fontFamily: 'JetBrains Mono',
+            background: isPaid ? 'var(--success-dim)' : 'var(--warning-dim)',
+            color: isPaid ? 'var(--success)' : 'var(--warning)',
+            border: `1px solid ${isPaid ? 'var(--success)' : 'var(--warning)'}`,
+          }}
+        >
+          {isToggling ? 'Guardando...' : isPaid ? 'Pagado' : 'Pendiente'}
+        </button>
+        {isPaid && payment?.paid_at && (
+          <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>{payment.paid_at}</span>
+        )}
+        {isPaid && (
+          <button
+            className="btn-ghost"
+            disabled={!hasReceiver || isTogglingPartner}
+            onClick={() => void handleTogglePartnerPaid(client.id, period)}
+            title={hasReceiver ? 'Click para marcar/desmarcar como pasado al socio' : 'Sin receptor asignado — no se puede calcular qué pasarle'}
+            style={{
+              fontSize: '0.58rem',
+              padding: '3px 8px',
+              opacity: hasReceiver ? 1 : 0.5,
+              cursor: hasReceiver ? 'pointer' : 'not-allowed',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {!hasReceiver
+              ? 'Sin receptor'
+              : isTogglingPartner
+                ? 'Guardando...'
+                : payment?.partner_paid
+                  ? `Pagado al socio ✓${payment.partner_paid_at ? ` (${payment.partner_paid_at})` : ''}`
+                  : 'Pagado al socio'}
+          </button>
+        )}
+      </div>
+    );
   }
 
   const loading = loadingClients || loadingBilling;
@@ -375,14 +533,15 @@ export function FacturacionPage() {
       <div className="portal-kpi-grid" style={{ marginBottom: 20 }}>
         {[
           { label: 'Fee total esperado', value: formatCopExact(totals.feeExpected), sub: getMonthLabel(selectedMonth) },
-          { label: 'Cobrado', value: formatCopExact(totals.collected), sub: `${totals.paidCount} cliente${totals.paidCount === 1 ? '' : 's'} pagado${totals.paidCount === 1 ? '' : 's'}` },
-          { label: 'Por cobrar', value: formatCopExact(totals.pending), sub: `${totals.pendingCount} cliente${totals.pendingCount === 1 ? '' : 's'} pendiente${totals.pendingCount === 1 ? '' : 's'}` },
+          { label: 'Cobrado', value: formatCopExact(totals.collected), sub: `${totals.paidCount} cobro${totals.paidCount === 1 ? '' : 's'} pagado${totals.paidCount === 1 ? '' : 's'}` },
+          { label: 'Por cobrar', value: formatCopExact(totals.pending), sub: `${totals.pendingCount} cobro${totals.pendingCount === 1 ? '' : 's'} pendiente${totals.pendingCount === 1 ? '' : 's'}` },
           { label: 'Fee sin definir', value: String(totals.feeUndefined), sub: `de ${visibleClients.length} mostrados` },
           { label: 'Inversión en pauta bajo gestión', value: formatCopExact(totals.adSpendUnderManagement), sub: `presupuesto mensual, ${visibleClients.length} cliente${visibleClients.length === 1 ? '' : 's'}` },
           { label: 'Esperado — Samuel', value: formatCopExact(totals.byReceiver.samuel.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.samuel.collected)}` },
           { label: 'Esperado — Juanca', value: formatCopExact(totals.byReceiver.juanca.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.juanca.collected)}` },
-          { label: 'Esperado — Compartido', value: formatCopExact(totals.byReceiver.compartido.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.compartido.collected)}` },
+          { label: 'Esperado — Compartido', value: formatCopExact(totals.byReceiver.compartido.expected), sub: `cobrado: ${formatCopExact(totals.byReceiver.compartido.collected)} (ya incluido 50/50 arriba)` },
           { label: 'Sin receptor asignado', value: String(totals.receiverUnassigned), sub: `de ${visibleClients.length} mostrados` },
+          { label: 'Pendiente por pasar al socio', value: formatCopExact(totals.partnerPending), sub: 'cobros ya pagados, sin repartir' },
         ].map((card) => (
           <div key={card.label} className="card-glass portal-kpi-card">
             <p className="portal-kpi-label">{card.label}</p>
@@ -418,140 +577,143 @@ export function FacturacionPage() {
                   const row = rows.get(client.id);
                   if (!row) return null;
                   const rowError = errorByClient.get(client.id);
-                  const payment = paymentByClientForMonth.get(client.id);
-                  const status = paymentStatusFor(client.id);
-                  const isPaid = status === 'pagado';
                   const billing = billingByClient.get(client.id);
                   const isUpdatingField = updatingFieldId === client.id;
+                  const periods = periodsForFrequency(billing?.payment_frequency);
+                  const isQuincenal = periods.length === 2;
+                  const isExpanded = expandedClientIds.has(client.id);
+                  const paidPeriods = periods.filter((p) => paymentFor(client.id, p)?.status === 'pagado').length;
 
                   return (
-                    <tr key={client.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '9px 12px', fontFamily: 'Outfit, sans-serif', fontSize: '0.82rem', color: 'var(--fg)', whiteSpace: 'nowrap' }}>
-                        {client.name}
-                        {client.status !== 'active' && (
-                          <span className="meta-chip" style={{ marginLeft: 6, fontSize: '0.56rem' }}>{client.status}</span>
-                        )}
-                        {rowError && (
-                          <p style={{ margin: '4px 0 0', fontSize: '0.64rem', color: 'var(--danger)', whiteSpace: 'normal', maxWidth: 220 }}>
-                            {rowError}
-                          </p>
-                        )}
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <input
-                          className="form-input"
-                          type="number"
-                          min={0}
-                          value={row.monthly_fee}
-                          onChange={(e) => updateRow(client.id, { monthly_fee: e.target.value })}
-                          placeholder="—"
-                          style={{ width: 130 }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <input
-                          className="form-input"
-                          type="number"
-                          min={0}
-                          value={row.monthly_ad_budget}
-                          onChange={(e) => updateRow(client.id, { monthly_ad_budget: e.target.value })}
-                          placeholder="—"
-                          style={{ width: 130 }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <select
-                          value={billing?.payment_receiver ?? ''}
-                          disabled={isUpdatingField}
-                          onChange={(e) =>
-                            void handleUpdateBillingField(client.id, {
-                              payment_receiver: (e.target.value || null) as BillingPaymentReceiver | null,
-                            })
-                          }
-                          style={{
-                            height: '34px',
-                            padding: '0 8px',
-                            background: 'var(--color-bg-input)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            color: billing?.payment_receiver ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
-                            fontFamily: 'JetBrains Mono',
-                            fontSize: '0.7rem',
-                            outline: 'none',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <option value="">Sin asignar</option>
-                          {(Object.keys(RECEIVER_LABELS) as BillingPaymentReceiver[]).map((value) => (
-                            <option key={value} value={value}>
-                              {RECEIVER_LABELS[value]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <select
-                          value={billing?.payment_frequency ?? ''}
-                          disabled={isUpdatingField}
-                          onChange={(e) =>
-                            void handleUpdateBillingField(client.id, {
-                              payment_frequency: (e.target.value || null) as BillingPaymentFrequency | null,
-                            })
-                          }
-                          style={{
-                            height: '34px',
-                            padding: '0 8px',
-                            background: 'var(--color-bg-input)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            color: billing?.payment_frequency ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
-                            fontFamily: 'JetBrains Mono',
-                            fontSize: '0.7rem',
-                            outline: 'none',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <option value="">—</option>
-                          {(Object.keys(FREQUENCY_LABELS) as BillingPaymentFrequency[]).map((value) => (
-                            <option key={value} value={value}>
-                              {FREQUENCY_LABELS[value]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <button
-                          className="status-pill"
-                          disabled={togglingPaymentId === client.id}
-                          onClick={() => void handleTogglePayment(client.id)}
-                          title="Click para alternar pagado/pendiente"
-                          style={{
-                            cursor: 'pointer',
-                            display: 'block',
-                            fontFamily: 'JetBrains Mono',
-                            background: isPaid ? 'var(--success-dim)' : 'var(--warning-dim)',
-                            color: isPaid ? 'var(--success)' : 'var(--warning)',
-                            border: `1px solid ${isPaid ? 'var(--success)' : 'var(--warning)'}`,
-                          }}
-                        >
-                          {togglingPaymentId === client.id ? 'Guardando...' : isPaid ? 'Pagado' : 'Pendiente'}
-                        </button>
-                        {isPaid && payment?.paid_at && (
-                          <span style={{ display: 'block', marginTop: 4, fontSize: '0.58rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>
-                            {payment.paid_at}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <button
-                          className="btn-secondary"
-                          disabled={savingId === client.id}
-                          onClick={() => void handleSave(client.id)}
-                        >
-                          {savingId === client.id ? 'Guardando...' : 'Guardar'}
-                        </button>
-                      </td>
-                    </tr>
+                    <Fragment key={client.id}>
+                      <tr style={{ borderBottom: isQuincenal && isExpanded ? 'none' : '1px solid var(--border)' }}>
+                        <td style={{ padding: '9px 12px', fontFamily: 'Outfit, sans-serif', fontSize: '0.82rem', color: 'var(--fg)', whiteSpace: 'nowrap' }}>
+                          {client.name}
+                          {client.status !== 'active' && (
+                            <span className="meta-chip" style={{ marginLeft: 6, fontSize: '0.56rem' }}>{client.status}</span>
+                          )}
+                          {rowError && (
+                            <p style={{ margin: '4px 0 0', fontSize: '0.64rem', color: 'var(--danger)', whiteSpace: 'normal', maxWidth: 220 }}>
+                              {rowError}
+                            </p>
+                          )}
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <input
+                            className="form-input"
+                            type="number"
+                            min={0}
+                            value={row.monthly_fee}
+                            onChange={(e) => updateRow(client.id, { monthly_fee: e.target.value })}
+                            placeholder="—"
+                            style={{ width: 130 }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <input
+                            className="form-input"
+                            type="number"
+                            min={0}
+                            value={row.monthly_ad_budget}
+                            onChange={(e) => updateRow(client.id, { monthly_ad_budget: e.target.value })}
+                            placeholder="—"
+                            style={{ width: 130 }}
+                          />
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <select
+                            value={billing?.payment_receiver ?? ''}
+                            disabled={isUpdatingField}
+                            onChange={(e) =>
+                              void handleUpdateBillingField(client.id, {
+                                payment_receiver: (e.target.value || null) as BillingPaymentReceiver | null,
+                              })
+                            }
+                            style={{
+                              height: '34px',
+                              padding: '0 8px',
+                              background: 'var(--color-bg-input)',
+                              border: '1px solid var(--color-border)',
+                              borderRadius: '4px',
+                              color: billing?.payment_receiver ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
+                              fontFamily: 'JetBrains Mono',
+                              fontSize: '0.7rem',
+                              outline: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <option value="">Sin asignar</option>
+                            {(Object.keys(RECEIVER_LABELS) as BillingPaymentReceiver[]).map((value) => (
+                              <option key={value} value={value}>
+                                {RECEIVER_LABELS[value]}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <select
+                            value={billing?.payment_frequency ?? ''}
+                            disabled={isUpdatingField}
+                            onChange={(e) =>
+                              void handleUpdateBillingField(client.id, {
+                                payment_frequency: (e.target.value || null) as BillingPaymentFrequency | null,
+                              })
+                            }
+                            style={{
+                              height: '34px',
+                              padding: '0 8px',
+                              background: 'var(--color-bg-input)',
+                              border: '1px solid var(--color-border)',
+                              borderRadius: '4px',
+                              color: billing?.payment_frequency ? 'var(--color-text-secondary)' : 'var(--fg-muted)',
+                              fontFamily: 'JetBrains Mono',
+                              fontSize: '0.7rem',
+                              outline: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <option value="">—</option>
+                            {(Object.keys(FREQUENCY_LABELS) as BillingPaymentFrequency[]).map((value) => (
+                              <option key={value} value={value}>
+                                {FREQUENCY_LABELS[value]}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          {isQuincenal ? (
+                            <button
+                              className="btn-secondary"
+                              onClick={() => toggleExpanded(client.id)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.68rem' }}
+                            >
+                              {paidPeriods} de {periods.length} pagadas
+                              {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            </button>
+                          ) : (
+                            renderPeriodControl(client, periods[0], billing, true)
+                          )}
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <button
+                            className="btn-secondary"
+                            disabled={savingId === client.id}
+                            onClick={() => void handleSave(client.id)}
+                          >
+                            {savingId === client.id ? 'Guardando...' : 'Guardar'}
+                          </button>
+                        </td>
+                      </tr>
+                      {isQuincenal && isExpanded && (
+                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td colSpan={7} style={{ padding: '4px 12px 14px 12px', background: 'var(--surface-2)' }}>
+                            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                              {periods.map((period) => renderPeriodControl(client, period, billing, false))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
 

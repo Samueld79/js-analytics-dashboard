@@ -79,7 +79,7 @@ export async function upsertClientBillingPayment(
 
   const { data, error } = await supabase
     .from('client_billing_payments')
-    .upsert(payload, { onConflict: 'client_id,month' })
+    .upsert(payload, { onConflict: 'client_id,month,period' })
     .select('*')
     .maybeSingle();
 
