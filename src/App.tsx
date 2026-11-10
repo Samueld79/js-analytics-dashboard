@@ -28,6 +28,7 @@ import { PortalClientAdminPage } from './pages/PortalClientAdminPage';
 import { ClientPortalPublicPage } from './pages/ClientPortalPublicPage';
 import { PulsePublicPage } from './pages/PulsePublicPage';
 import { SplashScreen } from './components/SplashScreen';
+import { UpdateBanner } from './components/UpdateBanner';
 import { WelcomeOverlay } from './components/WelcomeOverlay';
 
 function App() {
@@ -156,6 +157,7 @@ function AppContent() {
   return (
     <>
       {welcomeName && <WelcomeOverlay name={welcomeName} onDone={() => setWelcomeName(null)} />}
+      <UpdateBanner />
       <div className="app-shell">
         <div className="page-bg" />
         <Sidebar />
