@@ -6,24 +6,36 @@ interface Props {
   expected: number;
   collected: number;
   pending: number;
+  paidCount: number;
+  totalCount: number;
+  adSpendUnderManagement: number;
   feeUndefinedCount: number;
 }
 
-export function IncomeHero({ monthLabel, expected, collected, pending, feeUndefinedCount }: Props) {
+// Fusiona el antiguo hero + las 4 tarjetas KPI en una sola tarjeta de
+// resumen del mes.
+export function MonthSummaryCard({
+  monthLabel,
+  expected,
+  collected,
+  pending,
+  paidCount,
+  totalCount,
+  adSpendUnderManagement,
+  feeUndefinedCount,
+}: Props) {
   const percentCollected = expected > 0 ? (collected / expected) * 100 : 0;
 
   return (
     <div className="card-glass card-padded" style={{ display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
-      <ProgressRing
-        percent={percentCollected}
-        label={`${Math.round(percentCollected)} por ciento cobrado del mes`}
-      />
-      <div style={{ flex: '1 1 260px', minWidth: 220 }}>
-        <p className="number-label" style={{ fontSize: '0.64rem', color: 'var(--fg-muted)' }}>Ingresos de {monthLabel}</p>
+      <ProgressRing percent={percentCollected} label={`${Math.round(percentCollected)} por ciento cobrado del mes`} />
+
+      <div style={{ flex: '1 1 320px', minWidth: 260 }}>
+        <p className="number-label" style={{ fontSize: '0.64rem', color: 'var(--fg-muted)' }}>Resumen de {monthLabel}</p>
         <p
           style={{
             margin: '4px 0 0',
-            fontSize: '2rem',
+            fontSize: '1.7rem',
             fontWeight: 700,
             fontFamily: 'JetBrains Mono, monospace',
             color: 'var(--fg)',
@@ -31,7 +43,9 @@ export function IncomeHero({ monthLabel, expected, collected, pending, feeUndefi
           }}
         >
           {formatCopExact(expected)}
+          <span style={{ fontSize: '0.6rem', color: 'var(--fg-muted)', fontWeight: 400, marginLeft: 8 }}>esperado</span>
         </p>
+
         <div style={{ display: 'flex', gap: 24, marginTop: 14, flexWrap: 'wrap' }}>
           <div>
             <p style={{ margin: 0, fontSize: '0.6rem', color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cobrado</p>
@@ -45,9 +59,20 @@ export function IncomeHero({ monthLabel, expected, collected, pending, feeUndefi
               {formatCopExact(pending)}
             </p>
           </div>
+          <div>
+            <p style={{ margin: 0, fontSize: '0.6rem', color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pagados</p>
+            <p style={{ margin: '2px 0 0', fontSize: '1.05rem', fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg)', fontWeight: 600 }}>
+              {paidCount} de {totalCount}
+            </p>
+          </div>
         </div>
+
+        <p style={{ margin: '14px 0 0', fontSize: '0.64rem', color: 'var(--fg-muted)' }}>
+          Pauta bajo gestión: {formatCopExact(adSpendUnderManagement)}
+        </p>
+
         {feeUndefinedCount > 0 && (
-          <p style={{ margin: '14px 0 0', fontSize: '0.68rem', color: 'var(--warning)' }}>
+          <p style={{ margin: '6px 0 0', fontSize: '0.64rem', color: 'var(--warning)' }}>
             Fee sin definir: {feeUndefinedCount} cliente{feeUndefinedCount === 1 ? '' : 's'}
           </p>
         )}

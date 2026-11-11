@@ -21,14 +21,10 @@ function daysLabel(dueDate: string, todayIso: string): { text: string; color: st
 // Lista de cobros pendientes del mes actual (real, no el del selector de
 // arriba), ordenada por fecha de vencimiento. El botón reutiliza el modal
 // de "Cuenta de cobro" que ya existe en FacturacionPage (via onRequestInvoice).
+// Sin envoltorio propio (card/título) — vive dentro de DueTabsCard.
 export function DueSoonList({ items, todayIso, onRequestInvoice }: Props) {
   return (
-    <div className="card-glass card-padded">
-      <p className="number-label" style={{ fontSize: '0.72rem', color: 'var(--fg)', marginBottom: 2 }}>Por cobrar ahora</p>
-      <p style={{ margin: '0 0 12px', fontSize: '0.6rem', color: 'var(--fg-muted)' }}>
-        Mes actual, independiente del selector de arriba
-      </p>
-
+    <div>
       {items.length === 0 ? (
         <p className="empty-note">Todo cobrado este mes 🎉</p>
       ) : (

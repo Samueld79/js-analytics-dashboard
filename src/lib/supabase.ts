@@ -215,6 +215,30 @@ export type BillingSettlementInput = Pick<
   'settled_on' | 'payer' | 'payee' | 'amount' | 'gross_samuel_to_juanca' | 'gross_juanca_to_samuel'
 >;
 
+// ── Ingresos extra (billing_extra_income) — SOLO admin ─────────────────────
+// Instalaciones, agente IA, etc. — nunca el fee mensual. Siempre 50/50: el
+// collector se queda con todo y le debe la mitad al otro socio. No cuentan
+// en el fee esperado/cobrado de clientes; tienen su propio total y entran
+// al mismo cruce neto que los cobros compartidos (ver NetBalanceCard).
+
+export type BillingExtraIncome = {
+  id: string;
+  month: string;
+  received_on: string;
+  concept: string;
+  client_id: string | null;
+  amount: number;
+  collector: BillingInvoiceIssuerKey;
+  settlement_id: string | null;
+  created_by?: string | null;
+  created_at: string;
+};
+
+export type BillingExtraIncomeInput = Pick<
+  BillingExtraIncome,
+  'month' | 'received_on' | 'concept' | 'client_id' | 'amount' | 'collector'
+>;
+
 // ── Emisores de cuenta de cobro (billing_issuers) — SOLO admin ─────────────
 // Datos personales de Samuel/Juanca (NIT, cuenta bancaria, etc.). NUNCA
 // hardcodear estos valores en el código: siempre se leen de esta tabla con

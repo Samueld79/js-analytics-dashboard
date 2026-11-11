@@ -16,6 +16,7 @@ function addDays(iso: string, days: number): string {
 
 // Mini línea de tiempo de los próximos 7 días (HTML/CSS, no hace falta SVG
 // para una fila de celdas). Agrupa los DueItem por fecha de vencimiento.
+// Sin envoltorio propio (card/título) — vive dentro de DueTabsCard.
 export function UpcomingTimeline({ items, todayIso }: Props) {
   const days = Array.from({ length: 8 }, (_, i) => addDays(todayIso, i));
   const byDate = new Map<string, DueItem[]>();
@@ -26,8 +27,7 @@ export function UpcomingTimeline({ items, todayIso }: Props) {
   }
 
   return (
-    <div className="card-glass card-padded">
-      <p className="number-label" style={{ fontSize: '0.72rem', color: 'var(--fg)', marginBottom: 12 }}>Próximos 7 días</p>
+    <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 8 }}>
         {days.map((date) => {
           const dayItems = byDate.get(date) ?? [];
