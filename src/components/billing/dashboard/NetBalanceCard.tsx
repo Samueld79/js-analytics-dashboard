@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { formatCopExact } from '../../../lib/utils';
 import type { BillingInvoiceIssuerKey, BillingSettlement } from '../../../lib/supabase';
+import { SettleConfirmModal } from './SettleConfirmModal';
 
 const ISSUER_LABELS: Record<BillingInvoiceIssuerKey, string> = { samuel: 'Samuel', juanca: 'Juanca' };
 
@@ -12,6 +14,8 @@ interface Props {
   monthProjectionNet: number;
   monthProjectionSamuelToJuanca: number;
   monthProjectionJuancaToSamuel: number;
+  sharedCobrosCount: number;
+  sharedPendingCount: number;
   settling: boolean;
   settleError: string | null;
   settlements: BillingSettlement[];
@@ -26,8 +30,13 @@ function netPhrase(net: number, verb: string): string {
 
 // "Saldo actual (cobrado)" = netBalance real y acumulado, viene tal cual de
 // FacturacionPage (sin recalcular acá). "Proyección del mes" es un número
-// aparte e hipotético (todo lo compartido del mes se pagara), para que no
-// se confundan. El historial se lee de billing_settlements (no se infiere).
+// aparte e hipotético (todo lo compartido del mes se pagara). Jerarquía:
+// mientras falten compartidos del mes por cobrar, la proyección manda
+// (cifra grande) y el saldo real queda de referencia chica; en cuanto no
+// quede ninguno pendiente, ambas cifras coincidirían, así que el saldo real
+// pasa a ser la única/cifra principal. El historial se lee de
+// billing_settlements (no se infiere). La confirmación de "Liquidar saldo"
+// vive en SettleConfirmModal (sin window.confirm).
 export function NetBalanceCard({
   net,
   owedBySamuelToJuanca,
@@ -37,32 +46,66 @@ export function NetBalanceCard({
   monthProjectionNet,
   monthProjectionSamuelToJuanca,
   monthProjectionJuancaToSamuel,
+  sharedCobrosCount,
+  sharedPendingCount,
   settling,
   settleError,
   settlements,
   onSettle,
 }: Props) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const hasSharedThisMonth = sharedCobrosCount > 0;
+  const hasPendingThisMonth = sharedPendingCount > 0;
+
+  function handleConfirm() {
+    onSettle();
+    setConfirmOpen(false);
+  }
+
   return (
     <div className="card-glass card-padded">
-      <p className="number-label" style={{ fontSize: '0.6rem', color: 'var(--fg-muted)' }}>Saldo actual (cobrado)</p>
-      <p style={{ margin: '4px 0 0', fontSize: '1.05rem', fontWeight: 600, color: 'var(--fg)' }}>{netPhrase(net, 'debe')}</p>
-      <p style={{ margin: '4px 0 0', fontSize: '0.66rem', color: 'var(--fg-muted)' }}>
-        Samuel debe {formatCopExact(owedBySamuelToJuanca)} · Juanca debe {formatCopExact(owedByJuancaToSamuel)}
-      </p>
+      {hasPendingThisMonth ? (
+        <>
+          <p className="number-label" style={{ fontSize: '0.6rem', color: 'var(--fg-muted)' }}>
+            Proyección del mes ({monthLabel})
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: '1.05rem', fontWeight: 600, color: 'var(--fg)' }}>
+            {netPhrase(monthProjectionNet, 'pagaría')}
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: '0.66rem', color: 'var(--fg-muted)' }}>
+            Si todo lo compartido de este mes se pagara: Samuel {formatCopExact(monthProjectionSamuelToJuanca)} · Juanca{' '}
+            {formatCopExact(monthProjectionJuancaToSamuel)}
+          </p>
 
-      <div style={{ height: 1, background: 'var(--border)', margin: '12px 0' }} />
+          <div style={{ height: 1, background: 'var(--border)', margin: '12px 0' }} />
 
-      <p className="number-label" style={{ fontSize: '0.6rem', color: 'var(--fg-muted)' }}>
-        Proyección del mes ({monthLabel})
-      </p>
-      <p style={{ margin: '4px 0 0', fontSize: '0.84rem', fontWeight: 600, color: 'var(--fg-2)' }}>
-        {netPhrase(monthProjectionNet, 'pagaría')}
-      </p>
-      <p style={{ margin: '4px 0 14px', fontSize: '0.62rem', color: 'var(--fg-muted)' }}>
-        Si todo lo compartido de este mes se pagara: Samuel {formatCopExact(monthProjectionSamuelToJuanca)} · Juanca {formatCopExact(monthProjectionJuancaToSamuel)}
-      </p>
+          <p className="number-label" style={{ fontSize: '0.56rem', color: 'var(--fg-muted)' }}>Saldo actual (cobrado)</p>
+          <p style={{ margin: '4px 0 0', fontSize: '0.8rem', fontWeight: 600, color: 'var(--fg-2)' }}>{netPhrase(net, 'debe')}</p>
+          <p style={{ margin: '4px 0 0', fontSize: '0.62rem', color: 'var(--fg-muted)' }}>
+            Samuel debe {formatCopExact(owedBySamuelToJuanca)} · Juanca debe {formatCopExact(owedByJuancaToSamuel)}
+          </p>
+          <p style={{ margin: '6px 0 14px', fontSize: '0.6rem', color: 'var(--warning)' }}>
+            Aún faltan compartidos por cobrar; este saldo cambiará cuando paguen los demás.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="number-label" style={{ fontSize: '0.6rem', color: 'var(--fg-muted)' }}>Saldo actual (cobrado)</p>
+          <p style={{ margin: '4px 0 0', fontSize: '1.05rem', fontWeight: 600, color: 'var(--fg)' }}>{netPhrase(net, 'debe')}</p>
+          <p style={{ margin: '4px 0 14px', fontSize: '0.66rem', color: 'var(--fg-muted)' }}>
+            Samuel debe {formatCopExact(owedBySamuelToJuanca)} · Juanca debe {formatCopExact(owedByJuancaToSamuel)}
+          </p>
 
-      <button className="btn-primary" disabled={pendingSettlementsCount === 0 || settling} onClick={onSettle}>
+          {!hasSharedThisMonth && (
+            <p style={{ margin: '0 0 14px', fontSize: '0.62rem', color: 'var(--fg-muted)' }}>
+              No hay cobros compartidos en {monthLabel}.
+            </p>
+          )}
+        </>
+      )}
+
+      <button className="btn-primary" disabled={pendingSettlementsCount === 0 || settling} onClick={() => setConfirmOpen(true)}>
         {settling ? 'Liquidando...' : 'Liquidar saldo'}
       </button>
 
@@ -88,6 +131,16 @@ export function NetBalanceCard({
             ))}
           </ul>
         </div>
+      )}
+
+      {confirmOpen && (
+        <SettleConfirmModal
+          net={net}
+          sharedPendingCount={sharedPendingCount}
+          settling={settling}
+          onConfirm={handleConfirm}
+          onClose={() => setConfirmOpen(false)}
+        />
       )}
     </div>
   );

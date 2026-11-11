@@ -28,7 +28,7 @@ interface Props {
     owedByJuancaToSamuel: number;
     settlementCandidates: unknown[];
   };
-  monthProjection: { net: number; samuelToJuanca: number; juancaToSamuel: number };
+  monthProjection: { net: number; samuelToJuanca: number; juancaToSamuel: number; sharedCobrosCount: number; sharedPendingCount: number };
   settlements: BillingSettlement[];
   settling: boolean;
   settleError: string | null;
@@ -106,6 +106,8 @@ export function IncomeDashboard({
           monthProjectionNet={monthProjection.net}
           monthProjectionSamuelToJuanca={monthProjection.samuelToJuanca}
           monthProjectionJuancaToSamuel={monthProjection.juancaToSamuel}
+          sharedCobrosCount={monthProjection.sharedCobrosCount}
+          sharedPendingCount={monthProjection.sharedPendingCount}
           settling={settling}
           settleError={settleError}
           settlements={settlements}

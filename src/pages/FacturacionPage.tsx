@@ -479,6 +479,8 @@ export function FacturacionPage() {
   const monthProjection = useMemo(() => {
     let samuelToJuanca = 0;
     let juancaToSamuel = 0;
+    let sharedCobrosCount = 0;
+    let sharedPendingCount = 0;
 
     for (const client of visibleClients) {
       const billing = billingByClient.get(client.id);
@@ -490,10 +492,25 @@ export function FacturacionPage() {
 
       if (billing.invoice_issuer === 'samuel') samuelToJuanca += halfForAllPeriods;
       else juancaToSamuel += halfForAllPeriods;
+
+      // Conteo adicional (no afecta el neto de arriba): cuántos de estos
+      // cobros compartidos del mes seleccionado ya están pagados o no,
+      // para la jerarquía visual de la tarjeta y el aviso al liquidar.
+      sharedCobrosCount += periods.length;
+      for (const period of periods) {
+        if (paymentFor(client.id, period)?.status !== 'pagado') sharedPendingCount += 1;
+      }
     }
 
-    return { samuelToJuanca, juancaToSamuel, net: samuelToJuanca - juancaToSamuel };
-  }, [visibleClients, billingByClient]);
+    return {
+      samuelToJuanca,
+      juancaToSamuel,
+      net: samuelToJuanca - juancaToSamuel,
+      sharedCobrosCount,
+      sharedPendingCount,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleClients, billingByClient, paymentByClientPeriod]);
 
   // ── Data del dashboard de ingresos (sección superior) ──────────────────
   // "Hoy" y "mes actual" se fijan una vez por montaje (no por render) —
@@ -606,22 +623,15 @@ export function FacturacionPage() {
     });
   }
 
+  // La confirmación ya no es window.confirm — vive en el modal propio de
+  // NetBalanceCard (SettleConfirmModal), que llama a esta función solo
+  // después de que el usuario confirma. La lógica de liquidación en sí
+  // (qué se inserta/actualiza) no cambió.
   async function handleSettleBalance() {
     const candidates = netBalance.settlementCandidates;
     if (candidates.length === 0) return;
 
     const net = netBalance.net;
-    const who =
-      net > 0
-        ? `Samuel le paga a Juanca ${formatCopExact(net)}`
-        : net < 0
-          ? `Juanca le paga a Samuel ${formatCopExact(Math.abs(net))}`
-          : 'Están a mano — no hay nada que transferir';
-    const confirmed = window.confirm(
-      `${who}.\n\nEsto registra la liquidación y marca ${candidates.length} cobro${candidates.length === 1 ? '' : 's'} compartido${candidates.length === 1 ? '' : 's'} como repartido${candidates.length === 1 ? '' : 's'}. ¿Confirmas?`,
-    );
-    if (!confirmed) return;
-
     setSettling(true);
     setSettleError(null);
 
