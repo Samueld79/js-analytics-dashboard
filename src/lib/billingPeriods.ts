@@ -1,5 +1,44 @@
 import type { BillingPaymentFrequency, BillingPaymentPeriod } from './supabase';
 
+// ── Fechas en America/Bogota (nunca UTC ni la hora local del navegador) ────
+// Colombia no tiene horario de verano, así que un offset fijo bastaría, pero
+// Intl con timeZone explícito es más a prueba de fallos. Centralizado acá
+// para que todo el módulo de facturación (página, resumen de cliente,
+// dashboard) use la misma fuente de "hoy"/"mes actual".
+
+export function getBogotaCurrentMonth(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+  return `${year}-${month}-01`;
+}
+
+export function getBogotaTodayIso(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+  const day = parts.find((p) => p.type === 'day')?.value ?? '01';
+  return `${year}-${month}-${day}`;
+}
+
+// Aritmética de calendario pura sobre un 'YYYY-MM-01' ya conocido — usa
+// Date.UTC solo como herramienta de cálculo de meses, no para derivar "hoy"
+// (eso es getBogotaCurrentMonth/getBogotaTodayIso de arriba). Segura sin
+// importar la zona horaria del proceso.
+export function shiftMonth(monthStr: string, delta: number): string {
+  const [y, m] = monthStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 10);
+}
+
 // mensual/anticipado => un solo cobro ('mes'). quincenal => dos ('q1','q2'),
 // cada uno por fee/2. Cambiar de modalidad nunca borra pagos ya guardados
 // del otro esquema, solo deja de mostrarlos.

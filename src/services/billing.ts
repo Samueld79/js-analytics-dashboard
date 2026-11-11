@@ -9,6 +9,7 @@ import {
   type BillingIssuer,
   type BillingIssuerInput,
   type BillingPaymentPeriod,
+  type BillingSettlement,
   type ClientBilling,
   type ClientBillingInput,
   type ClientBillingPayment,
@@ -122,6 +123,96 @@ export async function upsertClientBillingPaymentsBatch(
   }
 
   return { data: (data ?? []) as ClientBillingPayment[], error: null };
+}
+
+// ── Liquidaciones entre socios (billing_settlements) — SOLO admin ──────────
+
+export async function listBillingSettlements(): Promise<BillingSettlement[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('billing_settlements')
+    .select('*')
+    .order('settled_on', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[billing] listBillingSettlements', error);
+    return [];
+  }
+
+  return (data ?? []) as BillingSettlement[];
+}
+
+// "Liquidar saldo": inserta la liquidación (el neto real, no el bruto de
+// cada lado) y DESPUÉS marca en lote los cobros que la componen. Si el
+// lote falla, borra la liquidación recién creada — nunca debe quedar una
+// liquidación sin sus cobros marcados, ni a medias.
+export async function createSettlementAndMarkPaid(params: {
+  settledOn: string;
+  payer: BillingInvoiceIssuerKey | null;
+  payee: BillingInvoiceIssuerKey | null;
+  amount: number;
+  grossSamuelToJuanca: number;
+  grossJuancaToSamuel: number;
+  candidates: { client_id: string; month: string; period: BillingPaymentPeriod; paid_at: string | null }[];
+}): Promise<ServiceMutationResult<{ settlement: BillingSettlement; payments: ClientBillingPayment[] }>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const created_by = await getCurrentUserId();
+  const { data: settlement, error: insertError } = await supabase
+    .from('billing_settlements')
+    .insert({
+      settled_on: params.settledOn,
+      payer: params.payer,
+      payee: params.payee,
+      amount: params.amount,
+      gross_samuel_to_juanca: params.grossSamuelToJuanca,
+      gross_juanca_to_samuel: params.grossJuancaToSamuel,
+      created_by,
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (insertError || !settlement) {
+    console.error('[billing] createSettlementAndMarkPaid insert', insertError);
+    return { data: null, error: getErrorMessage(insertError, 'No se pudo registrar la liquidación.') };
+  }
+
+  const settlementRow = settlement as BillingSettlement;
+
+  if (params.candidates.length === 0) {
+    return { data: { settlement: settlementRow, payments: [] }, error: null };
+  }
+
+  const batchResult = await upsertClientBillingPaymentsBatch(
+    params.candidates.map((c) => ({
+      client_id: c.client_id,
+      month: c.month,
+      period: c.period,
+      status: 'pagado',
+      paid_at: c.paid_at,
+      partner_paid: true,
+      partner_paid_at: params.settledOn,
+      settlement_id: settlementRow.id,
+    })),
+  );
+
+  if (batchResult.error) {
+    const { error: rollbackError } = await supabase.from('billing_settlements').delete().eq('id', settlementRow.id);
+    if (rollbackError) console.error('[billing] createSettlementAndMarkPaid rollback failed', rollbackError);
+    return {
+      data: null,
+      error: getErrorMessage(
+        { message: batchResult.error },
+        'No se pudieron marcar los cobros como liquidados. La liquidación se revirtió, no se guardó nada.',
+      ),
+    };
+  }
+
+  return { data: { settlement: settlementRow, payments: batchResult.data ?? [] }, error: null };
 }
 
 // ── Emisores de cuenta de cobro (billing_issuers) — SOLO admin ─────────────

@@ -3,13 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { useClients } from '../hooks/useClients';
 import {
+  createSettlementAndMarkPaid,
   listBillingInvoices,
   listBillingIssuers,
+  listBillingSettlements,
   listClientBilling,
   listClientBillingPayments,
   upsertClientBilling,
   upsertClientBillingPayment,
-  upsertClientBillingPaymentsBatch,
 } from '../services/billing';
 import { updateClientAdBudget } from '../services/clients';
 import type {
@@ -20,15 +21,17 @@ import type {
   BillingPaymentMonthStatus,
   BillingPaymentPeriod,
   BillingPaymentReceiver,
+  BillingSettlement,
   Client,
   ClientBilling,
   ClientBillingInput,
   ClientBillingPayment,
-  ClientBillingPaymentInput,
 } from '../lib/supabase';
 import { formatCopExact } from '../lib/utils';
 import { getMonthLabel } from '../utils/monthLabel';
 import {
+  getBogotaCurrentMonth,
+  getBogotaTodayIso,
   PAY_DAYS_PRESET_LABELS,
   PAY_DAYS_PRESET_VALUES,
   type PayDaysPreset,
@@ -37,6 +40,7 @@ import {
   periodRangeShort,
   periodsForFrequency,
   presetForPayDays,
+  shiftMonth,
 } from '../lib/billingPeriods';
 import { InvoiceGenerateModal } from '../components/billing/InvoiceGenerateModal';
 import { BulkInvoiceModal } from '../components/billing/BulkInvoiceModal';
@@ -63,45 +67,6 @@ const ISSUER_LABELS: Record<BillingInvoiceIssuerKey, string> = {
   samuel: 'Samuel',
   juanca: 'Juanca',
 };
-
-// Siempre el 1ro del mes actual en America/Bogota (no la zona del navegador
-// ni del servidor) — Colombia no tiene horario de verano, así que un offset
-// fijo bastaría, pero Intl con timeZone explícito es más a prueba de fallos.
-function getBogotaCurrentMonth(): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Bogota',
-    year: 'numeric',
-    month: '2-digit',
-  }).formatToParts(new Date());
-  const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
-  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
-  return `${year}-${month}-01`;
-}
-
-// Fecha de "hoy" en America/Bogota (no UTC ni la zona del navegador) — para
-// el dashboard de ingresos (vencidos/próximos), consistente con
-// getBogotaCurrentMonth de arriba.
-function getBogotaTodayIso(): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Bogota',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
-  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
-  const day = parts.find((p) => p.type === 'day')?.value ?? '01';
-  return `${year}-${month}-${day}`;
-}
-
-function shiftMonth(monthStr: string, delta: number): string {
-  const [y, m] = monthStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 10);
-}
-
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function paymentKey(clientId: string, period: BillingPaymentPeriod): string {
   return `${clientId}:${period}`;
@@ -151,10 +116,10 @@ export function FacturacionPage() {
   const [payments, setPayments] = useState<ClientBillingPayment[]>([]);
   const [issuers, setIssuers] = useState<BillingIssuer[]>([]);
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
+  const [billingSettlements, setBillingSettlements] = useState<BillingSettlement[]>([]);
   const [loadingBilling, setLoadingBilling] = useState(true);
   const [rows, setRows] = useState<Map<string, EditableRow>>(new Map());
   const [togglingPaymentKey, setTogglingPaymentKey] = useState<string | null>(null);
-  const [togglingPartnerKey, setTogglingPartnerKey] = useState<string | null>(null);
   const [errorByClient, setErrorByClient] = useState<Map<string, string>>(new Map());
   const [rowStatus, setRowStatusState] = useState<Map<string, RowSaveStatus>>(new Map());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
@@ -265,11 +230,12 @@ export function FacturacionPage() {
 
   async function loadBilling() {
     setLoadingBilling(true);
-    const [billing, pays, issuersList, invoicesList] = await Promise.all([
+    const [billing, pays, issuersList, invoicesList, settlementsList] = await Promise.all([
       listClientBilling(),
       listClientBillingPayments(),
       listBillingIssuers(),
       listBillingInvoices(),
+      listBillingSettlements(),
     ]);
     const billingMap = new Map(billing.map((b) => [b.client_id, b]));
     setBillingByClient(billingMap);
@@ -277,6 +243,7 @@ export function FacturacionPage() {
     setPayments(pays);
     setIssuers(issuersList);
     setInvoices(invoicesList);
+    setBillingSettlements(settlementsList);
     setLoadingBilling(false);
   }
 
@@ -505,33 +472,28 @@ export function FacturacionPage() {
     };
   }, [payments, billingByClient]);
 
-  // Historial de liquidaciones derivado de partner_paid_at — sin tabla
-  // nueva: agrupa los cobros compartidos ya repartidos por fecha y muestra
-  // el neto de cada fecha (puede mezclar ambas direcciones si ese día se
-  // liquidaron cobros de los dos emisores).
-  const settlementHistory = useMemo(() => {
-    const byDate = new Map<string, { samuelToJuanca: number; juancaToSamuel: number }>();
+  // Proyección del mes seleccionado: el neto SI todos los cobros compartidos
+  // de este mes se pagaran (sin filtrar por status/partner_paid — es un
+  // "hacia dónde va", no el saldo real ya cobrado). Independiente de
+  // netBalance de arriba, que es el saldo real acumulado de todos los meses.
+  const monthProjection = useMemo(() => {
+    let samuelToJuanca = 0;
+    let juancaToSamuel = 0;
 
-    for (const payment of payments) {
-      if (!payment.partner_paid || !payment.partner_paid_at) continue;
-      const billing = billingByClient.get(payment.client_id);
+    for (const client of visibleClients) {
+      const billing = billingByClient.get(client.id);
       if (!billing || billing.payment_receiver !== 'compartido' || !billing.invoice_issuer) continue;
       if (billing.monthly_fee == null) continue;
 
       const periods = periodsForFrequency(billing.payment_frequency);
-      if (!periods.includes(payment.period)) continue;
+      const halfForAllPeriods = ((periodAmountFor(billing.monthly_fee, periods.length) ?? 0) / 2) * periods.length;
 
-      const half = (periodAmountFor(billing.monthly_fee, periods.length) ?? 0) / 2;
-      const entry = byDate.get(payment.partner_paid_at) ?? { samuelToJuanca: 0, juancaToSamuel: 0 };
-      if (billing.invoice_issuer === 'samuel') entry.samuelToJuanca += half;
-      else entry.juancaToSamuel += half;
-      byDate.set(payment.partner_paid_at, entry);
+      if (billing.invoice_issuer === 'samuel') samuelToJuanca += halfForAllPeriods;
+      else juancaToSamuel += halfForAllPeriods;
     }
 
-    return Array.from(byDate.entries())
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([date, { samuelToJuanca, juancaToSamuel }]) => ({ date, net: samuelToJuanca - juancaToSamuel }));
-  }, [payments, billingByClient]);
+    return { samuelToJuanca, juancaToSamuel, net: samuelToJuanca - juancaToSamuel };
+  }, [visibleClients, billingByClient]);
 
   // ── Data del dashboard de ingresos (sección superior) ──────────────────
   // "Hoy" y "mes actual" se fijan una vez por montaje (no por render) —
@@ -648,39 +610,42 @@ export function FacturacionPage() {
     const candidates = netBalance.settlementCandidates;
     if (candidates.length === 0) return;
 
+    const net = netBalance.net;
     const who =
-      netBalance.net > 0
-        ? `Samuel le debe a Juanca ${formatCopExact(netBalance.net)}`
-        : netBalance.net < 0
-          ? `Juanca le debe a Samuel ${formatCopExact(Math.abs(netBalance.net))}`
-          : 'Están a mano ($0)';
+      net > 0
+        ? `Samuel le paga a Juanca ${formatCopExact(net)}`
+        : net < 0
+          ? `Juanca le paga a Samuel ${formatCopExact(Math.abs(net))}`
+          : 'Están a mano — no hay nada que transferir';
     const confirmed = window.confirm(
-      `${who}.\n\nEsto marcará ${candidates.length} cobro${candidates.length === 1 ? '' : 's'} compartido${candidates.length === 1 ? '' : 's'} como repartido${candidates.length === 1 ? '' : 's'} (partner_paid = true, hoy). ¿Confirmas la liquidación?`,
+      `${who}.\n\nEsto registra la liquidación y marca ${candidates.length} cobro${candidates.length === 1 ? '' : 's'} compartido${candidates.length === 1 ? '' : 's'} como repartido${candidates.length === 1 ? '' : 's'}. ¿Confirmas?`,
     );
     if (!confirmed) return;
 
     setSettling(true);
     setSettleError(null);
 
-    const today = todayIsoDate();
-    const payloads: ClientBillingPaymentInput[] = candidates.map((c) => ({
-      client_id: c.client_id,
-      month: c.month,
-      period: c.period,
-      status: 'pagado',
-      paid_at: c.paid_at,
-      partner_paid: true,
-      partner_paid_at: today,
-    }));
+    const payer: BillingInvoiceIssuerKey | null = net > 0 ? 'samuel' : net < 0 ? 'juanca' : null;
+    const payee: BillingInvoiceIssuerKey | null = net > 0 ? 'juanca' : net < 0 ? 'samuel' : null;
 
-    const result = await upsertClientBillingPaymentsBatch(payloads);
+    const result = await createSettlementAndMarkPaid({
+      settledOn: getBogotaTodayIso(),
+      payer,
+      payee,
+      amount: Math.abs(net),
+      grossSamuelToJuanca: netBalance.owedBySamuelToJuanca,
+      grossJuancaToSamuel: netBalance.owedByJuancaToSamuel,
+      candidates: candidates.map((c) => ({ client_id: c.client_id, month: c.month, period: c.period, paid_at: c.paid_at })),
+    });
+
     if (result.error) {
       setSettleError(result.error);
     } else if (result.data) {
-      const saved = result.data;
+      const { settlement, payments: updatedPayments } = result.data;
+      setBillingSettlements((current) => [settlement, ...current]);
       setPayments((current) => {
         const byKey = new Map(current.map((p) => [paymentIdentityKey(p), p] as const));
-        for (const s of saved) byKey.set(paymentIdentityKey(s), s);
+        for (const s of updatedPayments) byKey.set(paymentIdentityKey(s), s);
         return Array.from(byKey.values());
       });
     }
@@ -887,8 +852,9 @@ export function FacturacionPage() {
     setTogglingPaymentKey(key);
     setRowError(clientId, null);
 
-    // Al volver a pendiente también se limpia "pagado al socio": si el
-    // cliente no ha pagado, no tiene sentido marcar nada como repartido.
+    // Al volver a pendiente también se limpia "pagado al socio" y cualquier
+    // liquidación ya registrada para ese cobro: si el cliente no ha pagado,
+    // no tiene sentido marcarlo como repartido/liquidado.
     const goingToPending = next === 'pendiente';
 
     const result = await upsertClientBillingPayment({
@@ -896,38 +862,15 @@ export function FacturacionPage() {
       month: selectedMonth,
       period,
       status: next,
-      paid_at: next === 'pagado' ? todayIsoDate() : null,
+      paid_at: next === 'pagado' ? getBogotaTodayIso() : null,
       partner_paid: goingToPending ? false : current?.partner_paid ?? false,
       partner_paid_at: goingToPending ? null : current?.partner_paid_at ?? null,
+      settlement_id: goingToPending ? null : current?.settlement_id ?? null,
     });
 
     if (result.error) setRowError(clientId, result.error);
     else if (result.data) replacePayment(result.data);
     setTogglingPaymentKey(null);
-  }
-
-  async function handleTogglePartnerPaid(clientId: string, period: BillingPaymentPeriod) {
-    const current = paymentFor(clientId, period);
-    if (!current || current.status !== 'pagado') return;
-
-    const key = paymentKey(clientId, period);
-    setTogglingPartnerKey(key);
-    setRowError(clientId, null);
-
-    const nextPartnerPaid = !current.partner_paid;
-    const result = await upsertClientBillingPayment({
-      client_id: clientId,
-      month: selectedMonth,
-      period,
-      status: 'pagado',
-      paid_at: current.paid_at,
-      partner_paid: nextPartnerPaid,
-      partner_paid_at: nextPartnerPaid ? todayIsoDate() : null,
-    });
-
-    if (result.error) setRowError(clientId, result.error);
-    else if (result.data) replacePayment(result.data);
-    setTogglingPartnerKey(null);
   }
 
   function handleInvoiceCreated(invoice: BillingInvoice) {
@@ -945,7 +888,6 @@ export function FacturacionPage() {
     const isPaid = payment?.status === 'pagado';
     const key = paymentKey(client.id, period);
     const isToggling = togglingPaymentKey === key;
-    const isTogglingPartner = togglingPartnerKey === key;
     const amount = periodAmountFor(billing?.monthly_fee, periodsForFrequency(billing?.payment_frequency).length);
     const issuerKey = billing?.invoice_issuer ?? null;
     const issuer = issuerKey ? issuersByKey.get(issuerKey) : undefined;
@@ -986,47 +928,13 @@ export function FacturacionPage() {
         {isPaid && payment?.paid_at && (
           <span style={{ fontSize: '0.58rem', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono' }}>{payment.paid_at}</span>
         )}
-        {/* Solo hay "parte del socio" que repartir cuando el fee es compartido
-            50/50 — si el receptor es samuel o juanca, el 100% ya es suyo y no
-            hay nada que pasar. */}
-        {isPaid && billing?.payment_receiver === 'compartido' && (() => {
-          const partnerName = issuerKey === 'juanca' ? 'Samuel' : issuerKey === 'samuel' ? 'Juanca' : null;
-          const halfAmount = amount != null ? amount / 2 : null;
-          const canToggle = !!partnerName;
-
-          return (
-            <button
-              className="btn-ghost"
-              disabled={!canToggle || isTogglingPartner}
-              onClick={() => void handleTogglePartnerPaid(client.id, period)}
-              title={canToggle ? 'Click para marcar/desmarcar' : 'Asigna quién cobra (Emite / cobra) primero'}
-              style={{
-                fontSize: '0.58rem',
-                padding: '3px 8px',
-                opacity: canToggle ? 1 : 0.5,
-                cursor: canToggle ? 'pointer' : 'not-allowed',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                gap: 2,
-              }}
-            >
-              <span>
-                {!canToggle
-                  ? 'Falta definir quién cobra'
-                  : isTogglingPartner
-                    ? 'Guardando...'
-                    : payment?.partner_paid
-                      ? `Incluido en la liquidación ✓${payment.partner_paid_at ? ` (${payment.partner_paid_at})` : ''}`
-                      : `Ya le pasé a ${partnerName} su 50%`}
-              </span>
-              {halfAmount != null && (
-                <span style={{ fontSize: '0.54rem', color: 'var(--fg-muted)' }}>{formatCopExact(halfAmount)}</span>
-              )}
-            </button>
-          );
-        })()}
+        {/* Ya no se marca "pasado al socio" cobro por cobro — la única vía
+            es "Liquidar saldo" (neto acumulado). Esto es solo informativo. */}
+        {isPaid && billing?.payment_receiver === 'compartido' && payment?.partner_paid && (
+          <span style={{ fontSize: '0.56rem', color: 'var(--cyan)' }}>
+            Incluido en liquidación{payment.partner_paid_at ? ` del ${payment.partner_paid_at}` : ''}
+          </span>
+        )}
 
         {existingInvoice ? (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1151,7 +1059,8 @@ export function FacturacionPage() {
           monthLabel={getMonthLabel(selectedMonth)}
           totals={totals}
           netBalance={netBalance}
-          settlementHistory={settlementHistory}
+          monthProjection={monthProjection}
+          settlements={billingSettlements}
           settling={settling}
           settleError={settleError}
           onSettle={() => void handleSettleBalance()}
