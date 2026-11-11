@@ -182,13 +182,37 @@ export type ClientBillingPayment = {
   paid_at: string | null;
   partner_paid: boolean;
   partner_paid_at: string | null;
+  // Liquidación (billing_settlements) que saldó este cobro, si ya se
+  // liquidó en lote. Nunca se pone a mano — solo vía "Liquidar saldo".
+  settlement_id?: string | null;
   updated_by?: string | null;
   updated_at: string;
 };
 
 export type ClientBillingPaymentInput = Pick<
   ClientBillingPayment,
-  'client_id' | 'month' | 'period' | 'status' | 'paid_at' | 'partner_paid' | 'partner_paid_at'
+  'client_id' | 'month' | 'period' | 'status' | 'paid_at' | 'partner_paid' | 'partner_paid_at' | 'settlement_id'
+>;
+
+// ── Liquidaciones entre socios (billing_settlements) — SOLO admin ──────────
+// Una fila por cada vez que se usa "Liquidar saldo": registra el neto real
+// transferido (no el bruto de cada lado) y de quién a quién.
+
+export type BillingSettlement = {
+  id: string;
+  settled_on: string;
+  payer: BillingInvoiceIssuerKey | null;
+  payee: BillingInvoiceIssuerKey | null;
+  amount: number;
+  gross_samuel_to_juanca: number;
+  gross_juanca_to_samuel: number;
+  created_by?: string | null;
+  created_at: string;
+};
+
+export type BillingSettlementInput = Pick<
+  BillingSettlement,
+  'settled_on' | 'payer' | 'payee' | 'amount' | 'gross_samuel_to_juanca' | 'gross_juanca_to_samuel'
 >;
 
 // ── Emisores de cuenta de cobro (billing_issuers) — SOLO admin ─────────────

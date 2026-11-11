@@ -4,7 +4,7 @@ import { listClientBilling, listClientBillingPayments } from '../../services/bil
 import type { BillingInvoiceIssuerKey, BillingPaymentFrequency, BillingPaymentReceiver, ClientBilling, ClientBillingPayment } from '../../lib/supabase';
 import { formatCopExact } from '../../lib/utils';
 import { getMonthLabel } from '../../utils/monthLabel';
-import { periodLabel, periodsForFrequency } from '../../lib/billingPeriods';
+import { getBogotaCurrentMonth, periodLabel, periodsForFrequency, shiftMonth } from '../../lib/billingPeriods';
 
 const RECEIVER_LABELS: Record<BillingPaymentReceiver, string> = {
   samuel: 'Samuel',
@@ -23,13 +23,12 @@ const ISSUER_LABELS: Record<BillingInvoiceIssuerKey, string> = {
   juanca: 'Juanca',
 };
 
+// Bogota, no UTC: cerca del cambio de mes, la fecha UTC ya puede ir un mes
+// adelante de la de Bogota (UTC-5) y mostraría el rango equivocado.
 function lastSixMonths(): string[] {
-  const now = new Date();
+  const current = getBogotaCurrentMonth();
   const months: string[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    months.push(d.toISOString().slice(0, 10));
-  }
+  for (let i = 5; i >= 0; i--) months.push(shiftMonth(current, -i));
   return months;
 }
 

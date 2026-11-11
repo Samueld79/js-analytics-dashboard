@@ -1,4 +1,5 @@
 import { formatCopExact } from '../../../lib/utils';
+import type { BillingSettlement } from '../../../lib/supabase';
 import { IncomeHero } from './IncomeHero';
 import { PartnerSplitCard } from './PartnerSplitCard';
 import { NetBalanceCard } from './NetBalanceCard';
@@ -27,7 +28,8 @@ interface Props {
     owedByJuancaToSamuel: number;
     settlementCandidates: unknown[];
   };
-  settlementHistory: { date: string; net: number }[];
+  monthProjection: { net: number; samuelToJuanca: number; juancaToSamuel: number };
+  settlements: BillingSettlement[];
   settling: boolean;
   settleError: string | null;
   onSettle: () => void;
@@ -39,14 +41,15 @@ interface Props {
 }
 
 // Dashboard de ingresos al inicio de /admin/facturacion. No recalcula nada:
-// toda la data (totals, byReceiver, saldo neto, tendencia, vencimientos) se
-// computa en FacturacionPage y llega lista por props — este componente solo
-// la organiza en una cuadrícula responsive.
+// toda la data (totals, byReceiver, saldo neto, proyección, tendencia,
+// vencimientos) se computa en FacturacionPage y llega lista por props —
+// este componente solo la organiza en una cuadrícula responsive.
 export function IncomeDashboard({
   monthLabel,
   totals,
   netBalance,
-  settlementHistory,
+  monthProjection,
+  settlements,
   settling,
   settleError,
   onSettle,
@@ -100,22 +103,21 @@ export function IncomeDashboard({
           owedByJuancaToSamuel={netBalance.owedByJuancaToSamuel}
           pendingSettlementsCount={netBalance.settlementCandidates.length}
           monthLabel={monthLabel}
-          monthOwedBySamuelToJuanca={totals.owedBySamuelToJuanca}
-          monthOwedByJuancaToSamuel={totals.owedByJuancaToSamuel}
+          monthProjectionNet={monthProjection.net}
+          monthProjectionSamuelToJuanca={monthProjection.samuelToJuanca}
+          monthProjectionJuancaToSamuel={monthProjection.juancaToSamuel}
           settling={settling}
           settleError={settleError}
-          history={settlementHistory}
+          settlements={settlements}
           onSettle={onSettle}
         />
       </div>
 
-      <div className="card-glass card-padded">
-        <p className="number-label" style={{ fontSize: '0.72rem', color: 'var(--fg)', marginBottom: 12 }}>Tendencia de 6 meses</p>
-        <MonthlyTrendChart data={trend} />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, alignItems: 'start' }}>
         <DueSoonList items={dueNowItems} todayIso={todayIso} onRequestInvoice={onRequestInvoice} />
+        <div className="card-glass card-padded" style={{ maxHeight: 148, overflow: 'hidden' }}>
+          <MonthlyTrendChart data={trend} />
+        </div>
         <UpcomingTimeline items={next7Items} todayIso={todayIso} />
       </div>
     </div>
