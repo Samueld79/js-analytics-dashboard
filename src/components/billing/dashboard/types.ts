@@ -22,3 +22,12 @@ export type TrendMonth = {
 };
 
 export type ReceiverTotals = { expected: number; collected: number };
+
+// Una fila del "Cruce entre socios": un cliente compartido o un ingreso
+// extra sin liquidar del mes seleccionado.
+export type CrossRow = {
+  key: string;
+  label: string;
+  collector: BillingInvoiceIssuerKey;
+  half: number;
+};

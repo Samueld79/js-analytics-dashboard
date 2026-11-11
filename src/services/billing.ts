@@ -3,6 +3,8 @@ import {
   isSupabaseConfigured,
   SUPABASE_MISSING_MESSAGE,
   supabase,
+  type BillingExtraIncome,
+  type BillingExtraIncomeInput,
   type BillingInvoice,
   type BillingInvoiceIssuerKey,
   type BillingInvoiceItem,
@@ -145,9 +147,12 @@ export async function listBillingSettlements(): Promise<BillingSettlement[]> {
 }
 
 // "Liquidar saldo": inserta la liquidación (el neto real, no el bruto de
-// cada lado) y DESPUÉS marca en lote los cobros que la componen. Si el
-// lote falla, borra la liquidación recién creada — nunca debe quedar una
-// liquidación sin sus cobros marcados, ni a medias.
+// cada lado) y DESPUÉS marca en lote los cobros y los ingresos extra que la
+// componen. Si algún lote falla, borra la liquidación recién creada — el FK
+// de settlement_id en ambas tablas es ON DELETE SET NULL, así que borrar la
+// liquidación limpia automáticamente cualquier referencia ya aplicada
+// (aunque partner_paid de ese lote ya aplicado se queda en true; mismo
+// riesgo que ya existía con un solo lote, ahora con dos).
 export async function createSettlementAndMarkPaid(params: {
   settledOn: string;
   payer: BillingInvoiceIssuerKey | null;
@@ -156,7 +161,10 @@ export async function createSettlementAndMarkPaid(params: {
   grossSamuelToJuanca: number;
   grossJuancaToSamuel: number;
   candidates: { client_id: string; month: string; period: BillingPaymentPeriod; paid_at: string | null }[];
-}): Promise<ServiceMutationResult<{ settlement: BillingSettlement; payments: ClientBillingPayment[] }>> {
+  extraIncomeIds: string[];
+}): Promise<
+  ServiceMutationResult<{ settlement: BillingSettlement; payments: ClientBillingPayment[]; extraIncome: BillingExtraIncome[] }>
+> {
   if (!isSupabaseConfigured || !supabase) {
     return { data: null, error: SUPABASE_MISSING_MESSAGE };
   }
@@ -183,36 +191,49 @@ export async function createSettlementAndMarkPaid(params: {
 
   const settlementRow = settlement as BillingSettlement;
 
-  if (params.candidates.length === 0) {
-    return { data: { settlement: settlementRow, payments: [] }, error: null };
-  }
-
-  const batchResult = await upsertClientBillingPaymentsBatch(
-    params.candidates.map((c) => ({
-      client_id: c.client_id,
-      month: c.month,
-      period: c.period,
-      status: 'pagado',
-      paid_at: c.paid_at,
-      partner_paid: true,
-      partner_paid_at: params.settledOn,
-      settlement_id: settlementRow.id,
-    })),
-  );
-
-  if (batchResult.error) {
-    const { error: rollbackError } = await supabase.from('billing_settlements').delete().eq('id', settlementRow.id);
+  async function rollback(error: string) {
+    const { error: rollbackError } = await supabase!.from('billing_settlements').delete().eq('id', settlementRow.id);
     if (rollbackError) console.error('[billing] createSettlementAndMarkPaid rollback failed', rollbackError);
-    return {
-      data: null,
-      error: getErrorMessage(
-        { message: batchResult.error },
-        'No se pudieron marcar los cobros como liquidados. La liquidación se revirtió, no se guardó nada.',
-      ),
-    };
+    return { data: null, error };
   }
 
-  return { data: { settlement: settlementRow, payments: batchResult.data ?? [] }, error: null };
+  let updatedPayments: ClientBillingPayment[] = [];
+  if (params.candidates.length > 0) {
+    const batchResult = await upsertClientBillingPaymentsBatch(
+      params.candidates.map((c) => ({
+        client_id: c.client_id,
+        month: c.month,
+        period: c.period,
+        status: 'pagado',
+        paid_at: c.paid_at,
+        partner_paid: true,
+        partner_paid_at: params.settledOn,
+        settlement_id: settlementRow.id,
+      })),
+    );
+
+    if (batchResult.error) {
+      return rollback('No se pudieron marcar los cobros como liquidados. La liquidación se revirtió, no se guardó nada.');
+    }
+    updatedPayments = batchResult.data ?? [];
+  }
+
+  let updatedExtraIncome: BillingExtraIncome[] = [];
+  if (params.extraIncomeIds.length > 0) {
+    const { data: extraData, error: extraError } = await supabase
+      .from('billing_extra_income')
+      .update({ settlement_id: settlementRow.id })
+      .in('id', params.extraIncomeIds)
+      .select('*');
+
+    if (extraError) {
+      console.error('[billing] createSettlementAndMarkPaid extra income update', extraError);
+      return rollback('No se pudieron marcar los ingresos extra como liquidados. La liquidación se revirtió.');
+    }
+    updatedExtraIncome = (extraData ?? []) as BillingExtraIncome[];
+  }
+
+  return { data: { settlement: settlementRow, payments: updatedPayments, extraIncome: updatedExtraIncome }, error: null };
 }
 
 // ── Emisores de cuenta de cobro (billing_issuers) — SOLO admin ─────────────
@@ -335,4 +356,82 @@ export async function createBillingInvoice(params: {
   }
 
   return { data: (data ?? null) as BillingInvoice | null, error: null };
+}
+
+// ── Ingresos extra (billing_extra_income) — SOLO admin ─────────────────────
+// Instalaciones, agente IA, etc. — siempre 50/50, nunca el fee mensual. Se
+// listan todos (la tabla es pequeña) y se filtra por mes en el cliente,
+// igual que client_billing_payments.
+
+export async function listBillingExtraIncome(): Promise<BillingExtraIncome[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from('billing_extra_income')
+    .select('*')
+    .order('received_on', { ascending: false });
+
+  if (error) {
+    console.error('[billing] listBillingExtraIncome', error);
+    return [];
+  }
+
+  return (data ?? []) as BillingExtraIncome[];
+}
+
+export async function createBillingExtraIncome(
+  input: BillingExtraIncomeInput,
+): Promise<ServiceMutationResult<BillingExtraIncome>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const created_by = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from('billing_extra_income')
+    .insert({ ...input, created_by })
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[billing] createBillingExtraIncome', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo guardar el ingreso extra.') };
+  }
+
+  return { data: (data ?? null) as BillingExtraIncome | null, error: null };
+}
+
+export async function updateBillingExtraIncome(
+  id: string,
+  input: BillingExtraIncomeInput,
+): Promise<ServiceMutationResult<BillingExtraIncome>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const { data, error } = await supabase
+    .from('billing_extra_income')
+    .update(input)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[billing] updateBillingExtraIncome', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo actualizar el ingreso extra.') };
+  }
+
+  return { data: (data ?? null) as BillingExtraIncome | null, error: null };
+}
+
+export async function deleteBillingExtraIncome(id: string): Promise<{ error: string | null }> {
+  if (!isSupabaseConfigured || !supabase) return { error: SUPABASE_MISSING_MESSAGE };
+
+  const { error } = await supabase.from('billing_extra_income').delete().eq('id', id);
+  if (error) {
+    console.error('[billing] deleteBillingExtraIncome', error);
+    return { error: getErrorMessage(error, 'No se pudo borrar el ingreso extra.') };
+  }
+
+  return { error: null };
 }
