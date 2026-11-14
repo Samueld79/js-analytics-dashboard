@@ -2297,6 +2297,8 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
 }
 .invoice-items-table td { padding: 10px; border-bottom: 1px solid #e0e0e0; color: #1a1a1a; }
 .invoice-items-table td:last-child, .invoice-items-table th:last-child { text-align: right; }
+/* La hoja es blanca: anula el hover oscuro global de tbody tr:hover td */
+.invoice-items-table tbody tr:hover td { background: transparent; }
 
 .invoice-totals { display: flex; justify-content: flex-end; gap: 16px; margin: 0 40px 24px; }
 .invoice-total-box {
