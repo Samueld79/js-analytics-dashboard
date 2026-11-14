@@ -194,13 +194,19 @@ export type ClientBillingPayment = {
   // Liquidación (billing_settlements) que saldó este cobro, si ya se
   // liquidó en lote. Nunca se pone a mano — solo vía "Liquidar saldo".
   settlement_id?: string | null;
+  // Monto real de ESTE cobro puntual si es distinto al fee normal (ej. un
+  // descuento). null = usar periodAmountFor(monthly_fee, …) como siempre.
+  // Nunca incluye contenido/pass-through. Ver passThroughForPeriod/
+  // periodAmountFor en billingPeriods.ts — este campo se resuelve en el
+  // llamador (FacturacionPage), no acá.
+  amount_received?: number | null;
   updated_by?: string | null;
   updated_at: string;
 };
 
 export type ClientBillingPaymentInput = Pick<
   ClientBillingPayment,
-  'client_id' | 'month' | 'period' | 'status' | 'paid_at' | 'partner_paid' | 'partner_paid_at' | 'settlement_id'
+  'client_id' | 'month' | 'period' | 'status' | 'paid_at' | 'partner_paid' | 'partner_paid_at' | 'settlement_id' | 'amount_received'
 >;
 
 // ── Liquidaciones entre socios (billing_settlements) — SOLO admin ──────────

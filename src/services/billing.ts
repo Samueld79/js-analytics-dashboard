@@ -146,6 +146,60 @@ export async function listBillingSettlements(): Promise<BillingSettlement[]> {
   return (data ?? []) as BillingSettlement[];
 }
 
+// "Registrar pago de Juanca" (meta mensual de Samuel, ver FacturacionPage):
+// a diferencia de createSettlementAndMarkPaid, NO toca cobros ni ingresos
+// extra — solo registra que esa plata ya se pasó, con gross_* en 0 porque
+// no hay "bruto por lado" en este modelo (Samuel nunca le transfiere nada
+// a Juanca). billing_settlements no tiene columna de nota libre.
+export async function createManualPartnerPayment(params: {
+  settledOn: string;
+  amount: number;
+}): Promise<ServiceMutationResult<BillingSettlement>> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: SUPABASE_MISSING_MESSAGE };
+  }
+
+  const created_by = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from('billing_settlements')
+    .insert({
+      settled_on: params.settledOn,
+      payer: 'juanca',
+      payee: 'samuel',
+      amount: params.amount,
+      gross_samuel_to_juanca: 0,
+      gross_juanca_to_samuel: 0,
+      created_by,
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    console.error('[billing] createManualPartnerPayment', error);
+    return { data: null, error: getErrorMessage(error, 'No se pudo registrar el pago.') };
+  }
+
+  return { data: (data ?? null) as BillingSettlement | null, error: null };
+}
+
+// "Deshacer" sobre un registro de "Registrar pago de Juanca" (o, en teoría,
+// cualquier billing_settlements) — borrado simple. El FK de settlement_id
+// en client_billing_payments/billing_extra_income es ON DELETE SET NULL,
+// así que borrar una liquidación vieja de "Liquidar saldo" por error acá
+// no deja referencias colgando (mismo comportamiento que el rollback de
+// createSettlementAndMarkPaid).
+export async function deleteBillingSettlement(id: string): Promise<{ error: string | null }> {
+  if (!isSupabaseConfigured || !supabase) return { error: SUPABASE_MISSING_MESSAGE };
+
+  const { error } = await supabase.from('billing_settlements').delete().eq('id', id);
+  if (error) {
+    console.error('[billing] deleteBillingSettlement', error);
+    return { error: getErrorMessage(error, 'No se pudo borrar el registro.') };
+  }
+
+  return { error: null };
+}
+
 // "Liquidar saldo": inserta la liquidación (el neto real, no el bruto de
 // cada lado) y DESPUÉS marca en lote los cobros y los ingresos extra que la
 // componen. Si algún lote falla, borra la liquidación recién creada — el FK
