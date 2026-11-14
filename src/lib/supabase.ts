@@ -149,6 +149,13 @@ export type ClientBilling = {
   // Días del mes en que se cobra (ej. [15] o [1,15]). Ver src/lib/billingPeriods.ts.
   pay_days?: number[] | null;
   invoice_issuer?: BillingInvoiceIssuerKey | null;
+  // "Paso a través": contenido u otro costo que se le paga a un tercero,
+  // facturado junto con el fee pero que NUNCA es ingreso de la agencia.
+  // No entra a expected/collected/byReceiver/saldo neto/proyección/
+  // liquidación — solo se suma al total de la cuenta de cobro impresa
+  // (ver passThroughForPeriod en billingPeriods.ts).
+  pass_through_monthly?: number | null;
+  pass_through_label?: string | null;
   updated_by?: string | null;
   updated_at: string;
   created_at: string;
@@ -163,6 +170,8 @@ export type ClientBillingInput = Pick<
   | 'payment_frequency'
   | 'pay_days'
   | 'invoice_issuer'
+  | 'pass_through_monthly'
+  | 'pass_through_label'
 >;
 
 // ── Estado de pago mensual (client_billing_payments) — solo admin ──────────────

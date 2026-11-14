@@ -12,6 +12,7 @@ import { formatCopExact } from '../../lib/utils';
 import { getMonthLabel } from '../../utils/monthLabel';
 import {
   defaultIssueDateForPeriod,
+  passThroughForPeriod,
   periodDateRangeText,
   periodLabel,
   periodsForFrequency,
@@ -23,7 +24,14 @@ type Candidate = {
   key: string;
   client: Client;
   period: BillingPaymentPeriod;
+  // Fee únicamente (el de siempre, el que entra a expected/collected/etc).
   amount: number | null;
+  // Contenido/otro costo a terceros, nunca ingreso de la agencia — 0 si el
+  // cliente no tiene pass_through_monthly configurado.
+  passThrough: number;
+  passThroughLabel: string;
+  // Lo que realmente va en la cuenta de cobro (amount + passThrough).
+  invoiceTotal: number | null;
   issuerKey: BillingInvoiceIssuerKey | null;
   payDays: number[] | null | undefined;
   disabledReason: string | null;
@@ -57,6 +65,9 @@ export function BulkInvoiceModal({ month, clients, billingByClient, issuersByKey
         if (invoicesByKey.has(`${client.id}:${month}:${period}`)) continue;
 
         const amount = periodAmountFor(billing?.monthly_fee, periods.length);
+        const passThrough = passThroughForPeriod(billing, periods.length);
+        const passThroughLabel = billing?.pass_through_label ?? 'Creación de contenido';
+        const invoiceTotal = amount != null ? amount + passThrough : null;
         const issuerKey = billing?.invoice_issuer ?? null;
         const issuer = issuerKey ? issuersByKey.get(issuerKey) : undefined;
         const issuerReady = !!issuer?.legal_name && !!issuer?.account_number;
@@ -75,6 +86,9 @@ export function BulkInvoiceModal({ month, clients, billingByClient, issuersByKey
           client,
           period,
           amount,
+          passThrough,
+          passThroughLabel,
+          invoiceTotal,
           issuerKey,
           payDays: billing?.pay_days,
           disabledReason,
@@ -118,16 +132,20 @@ export function BulkInvoiceModal({ month, clients, billingByClient, issuersByKey
       setResults(new Map(nextResults));
 
       const issueDate = defaultIssueDateForPeriod(month, candidate.period, candidate.payDays);
+      const items = [
+        { qty: 1, description: 'Actividades como Trafficker / Estratega en Meta Ads e Instagram', value: null },
+        { qty: 1, description: `Servicios de Growth Marketing ${periodDateRangeText(month, candidate.period)}`, value: candidate.amount },
+        ...(candidate.passThrough > 0
+          ? [{ qty: 1, description: `${candidate.passThroughLabel} ${periodDateRangeText(month, candidate.period)}`, value: candidate.passThrough }]
+          : []),
+      ];
       const result = await createBillingInvoice({
         clientId: candidate.client.id,
         issuerKey: candidate.issuerKey!,
         month,
         period: candidate.period,
-        items: [
-          { qty: 1, description: 'Actividades como Trafficker / Estratega en Meta Ads e Instagram', value: null },
-          { qty: 1, description: `Servicios de Growth Marketing ${periodDateRangeText(month, candidate.period)}`, value: candidate.amount },
-        ],
-        total: candidate.amount ?? 0,
+        items,
+        total: candidate.invoiceTotal ?? 0,
         issueDate,
       });
 
@@ -210,7 +228,12 @@ export function BulkInvoiceModal({ month, clients, billingByClient, issuersByKey
                       {defaultIssueDateForPeriod(month, c.period, c.payDays)}
                     </td>
                     <td style={{ padding: '6px 8px', fontSize: '0.74rem', fontFamily: 'JetBrains Mono' }}>
-                      {c.amount != null ? formatCopExact(c.amount) : '—'}
+                      {c.invoiceTotal != null ? formatCopExact(c.invoiceTotal) : '—'}
+                      {c.passThrough > 0 && (
+                        <span style={{ display: 'block', fontSize: '0.6rem', color: 'var(--fg-muted)', fontWeight: 400 }}>
+                          incl. {formatCopExact(c.passThrough)} contenido
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '6px 8px', fontSize: '0.74rem' }}>
                       {c.disabledReason ? (

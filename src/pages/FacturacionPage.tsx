@@ -35,6 +35,7 @@ import { getMonthLabel } from '../utils/monthLabel';
 import {
   getBogotaCurrentMonth,
   getBogotaTodayIso,
+  passThroughForPeriod,
   PAY_DAYS_PRESET_LABELS,
   PAY_DAYS_PRESET_VALUES,
   type PayDaysPreset,
@@ -105,6 +106,7 @@ type EditableRow = {
   monthly_fee: string;
   monthly_ad_budget: string;
   custom_pay_day: string;
+  pass_through_monthly: string;
 };
 
 function toEditableRow(clientId: string, budget: number | null | undefined, billing?: ClientBilling): EditableRow {
@@ -115,6 +117,7 @@ function toEditableRow(clientId: string, budget: number | null | undefined, bill
     monthly_fee: billing?.monthly_fee != null ? String(billing.monthly_fee) : '',
     monthly_ad_budget: budget != null ? String(budget) : '',
     custom_pay_day: singleCustomDay != null ? String(singleCustomDay) : '',
+    pass_through_monthly: billing?.pass_through_monthly != null ? String(billing.pass_through_monthly) : '',
   };
 }
 
@@ -142,6 +145,8 @@ export function FacturacionPage() {
     period: BillingPaymentPeriod;
     month: string;
     amount: number;
+    passThroughAmount: number;
+    passThroughLabel: string | null;
     issuerKey: BillingInvoiceIssuerKey;
     issuer: BillingIssuer | undefined;
     payDays: number[] | null | undefined;
@@ -170,6 +175,7 @@ export function FacturacionPage() {
   const dirtyFeeIdsRef = useRef<Set<string>>(new Set());
   const dirtyBudgetIdsRef = useRef<Set<string>>(new Set());
   const dirtyCustomDayIdsRef = useRef<Set<string>>(new Set());
+  const dirtyPassThroughIdsRef = useRef<Set<string>>(new Set());
 
   // Debounce (800ms) por campo+cliente.
   const debounceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -297,6 +303,7 @@ export function FacturacionPage() {
           monthly_fee: dirtyFeeIdsRef.current.has(client.id) ? prevRow.monthly_fee : fresh.monthly_fee,
           monthly_ad_budget: dirtyBudgetIdsRef.current.has(client.id) ? prevRow.monthly_ad_budget : fresh.monthly_ad_budget,
           custom_pay_day: dirtyCustomDayIdsRef.current.has(client.id) ? prevRow.custom_pay_day : fresh.custom_pay_day,
+          pass_through_monthly: dirtyPassThroughIdsRef.current.has(client.id) ? prevRow.pass_through_monthly : fresh.pass_through_monthly,
         });
       }
       return next;
@@ -678,11 +685,15 @@ export function FacturacionPage() {
       return;
     }
     if (!item.issuerKey) return;
+    const billing = billingByClient.get(item.client.id);
+    const periods = periodsForFrequency(billing?.payment_frequency);
     setInvoiceModalFor({
       client: item.client,
       period: item.period,
       month: item.month,
       amount: item.amount,
+      passThroughAmount: passThroughForPeriod(billing, periods.length),
+      passThroughLabel: billing?.pass_through_label ?? null,
       issuerKey: item.issuerKey,
       issuer: item.issuer,
       payDays: item.payDays,
@@ -740,6 +751,7 @@ export function FacturacionPage() {
     if ('monthly_fee' in patch) dirtyFeeIdsRef.current.add(clientId);
     if ('monthly_ad_budget' in patch) dirtyBudgetIdsRef.current.add(clientId);
     if ('custom_pay_day' in patch) dirtyCustomDayIdsRef.current.add(clientId);
+    if ('pass_through_monthly' in patch) dirtyPassThroughIdsRef.current.add(clientId);
     setRows((current) => {
       const next = new Map(current);
       const existing = next.get(clientId);
@@ -777,6 +789,8 @@ export function FacturacionPage() {
         payment_frequency: existing?.payment_frequency ?? null,
         pay_days: existing?.pay_days ?? null,
         invoice_issuer: existing?.invoice_issuer ?? null,
+        pass_through_monthly: existing?.pass_through_monthly ?? null,
+        pass_through_label: existing?.pass_through_label ?? null,
         ...toSend,
       };
 
@@ -796,6 +810,7 @@ export function FacturacionPage() {
       }
       if ('monthly_fee' in toSend) dirtyFeeIdsRef.current.delete(clientId);
       if ('pay_days' in toSend) dirtyCustomDayIdsRef.current.delete(clientId);
+      if ('pass_through_monthly' in toSend) dirtyPassThroughIdsRef.current.delete(clientId);
     }
 
     billingInFlightRef.current.delete(clientId);
@@ -857,6 +872,25 @@ export function FacturacionPage() {
     const committedStr = committed != null ? String(committed) : '';
     if (nextStr === committedStr) return;
     void saveBillingPatch(clientId, { monthly_fee: nextStr ? Number(nextStr) : null });
+  }
+
+  function handlePassThroughChange(clientId: string, value: string) {
+    updateRow(clientId, { pass_through_monthly: value });
+    scheduleDebouncedSave(`${clientId}:passThrough`, () => commitPassThrough(clientId, value));
+  }
+
+  function handlePassThroughBlur(clientId: string, value: string) {
+    cancelDebouncedSave(`${clientId}:passThrough`);
+    commitPassThrough(clientId, value);
+  }
+
+  function commitPassThrough(clientId: string, rawValue: string) {
+    const nextStr = rawValue.trim();
+    if (nextStr && Number.isNaN(Number(nextStr))) return;
+    const committed = billingByClientRef.current.get(clientId)?.pass_through_monthly;
+    const committedStr = committed != null ? String(committed) : '';
+    if (nextStr === committedStr) return;
+    void saveBillingPatch(clientId, { pass_through_monthly: nextStr ? Number(nextStr) : null });
   }
 
   function handleBudgetChange(client: Client, value: string) {
@@ -960,7 +994,7 @@ export function FacturacionPage() {
   function handleInvoiceCreated(invoice: BillingInvoice) {
     setInvoices((current) => [invoice, ...current]);
     setInvoiceModalFor(null);
-    navigate(`/admin/cuentas-de-cobro/${invoice.id}`);
+    navigate(`/admin/cuentas-de-cobro/${invoice.id}?descargar=1`);
   }
 
   function handleInvoicesIssuedInBulk(newInvoices: BillingInvoice[]) {
@@ -992,6 +1026,9 @@ export function FacturacionPage() {
     const isPaid = payment?.status === 'pagado';
     const key = paymentKey(client.id, period);
     const isToggling = togglingPaymentKey === key;
+    const periods = periodsForFrequency(billing?.payment_frequency);
+    const passThrough = passThroughForPeriod(billing, periods.length);
+    const feeAmount = periodAmountFor(billing?.monthly_fee, periods.length) ?? 0;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
@@ -1019,12 +1056,20 @@ export function FacturacionPage() {
             Incluido en liquidación{payment.partner_paid_at ? ` del ${payment.partner_paid_at}` : ''}
           </span>
         )}
+        {passThrough > 0 && (
+          <span style={{ fontSize: '0.56rem', color: 'var(--fg-muted)' }}>
+            Cuenta de cobro: {formatCopExact(feeAmount + passThrough)} (incl. {formatCopExact(passThrough)} contenido)
+          </span>
+        )}
       </div>
     );
   }
 
   function renderInvoiceAction(client: Client, period: BillingPaymentPeriod, billing: ClientBilling | undefined) {
-    const amount = periodAmountFor(billing?.monthly_fee, periodsForFrequency(billing?.payment_frequency).length);
+    const periods = periodsForFrequency(billing?.payment_frequency);
+    const amount = periodAmountFor(billing?.monthly_fee, periods.length);
+    const passThroughAmount = passThroughForPeriod(billing, periods.length);
+    const passThroughLabel = billing?.pass_through_label ?? null;
     const issuerKey = billing?.invoice_issuer ?? null;
     const issuer = issuerKey ? issuersByKey.get(issuerKey) : undefined;
     const issuerReady = !!issuer?.legal_name && !!issuer?.account_number;
@@ -1038,6 +1083,11 @@ export function FacturacionPage() {
           ? 'Falta el fee'
           : undefined;
 
+    function openModal() {
+      if (!issuerKey || amount == null) return;
+      setInvoiceModalFor({ client, period, month: selectedMonth, amount, passThroughAmount, passThroughLabel, issuerKey, issuer, payDays: billing?.pay_days });
+    }
+
     if (existingInvoice) {
       return (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1048,13 +1098,14 @@ export function FacturacionPage() {
           >
             Ver/reimprimir #{String(existingInvoice.invoice_number).padStart(5, '0')}
           </Link>
-          <button
+          <Link
+            to={`/admin/cuentas-de-cobro/${existingInvoice.id}?descargar=1`}
             className="btn-ghost"
-            disabled={invoiceDisabled}
-            title={invoiceTitle}
-            style={{ fontSize: '0.56rem', padding: '3px 8px' }}
-            onClick={() => issuerKey && amount != null && setInvoiceModalFor({ client, period, month: selectedMonth, amount, issuerKey, issuer, payDays: billing?.pay_days })}
+            style={{ fontSize: '0.56rem', textDecoration: 'none', padding: '3px 8px' }}
           >
+            Descargar PDF
+          </Link>
+          <button className="btn-ghost" disabled={invoiceDisabled} title={invoiceTitle} style={{ fontSize: '0.56rem', padding: '3px 8px' }} onClick={openModal}>
             Emitir otra
           </button>
         </div>
@@ -1062,13 +1113,7 @@ export function FacturacionPage() {
     }
 
     return (
-      <button
-        className="btn-secondary"
-        disabled={invoiceDisabled}
-        title={invoiceTitle}
-        style={{ fontSize: '0.56rem', padding: '3px 8px' }}
-        onClick={() => issuerKey && amount != null && setInvoiceModalFor({ client, period, month: selectedMonth, amount, issuerKey, issuer, payDays: billing?.pay_days })}
-      >
+      <button className="btn-secondary" disabled={invoiceDisabled} title={invoiceTitle} style={{ fontSize: '0.56rem', padding: '3px 8px' }} onClick={openModal}>
         Cuenta de cobro
       </button>
     );
@@ -1324,6 +1369,21 @@ export function FacturacionPage() {
                                 />
                               </div>
                               <div>
+                                <label style={{ display: 'block', fontSize: '0.58rem', color: 'var(--fg-muted)', marginBottom: 4 }}>
+                                  Contenido / mes (no es ingreso)
+                                </label>
+                                <input
+                                  className="form-input"
+                                  type="number"
+                                  min={0}
+                                  value={row.pass_through_monthly}
+                                  onChange={(e) => handlePassThroughChange(client.id, e.target.value)}
+                                  onBlur={(e) => handlePassThroughBlur(client.id, e.target.value)}
+                                  placeholder="—"
+                                  style={{ width: 130 }}
+                                />
+                              </div>
+                              <div>
                                 <label style={{ display: 'block', fontSize: '0.58rem', color: 'var(--fg-muted)', marginBottom: 4 }}>Recibe</label>
                                 <select
                                   value={billing?.payment_receiver ?? ''}
@@ -1506,9 +1566,14 @@ export function FacturacionPage() {
                         <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono', fontSize: '0.74rem' }}>{formatCopExact(invoice.total)}</td>
                         <td style={{ padding: '9px 12px', fontFamily: 'JetBrains Mono', fontSize: '0.7rem', color: 'var(--fg-muted)' }}>{invoice.issue_date}</td>
                         <td style={{ padding: '9px 12px' }}>
-                          <Link to={`/admin/cuentas-de-cobro/${invoice.id}`} className="btn-secondary" style={{ fontSize: '0.64rem', textDecoration: 'none' }}>
-                            Ver / reimprimir
-                          </Link>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <Link to={`/admin/cuentas-de-cobro/${invoice.id}`} className="btn-secondary" style={{ fontSize: '0.64rem', textDecoration: 'none' }}>
+                              Ver / reimprimir
+                            </Link>
+                            <Link to={`/admin/cuentas-de-cobro/${invoice.id}?descargar=1`} className="btn-ghost" style={{ fontSize: '0.64rem', textDecoration: 'none' }}>
+                              Descargar PDF
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1533,6 +1598,8 @@ export function FacturacionPage() {
           period={invoiceModalFor.period}
           month={invoiceModalFor.month}
           defaultAmount={invoiceModalFor.amount}
+          passThroughAmount={invoiceModalFor.passThroughAmount}
+          passThroughLabel={invoiceModalFor.passThroughLabel}
           issuerKey={invoiceModalFor.issuerKey}
           issuer={invoiceModalFor.issuer}
           payDays={invoiceModalFor.payDays}

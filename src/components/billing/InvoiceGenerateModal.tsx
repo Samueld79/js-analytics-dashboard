@@ -10,6 +10,11 @@ interface Props {
   period: BillingPaymentPeriod;
   month: string;
   defaultAmount: number;
+  // Contenido/otro costo a terceros facturado junto con el fee pero que NO
+  // es ingreso de la agencia (ver ClientBilling.pass_through_monthly). Si
+  // es > 0, se agrega como una tercera fila aparte en la cuenta de cobro.
+  passThroughAmount?: number;
+  passThroughLabel?: string | null;
   issuerKey: BillingInvoiceIssuerKey;
   issuer: BillingIssuer | undefined;
   payDays?: number[] | null;
@@ -19,15 +24,43 @@ interface Props {
 
 const ISSUER_LABELS: Record<BillingInvoiceIssuerKey, string> = { samuel: 'Samuel', juanca: 'Juanca' };
 
-function defaultItems(amount: number, month: string, period: BillingPaymentPeriod): BillingInvoiceItem[] {
-  return [
+function defaultItems(
+  amount: number,
+  month: string,
+  period: BillingPaymentPeriod,
+  passThroughAmount?: number,
+  passThroughLabel?: string | null,
+): BillingInvoiceItem[] {
+  const items: BillingInvoiceItem[] = [
     { qty: 1, description: 'Actividades como Trafficker / Estratega en Meta Ads e Instagram', value: null },
     { qty: 1, description: `Servicios de Growth Marketing ${periodDateRangeText(month, period)}`, value: amount },
   ];
+  if (passThroughAmount && passThroughAmount > 0) {
+    items.push({
+      qty: 1,
+      description: `${passThroughLabel ?? 'Creación de contenido'} ${periodDateRangeText(month, period)}`,
+      value: passThroughAmount,
+    });
+  }
+  return items;
 }
 
-export function InvoiceGenerateModal({ client, period, month, defaultAmount, issuerKey, issuer, payDays, onClose, onCreated }: Props) {
-  const [items, setItems] = useState<BillingInvoiceItem[]>(() => defaultItems(defaultAmount, month, period));
+export function InvoiceGenerateModal({
+  client,
+  period,
+  month,
+  defaultAmount,
+  passThroughAmount,
+  passThroughLabel,
+  issuerKey,
+  issuer,
+  payDays,
+  onClose,
+  onCreated,
+}: Props) {
+  const [items, setItems] = useState<BillingInvoiceItem[]>(() =>
+    defaultItems(defaultAmount, month, period, passThroughAmount, passThroughLabel),
+  );
   const [issueDate, setIssueDate] = useState(() => defaultIssueDateForPeriod(month, period, payDays));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
