@@ -49,10 +49,10 @@ export function PartnerGoalCard({
   return (
     <div className="card-glass card-padded">
       <p className="number-label" style={{ fontSize: '0.64rem', color: 'var(--fg-muted)', marginBottom: 10 }}>
-        Meta de Samuel en {monthLabel}
+        Lo que le toca a Samuel en {monthLabel}
       </p>
 
-      <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--fg)' }}>Meta del mes: {formatCopExact(goal)}</p>
+      <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--fg)' }}>Le toca a Samuel este mes: {formatCopExact(goal)}</p>
       <p style={{ margin: '4px 0 14px', fontSize: '0.64rem', color: 'var(--fg-muted)' }}>
         = mitad de lo que cobra Juanca ({formatCopExact(expectedJuanca / 2)}) menos la mitad de lo que Samuel ya cobró por su
         cuenta ({formatCopExact(expectedSamuel / 2)}).
@@ -66,7 +66,7 @@ export function PartnerGoalCard({
         aria-valuenow={Math.round(percent)}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`Meta del mes: ${Math.round(percent)}% cumplida`}
+        aria-label={`Lo que le toca a Samuel este mes: ${Math.round(percent)}% pagado`}
         style={{ height: 8, borderRadius: 999, background: 'var(--surface-3)', overflow: 'hidden', marginBottom: 14 }}
       >
         <div style={{ height: '100%', width: `${percent}%`, background: 'var(--cyan)', borderRadius: 999, transition: 'width 600ms ease-out' }} />
@@ -80,7 +80,7 @@ export function PartnerGoalCard({
           ? `Juanca le pasa ahora ${formatCopExact(payNow)} a Samuel (de lo que ya cobró)`
           : missing > 0
             ? 'Esperando más cobros de Juanca'
-            : 'Meta cumplida: lo que Juanca cobre de aquí en adelante este mes es suyo'}
+            : 'Ya está completo lo de Samuel: lo que Juanca cobre de aquí en adelante este mes es suyo'}
       </p>
 
       <button className="btn-primary" onClick={onRegisterPayment} style={{ marginBottom: 10 }}>
