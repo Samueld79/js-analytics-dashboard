@@ -135,6 +135,19 @@ export function periodRangeShort(month: string, period: BillingPaymentPeriod): s
   return `1–${lastDay} ${monthAbbr} ${y}`;
 }
 
+// Monto de "paso a través" (ver ClientBilling.pass_through_monthly) para un
+// periodo dado — mismo prorrateo quincenal que el fee, pero NUNCA se suma a
+// expected/collected/byReceiver/saldo neto: solo se usa para completar el
+// total de la cuenta de cobro impresa.
+export function passThroughForPeriod(
+  billing: { pass_through_monthly?: number | null } | null | undefined,
+  periodsCount: number,
+): number {
+  const monthly = billing?.pass_through_monthly ?? 0;
+  if (!monthly) return 0;
+  return Math.round(periodsCount === 2 ? monthly / 2 : monthly);
+}
+
 // Fecha por defecto de la cuenta de cobro (issue_date), editable en el
 // modal: q1 -> día 1, q2 -> día 15, 'mes' -> el primer pay_day si existe,
 // o el día 1 (cubre tanto anticipado como mensual sin pay_days definido).

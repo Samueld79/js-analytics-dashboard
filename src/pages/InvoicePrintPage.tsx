@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { getBillingInvoice, listBillingIssuers } from '../services/billing';
 import { getClientByIdOrSlug } from '../services/clients';
 import type { BillingInvoice, BillingIssuer, Client } from '../lib/supabase';
 import { formatCopPlain } from '../lib/utils';
 import brandLogo from '../assets/brand-logo.png';
+
+// Nombre de archivo sin caracteres raros (espacios, tildes aparte ya
+// permitidas, símbolos) — mismo criterio que OrganigramaOutput.tsx.
+function sanitizeForFilename(value: string): string {
+  return value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]/g, '_');
+}
 
 function formatInvoiceDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -22,11 +28,16 @@ function formatInvoiceDate(dateStr: string): string {
 // esta vista con sesión de admin (este repo es público).
 export function InvoicePrintPage() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const [searchParams] = useSearchParams();
   const [invoice, setInvoice] = useState<BillingInvoice | null>(null);
   const [issuer, setIssuer] = useState<BillingIssuer | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const autoDownloadFiredRef = useRef(false);
+  const wantsAutoDownload = searchParams.get('descargar') === '1';
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -54,6 +65,74 @@ export function InvoicePrintPage() {
       cancelled = true;
     };
   }, [invoiceId]);
+
+  // Descarga directa del PDF (sin pasar por "Imprimir"): captura la hoja con
+  // html2pdf.js, importado dinámicamente para no inflar el bundle principal.
+  async function handleDownloadPdf() {
+    const element = sheetRef.current;
+    if (!element || !invoice) return;
+
+    setDownloading(true);
+    // Durante la captura: sin sombra y con la altura exacta de una A4, para
+    // que html2canvas no deje una segunda página en blanco por el shadow/
+    // min-height normales de la hoja en pantalla. Se restauran en finally.
+    const prevBoxShadow = element.style.boxShadow;
+    const prevMinHeight = element.style.minHeight;
+    element.style.boxShadow = 'none';
+    element.style.minHeight = '296mm';
+
+    try {
+      const logo = element.querySelector('img');
+      if (logo) {
+        if (!logo.complete) {
+          await new Promise<void>((resolve) => {
+            logo.addEventListener('load', () => resolve(), { once: true });
+            logo.addEventListener('error', () => resolve(), { once: true });
+          });
+        }
+        try {
+          await logo.decode();
+        } catch {
+          // Si decode() falla (navegador sin soporte o imagen ya cacheada
+          // de forma rara), seguimos — el load/complete de arriba ya basta.
+        }
+      }
+
+      const html2pdf = (await import('html2pdf.js')).default;
+      const invoiceNumber = String(invoice.invoice_number).padStart(5, '0');
+      const clientNamePart = sanitizeForFilename(client?.name ?? 'Cliente');
+
+      const worker = html2pdf();
+      // El runtime real de html2pdf.js sí soporta `pagebreak` (desde hace
+      // varias versiones) pero node_modules/html2pdf.js/type.d.ts no lo
+      // declara — se añade acá vía intersección en vez de pelear con el
+      // merge de declaraciones ambientales del paquete.
+      type SetOptions = Parameters<typeof worker.set>[0] & { pagebreak?: { mode?: string } };
+      const pdfOptions: SetOptions = {
+        margin: 0,
+        filename: `Cuenta_de_cobro_${invoiceNumber}_${clientNamePart}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: 'avoid-all' },
+      };
+
+      await worker.set(pdfOptions).from(element).save();
+    } finally {
+      element.style.boxShadow = prevBoxShadow;
+      element.style.minHeight = prevMinHeight;
+      setDownloading(false);
+    }
+  }
+
+  // ?descargar=1 -> dispara la descarga automática una sola vez apenas la
+  // cuenta termine de cargar, sin cerrar ni redirigir la vista.
+  useEffect(() => {
+    if (!wantsAutoDownload || autoDownloadFiredRef.current || loading || !invoice) return;
+    autoDownloadFiredRef.current = true;
+    void handleDownloadPdf();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsAutoDownload, loading, invoice]);
 
   if (loading) {
     return <div className="page-content"><p className="empty-note">Cargando cuenta de cobro...</p></div>;
@@ -88,13 +167,16 @@ export function InvoicePrintPage() {
 
   return (
     <div className="invoice-print-page">
-      <div className="invoice-print-toolbar">
-        <button className="btn-primary" onClick={() => window.print()}>
-          Imprimir / Guardar PDF
+      <div className="invoice-print-toolbar" style={{ gap: 8 }}>
+        <button className="btn-secondary" onClick={() => window.print()}>
+          Imprimir
+        </button>
+        <button className="btn-primary" onClick={() => void handleDownloadPdf()} disabled={downloading}>
+          {downloading ? 'Generando PDF...' : 'Descargar PDF'}
         </button>
       </div>
 
-      <div className="invoice-sheet">
+      <div className="invoice-sheet" ref={sheetRef}>
         <div className="invoice-sheet-topbar" />
 
         <div className="invoice-header">
