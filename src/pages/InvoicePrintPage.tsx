@@ -112,7 +112,22 @@ export function InvoicePrintPage() {
         margin: 0,
         filename: `Cuenta_de_cobro_${invoiceNumber}_${clientNamePart}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          // html2canvas 1.4.1 no entiende oklch() (los tokens de la app lo usan
+          // en el fondo del body y en la barra/pie de la hoja) y aborta con
+          // "unsupported color function". En el clon que renderiza lo
+          // reemplazamos por hex equivalentes; la pantalla real no se toca.
+          onclone: (clonedDoc: Document) => {
+            const style = clonedDoc.createElement('style');
+            style.textContent =
+              'html, body { background: #ffffff !important; }' +
+              ' .invoice-sheet { box-shadow: none !important; }' +
+              ' .invoice-sheet-topbar, .invoice-footer { background: #0b1220 !important; }';
+            clonedDoc.head.appendChild(style);
+          },
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: 'avoid-all' },
       };
