@@ -9,6 +9,8 @@ interface Props {
   monthLabel: string;
   expectedJuanca: number;
   expectedSamuel: number;
+  collectedJuanca: number;
+  collectedSamuel: number;
   goal: number;
   received: number;
   missing: number;
@@ -31,6 +33,8 @@ export function PartnerGoalCard({
   monthLabel,
   expectedJuanca,
   expectedSamuel,
+  collectedJuanca,
+  collectedSamuel,
   goal,
   received,
   missing,
@@ -44,18 +48,52 @@ export function PartnerGoalCard({
 }: Props) {
   const [rowsOpen, setRowsOpen] = useState(false);
   const [paymentsOpen, setPaymentsOpen] = useState(false);
+  // Reparto simétrico: a cada socio le toca la mitad del total del mes
+  // (lo que cobra Juanca + lo que cobra Samuel). "Ya recibió" = lo que cada
+  // uno tiene de lo cobrado: Samuel lo que cobró él + lo que Juanca ya le
+  // pasó; Juanca lo que cobró él menos lo que ya le pasó a Samuel.
+  const share = (expectedJuanca + expectedSamuel) / 2;
+  const partners = [
+    { key: 'samuel', name: 'Samuel', color: 'var(--cyan)', got: collectedSamuel + received },
+    { key: 'juanca', name: 'Juanca', color: '#a78bfa', got: collectedJuanca - received },
+  ].map((p) => ({ ...p, left: share - p.got }));
   const percent = goal > 0 ? Math.min(100, (received / goal) * 100) : received > 0 ? 100 : 0;
 
   return (
     <div className="card-glass card-padded">
-      <p className="number-label" style={{ fontSize: '0.64rem', color: 'var(--fg-muted)', marginBottom: 10 }}>
-        Lo que le toca a Samuel en {monthLabel}
+      <p className="number-label" style={{ fontSize: '0.64rem', color: 'var(--fg-muted)', marginBottom: 12 }}>
+        Reparto de {monthLabel}
       </p>
 
-      <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--fg)' }}>Le toca a Samuel este mes: {formatCopExact(goal)}</p>
-      <p style={{ margin: '4px 0 14px', fontSize: '0.64rem', color: 'var(--fg-muted)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 6 }}>
+        {partners.map((p) => (
+          <div key={p.key}>
+            <p className="number-label" style={{ fontSize: '0.64rem', color: 'var(--fg-muted)', margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: p.color, display: 'inline-block' }} />
+              {p.name}
+            </p>
+            <p style={{ margin: 0, fontSize: '0.6rem', color: 'var(--fg-muted)' }}>Le toca este mes</p>
+            <p style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 700, color: 'var(--fg)' }}>{formatCopExact(share)}</p>
+            <p style={{ margin: 0, fontSize: '0.6rem', color: 'var(--fg-muted)' }}>Ya recibió</p>
+            <p style={{ margin: '0 0 8px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)' }}>{formatCopExact(p.got)}</p>
+            <p style={{ margin: 0, fontSize: '0.6rem', color: 'var(--fg-muted)' }}>{p.left >= 0 ? 'Le falta recibir' : 'Ya recibió de más'}</p>
+            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)' }}>{formatCopExact(Math.abs(p.left))}</p>
+          </div>
+        ))}
+      </div>
+      <p style={{ margin: '0 0 14px', fontSize: '0.6rem', color: 'var(--fg-muted)' }}>
+        A cada uno le toca la mitad de lo cobrado en los compartidos del mes. Lo que falta llega a medida que pagan los clientes.
+      </p>
+
+      <div style={{ height: 1, background: 'var(--border)', margin: '4px 0 14px' }} />
+
+      <p className="number-label" style={{ fontSize: '0.56rem', color: 'var(--fg-muted)' }}>Cómo se cuadra</p>
+      <p style={{ margin: '4px 0 4px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--fg)' }}>
+        Juanca le pasa a Samuel con los primeros cobros: {formatCopExact(goal)}
+      </p>
+      <p style={{ margin: '0 0 14px', fontSize: '0.64rem', color: 'var(--fg-muted)' }}>
         = mitad de lo que cobra Juanca ({formatCopExact(expectedJuanca / 2)}) menos la mitad de lo que Samuel ya cobró por su
-        cuenta ({formatCopExact(expectedSamuel / 2)}).
+        cuenta ({formatCopExact(expectedSamuel / 2)}), que Juanca retiene.
       </p>
 
       <p style={{ margin: '0 0 6px', fontSize: '0.74rem', color: 'var(--fg)' }}>

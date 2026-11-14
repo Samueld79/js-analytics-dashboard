@@ -637,6 +637,7 @@ export function FacturacionPage() {
     let expectedJuanca = 0;
     let expectedSamuel = 0;
     let collectedJuanca = 0;
+    let collectedSamuel = 0;
     const rows: PartnerGoalRow[] = [];
 
     for (const client of visibleClients) {
@@ -654,6 +655,7 @@ export function FacturacionPage() {
           if (isPaid) collectedJuanca += amount;
         } else {
           expectedSamuel += amount;
+          if (isPaid) collectedSamuel += amount;
         }
 
         rows.push({
@@ -674,6 +676,7 @@ export function FacturacionPage() {
         collectedJuanca += extra.amount;
       } else {
         expectedSamuel += extra.amount;
+        collectedSamuel += extra.amount;
       }
       rows.push({ key: `extra:${extra.id}`, label: extra.concept, collector: extra.collector, amount: extra.amount, half: extra.amount / 2 });
     }
@@ -696,7 +699,7 @@ export function FacturacionPage() {
     const missing = Math.max(0, goal - received);
     const payNow = Math.min(missing, available);
 
-    return { expectedJuanca, expectedSamuel, collectedJuanca, goal, received, missing, payNow, rows, monthSettlements };
+    return { expectedJuanca, expectedSamuel, collectedJuanca, collectedSamuel, goal, received, missing, payNow, rows, monthSettlements };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleClients, billingByClient, paymentByClientPeriod, extraIncomeForSelectedMonth, billingSettlements, selectedMonth]);
 
@@ -1414,6 +1417,8 @@ export function FacturacionPage() {
             monthLabel={monthLabel}
             expectedJuanca={partnerGoal.expectedJuanca}
             expectedSamuel={partnerGoal.expectedSamuel}
+            collectedJuanca={partnerGoal.collectedJuanca}
+            collectedSamuel={partnerGoal.collectedSamuel}
             goal={partnerGoal.goal}
             received={partnerGoal.received}
             missing={partnerGoal.missing}
