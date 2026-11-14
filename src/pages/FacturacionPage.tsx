@@ -5,6 +5,7 @@ import { useClients } from '../hooks/useClients';
 import {
   createSettlementAndMarkPaid,
   deleteBillingExtraIncome,
+  deleteBillingSettlement,
   listBillingExtraIncome,
   listBillingInvoices,
   listBillingIssuers,
@@ -50,13 +51,22 @@ import { InvoiceGenerateModal } from '../components/billing/InvoiceGenerateModal
 import { BulkInvoiceModal } from '../components/billing/BulkInvoiceModal';
 import { ExtraIncomeModal } from '../components/billing/ExtraIncomeModal';
 import { ExtraIncomeSection } from '../components/billing/ExtraIncomeSection';
+import { RegisterPartnerPaymentModal } from '../components/billing/RegisterPartnerPaymentModal';
 import { ControlBarMenu } from '../components/billing/dashboard/ControlBarMenu';
 import { MonthSummaryCard } from '../components/billing/dashboard/MonthSummaryCard';
 import { PartnerPairCard } from '../components/billing/dashboard/PartnerPairCard';
 import { NetBalanceCard } from '../components/billing/dashboard/NetBalanceCard';
+import { PartnerGoalCard } from '../components/billing/dashboard/PartnerGoalCard';
 import { MonthlyTrendChart } from '../components/billing/dashboard/MonthlyTrendChart';
 import { DueTabsCard } from '../components/billing/dashboard/DueTabsCard';
-import type { CrossRow, DueItem, TrendMonth } from '../components/billing/dashboard/types';
+import type { CrossRow, DueItem, PartnerGoalRow, TrendMonth } from '../components/billing/dashboard/types';
+
+// "Cruce entre socios" (saldo A-le-debe-a-B + "Liquidar saldo") quedó
+// reemplazado por PartnerGoalCard (meta mensual) — PROMPT_FACTURACION_V10
+// pidió explícitamente NO borrar netBalance/createSettlementAndMarkPaid,
+// solo ocultar esa UI. Por eso el bloque viejo sigue armado abajo, detrás
+// de esta bandera en false, en vez de borrarlo.
+const SHOW_LEGACY_NET_BALANCE_CARD = false;
 
 type ReceiverFilter = 'all' | BillingPaymentReceiver;
 type RowSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -97,6 +107,21 @@ function paymentIdentityKey(p: ClientBillingPayment): string {
 function periodAmountFor(fee: number | null | undefined, periodsCount: number): number | null {
   if (fee == null) return null;
   return periodsCount === 2 ? fee / 2 : fee;
+}
+
+// Monto real de UN cobro puntual: si el admin registró amount_received
+// para ese (client_id, month, period) se usa tal cual (aunque el cobro
+// esté pendiente), si no se cae al fee normal. Nunca incluye contenido/
+// pass-through. Usado en totales del mes, la gráfica y la meta mensual —
+// netBalance/monthProjection/monthCross (tarjeta vieja oculta) se dejaron
+// sin tocar a propósito, siguen usando solo periodAmountFor.
+function effectivePeriodAmount(
+  fee: number | null | undefined,
+  periodsCount: number,
+  payment: ClientBillingPayment | undefined,
+): number | null {
+  if (payment?.amount_received != null) return payment.amount_received;
+  return periodAmountFor(fee, periodsCount);
 }
 
 // Fila editable local — campos de texto con autoguardado (debounce/blur).
@@ -160,6 +185,15 @@ export function FacturacionPage() {
   const [extraIncomeModalState, setExtraIncomeModalState] = useState<'new' | BillingExtraIncome | null>(null);
   const [deletingExtraId, setDeletingExtraId] = useState<string | null>(null);
   const [extraIncomeSectionError, setExtraIncomeSectionError] = useState<string | null>(null);
+  const [registerPaymentModalOpen, setRegisterPaymentModalOpen] = useState(false);
+  const [undoingSettlementId, setUndoingSettlementId] = useState<string | null>(null);
+  const [partnerGoalActionError, setPartnerGoalActionError] = useState<string | null>(null);
+  // Borrador de "Monto de este cobro (si es distinto)" por (cliente,
+  // periodo) mientras se escribe/debounce — se derivan del payment real una
+  // vez guardado (se borra la entrada de este mapa), igual de simple que
+  // los demás inputs pero sin necesitar un efecto de resincronización
+  // porque la fuente de verdad (`payments`) ya es reactiva por sí misma.
+  const [amountReceivedEdits, setAmountReceivedEdits] = useState<Map<string, string>>(new Map());
 
   // Espejo en ref de billingByClient: saveBillingPatch necesita el valor más
   // reciente al momento de ejecutarse (no el capturado en el closure de
@@ -389,11 +423,11 @@ export function FacturacionPage() {
       if (!receiver) receiverUnassigned += 1;
 
       const periods = periodsForFrequency(billing?.payment_frequency);
-      const periodAmount = periodAmountFor(fee, periods.length) ?? 0;
 
       for (const period of periods) {
-        feeExpected += periodAmount;
         const payment = paymentFor(client.id, period);
+        const periodAmount = effectivePeriodAmount(fee, periods.length, payment) ?? 0;
+        feeExpected += periodAmount;
         const isPaid = payment?.status === 'pagado';
 
         if (isPaid) {
@@ -585,6 +619,87 @@ export function FacturacionPage() {
     return { rows, owedBySamuelToJuanca, owedByJuancaToSamuel, net: owedBySamuelToJuanca - owedByJuancaToSamuel };
   }, [visibleClients, billingByClient, extraIncomeForSelectedMonth]);
 
+  // "Meta de Samuel" (reemplaza la tarjeta de saldo entre socios): de lo
+  // que Juanca cobra en los compartidos del mes (X, el monto COMPLETO de
+  // cada cobro, no la mitad), la mitad es de Samuel — pero se descuenta la
+  // mitad de lo que Samuel ya cobró por su cuenta (Y), porque Samuel nunca
+  // le transfiere nada a Juanca. meta = max(0, X/2 - Y/2). Xcobrado = igual
+  // que X pero solo lo YA pagado. "recibido" se lee de billing_settlements
+  // (payer/payee juanca<->samuel, mismo mes) — por ahora solo las llena
+  // "Registrar pago de Juanca" (handleRegisterPartnerPayment), pero la
+  // fórmula no distingue el origen de la fila, tal cual pide el prompt.
+  // Independiente de netBalance/monthProjection/monthCross de arriba, que
+  // NO se tocaron (quedan ahí sin usarse en la UI, ver
+  // SHOW_LEGACY_NET_BALANCE_CARD) — este memo usa payment.month, no "todo
+  // lo sin liquidar". X/Y/Xcobrado usan amount_received cuando existe; el
+  // pass-through nunca entra (no se lee acá).
+  const partnerGoal = useMemo(() => {
+    let expectedJuanca = 0;
+    let expectedSamuel = 0;
+    let collectedJuanca = 0;
+    const rows: PartnerGoalRow[] = [];
+
+    for (const client of visibleClients) {
+      const billing = billingByClient.get(client.id);
+      if (!billing || billing.payment_receiver !== 'compartido' || !billing.invoice_issuer || billing.monthly_fee == null) continue;
+
+      const periods = periodsForFrequency(billing.payment_frequency);
+      for (const period of periods) {
+        const payment = paymentFor(client.id, period);
+        const amount = effectivePeriodAmount(billing.monthly_fee, periods.length, payment) ?? 0;
+        const isPaid = payment?.status === 'pagado';
+
+        if (billing.invoice_issuer === 'juanca') {
+          expectedJuanca += amount;
+          if (isPaid) collectedJuanca += amount;
+        } else {
+          expectedSamuel += amount;
+        }
+
+        rows.push({
+          key: `client:${client.id}:${period}`,
+          label: periods.length === 2 ? `${client.name} · ${periodLabel(period, billing.pay_days)}` : client.name,
+          collector: billing.invoice_issuer,
+          amount,
+          half: amount / 2,
+        });
+      }
+    }
+
+    // Los ingresos extra no tienen estado pendiente/pagado — ya ocurrieron,
+    // así que siempre cuentan como "cobrado" además de "esperado".
+    for (const extra of extraIncomeForSelectedMonth) {
+      if (extra.collector === 'juanca') {
+        expectedJuanca += extra.amount;
+        collectedJuanca += extra.amount;
+      } else {
+        expectedSamuel += extra.amount;
+      }
+      rows.push({ key: `extra:${extra.id}`, label: extra.concept, collector: extra.collector, amount: extra.amount, half: extra.amount / 2 });
+    }
+
+    const goal = Math.max(0, expectedJuanca / 2 - expectedSamuel / 2);
+
+    let received = 0;
+    for (const s of billingSettlements) {
+      if (s.settled_on.slice(0, 7) !== selectedMonth.slice(0, 7)) continue;
+      if (s.payer === 'juanca' && s.payee === 'samuel') received += s.amount;
+      else if (s.payer === 'samuel' && s.payee === 'juanca') received -= s.amount;
+    }
+    const monthSettlements = billingSettlements.filter(
+      (s) => s.settled_on.slice(0, 7) === selectedMonth.slice(0, 7) && (
+        (s.payer === 'juanca' && s.payee === 'samuel') || (s.payer === 'samuel' && s.payee === 'juanca')
+      ),
+    );
+
+    const available = Math.max(0, collectedJuanca / 2 - received);
+    const missing = Math.max(0, goal - received);
+    const payNow = Math.min(missing, available);
+
+    return { expectedJuanca, expectedSamuel, collectedJuanca, goal, received, missing, payNow, rows, monthSettlements };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleClients, billingByClient, paymentByClientPeriod, extraIncomeForSelectedMonth, billingSettlements, selectedMonth]);
+
   // ── Data del dashboard de ingresos (sección superior) ──────────────────
   // "Hoy" y "mes actual" se fijan una vez por montaje (no por render) —
   // suficiente para una página que el admin abre y usa en una sesión.
@@ -606,13 +721,13 @@ export function FacturacionPage() {
         const billing = billingByClient.get(client.id);
         if (billing?.monthly_fee == null) continue;
         const periods = periodsForFrequency(billing.payment_frequency);
-        const periodAmount = periodAmountFor(billing.monthly_fee, periods.length) ?? 0;
 
         for (const period of periods) {
-          expected += periodAmount;
           const payment = payments.find(
             (p) => p.client_id === client.id && p.month.slice(0, 10) === month && p.period === period,
           );
+          const periodAmount = effectivePeriodAmount(billing.monthly_fee, periods.length, payment) ?? 0;
+          expected += periodAmount;
           if (payment?.status === 'pagado') collected += periodAmount;
         }
       }
@@ -1021,6 +1136,94 @@ export function FacturacionPage() {
     setDeletingExtraId(null);
   }
 
+  function handleRegisterPartnerPayment(saved: BillingSettlement) {
+    setBillingSettlements((current) => [saved, ...current]);
+    setRegisterPaymentModalOpen(false);
+  }
+
+  async function handleUndoPartnerPayment(settlement: BillingSettlement) {
+    setUndoingSettlementId(settlement.id);
+    setPartnerGoalActionError(null);
+    const result = await deleteBillingSettlement(settlement.id);
+    if (result.error) {
+      setPartnerGoalActionError(result.error);
+    } else {
+      setBillingSettlements((current) => current.filter((s) => s.id !== settlement.id));
+    }
+    setUndoingSettlementId(null);
+  }
+
+  // "Monto de este cobro (si es distinto)" — mismo patrón de debounce que
+  // el fee, pero por (cliente, periodo) en vez de por cliente, y sin
+  // necesitar refs de "sucio": mientras se edita, el valor vive en
+  // amountReceivedEdits; al guardar (o si coincide con lo ya guardado) se
+  // borra esa entrada y el input vuelve a leer directo de `payments`.
+  function amountReceivedValue(clientId: string, period: BillingPaymentPeriod): string {
+    const key = paymentKey(clientId, period);
+    const draft = amountReceivedEdits.get(key);
+    if (draft != null) return draft;
+    const payment = paymentFor(clientId, period);
+    return payment?.amount_received != null ? String(payment.amount_received) : '';
+  }
+
+  function handleAmountReceivedChange(clientId: string, period: BillingPaymentPeriod, value: string) {
+    const key = paymentKey(clientId, period);
+    setAmountReceivedEdits((current) => new Map(current).set(key, value));
+    scheduleDebouncedSave(`${key}:amountReceived`, () => void commitAmountReceived(clientId, period, value));
+  }
+
+  function handleAmountReceivedBlur(clientId: string, period: BillingPaymentPeriod, value: string) {
+    const key = paymentKey(clientId, period);
+    cancelDebouncedSave(`${key}:amountReceived`);
+    void commitAmountReceived(clientId, period, value);
+  }
+
+  async function commitAmountReceived(clientId: string, period: BillingPaymentPeriod, rawValue: string) {
+    const key = paymentKey(clientId, period);
+    const nextStr = rawValue.trim();
+    if (nextStr && Number.isNaN(Number(nextStr))) return;
+
+    const current = paymentFor(clientId, period);
+    const committedStr = current?.amount_received != null ? String(current.amount_received) : '';
+    if (nextStr === committedStr) {
+      setAmountReceivedEdits((curr) => {
+        const next = new Map(curr);
+        next.delete(key);
+        return next;
+      });
+      return;
+    }
+
+    setRowStatus(clientId, 'saving');
+    setRowError(clientId, null);
+
+    const result = await upsertClientBillingPayment({
+      client_id: clientId,
+      month: selectedMonth,
+      period,
+      status: current?.status ?? 'pendiente',
+      paid_at: current?.paid_at ?? null,
+      partner_paid: current?.partner_paid ?? false,
+      partner_paid_at: current?.partner_paid_at ?? null,
+      settlement_id: current?.settlement_id ?? null,
+      amount_received: nextStr ? Number(nextStr) : null,
+    });
+
+    if (result.error) {
+      setRowStatus(clientId, 'error');
+      setRowError(clientId, result.error);
+      return;
+    }
+
+    if (result.data) replacePayment(result.data);
+    setAmountReceivedEdits((curr) => {
+      const next = new Map(curr);
+      next.delete(key);
+      return next;
+    });
+    setRowStatus(clientId, 'saved');
+  }
+
   function renderPaymentStatus(client: Client, period: BillingPaymentPeriod, billing: ClientBilling | undefined) {
     const payment = paymentFor(client.id, period);
     const isPaid = payment?.status === 'pagado';
@@ -1061,6 +1264,17 @@ export function FacturacionPage() {
             Cuenta de cobro: {formatCopExact(feeAmount + passThrough)} (incl. {formatCopExact(passThrough)} contenido)
           </span>
         )}
+        <input
+          className="form-input"
+          type="number"
+          min={0}
+          value={amountReceivedValue(client.id, period)}
+          onChange={(e) => handleAmountReceivedChange(client.id, period, e.target.value)}
+          onBlur={(e) => handleAmountReceivedBlur(client.id, period, e.target.value)}
+          placeholder={`Normal: ${formatCopExact(feeAmount)}`}
+          title="Monto de este cobro (si es distinto) — solo el fee, sin contenido"
+          style={{ width: '100%', fontSize: '0.62rem', padding: '3px 6px', height: 'auto' }}
+        />
       </div>
     );
   }
@@ -1196,6 +1410,29 @@ export function FacturacionPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, alignItems: 'start' }}>
           <PartnerPairCard samuel={totals.byReceiver.samuel} juanca={totals.byReceiver.juanca} />
+          <PartnerGoalCard
+            monthLabel={monthLabel}
+            expectedJuanca={partnerGoal.expectedJuanca}
+            expectedSamuel={partnerGoal.expectedSamuel}
+            goal={partnerGoal.goal}
+            received={partnerGoal.received}
+            missing={partnerGoal.missing}
+            payNow={partnerGoal.payNow}
+            rows={partnerGoal.rows}
+            monthSettlements={partnerGoal.monthSettlements}
+            onRegisterPayment={() => setRegisterPaymentModalOpen(true)}
+            onUndoPayment={(s) => void handleUndoPartnerPayment(s)}
+            undoingId={undoingSettlementId}
+            actionError={partnerGoalActionError}
+          />
+        </div>
+
+        {/* "Cruce entre socios" vieja — PROMPT_FACTURACION_V10 pidió quitarla
+            de la interfaz sin borrar netBalance/monthProjection/monthCross/
+            createSettlementAndMarkPaid. Nunca se renderiza (bandera en
+            false arriba del componente); solo sigue referenciada para que
+            el código quede intacto y listo para reactivarse. */}
+        {SHOW_LEGACY_NET_BALANCE_CARD && (
           <NetBalanceCard
             monthLabel={monthLabel}
             rows={monthCross.rows}
@@ -1212,7 +1449,7 @@ export function FacturacionPage() {
             settlements={billingSettlements}
             onSettle={() => void handleSettleBalance()}
           />
-        </div>
+        )}
 
         <ExtraIncomeSection
           monthLabel={monthLabel}
@@ -1626,6 +1863,14 @@ export function FacturacionPage() {
           initial={extraIncomeModalState === 'new' ? null : extraIncomeModalState}
           onClose={() => setExtraIncomeModalState(null)}
           onSaved={handleExtraIncomeSaved}
+        />
+      )}
+
+      {registerPaymentModalOpen && (
+        <RegisterPartnerPaymentModal
+          defaultAmount={partnerGoal.payNow}
+          onClose={() => setRegisterPaymentModalOpen(false)}
+          onSaved={handleRegisterPartnerPayment}
         />
       )}
     </div>
