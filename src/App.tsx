@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
-import { TrendingUp } from 'lucide-react';
+import brandLogo from './assets/brand-logo.png';
 import { BrandSignature } from './components/BrandSignature';
 import { Sidebar } from './components/Sidebar';
 import { useMetaSyncRows } from './hooks/useData';
@@ -137,7 +137,7 @@ function AppContent() {
           <header className="portal-shell-header">
             <div className="portal-logo-wrap">
               <div className="portal-logo-icon">
-                <TrendingUp size={20} color="oklch(0.12 0.03 250)" />
+                <img src={brandLogo} alt="" style={{ width: "100%", height: "100%", borderRadius: 8, display: "block" }} />
               </div>
               <span className="portal-logo-text">
                 Growth <span style={{ color: 'var(--cyan)' }}>Strategy</span>

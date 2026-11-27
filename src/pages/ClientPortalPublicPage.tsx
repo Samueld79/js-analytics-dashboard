@@ -889,7 +889,7 @@ export function ClientPortalPublicPage() {
                     style={{
                       position: 'relative',
                       aspectRatio: '1', borderRadius: 6, border: isSelected ? '2px solid var(--cyan)' : '1px solid var(--border)',
-                      background: count > 0 ? `oklch(0.72 0.15 200 / ${intensity})` : 'var(--surface-2)',
+                      background: count > 0 ? `oklch(0.66 0.19 262 / ${intensity})` : 'var(--surface-2)',
                       opacity: inMonth ? 1 : 0.35, cursor: 'pointer',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0,
                       color: 'var(--fg)', fontSize: '0.6rem', padding: 0,
