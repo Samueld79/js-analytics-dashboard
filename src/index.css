@@ -8,16 +8,16 @@
    ============================================================ */
 :root {
   /* Backgrounds */
-  --background:   oklch(0.14 0.025 250);
-  --surface:      oklch(0.19 0.030 250);
-  --surface-2:    oklch(0.23 0.035 250);
-  --surface-3:    oklch(0.27 0.038 250);
+  --background:   oklch(0.13 0.035 265);
+  --surface:      oklch(0.19 0.030 265);
+  --surface-2:    oklch(0.23 0.035 265);
+  --surface-3:    oklch(0.27 0.038 265);
 
   /* Cyan accent */
-  --cyan:         oklch(0.82 0.15 200);
-  --cyan-glow:    oklch(0.88 0.18 195);
-  --cyan-dim:     oklch(0.82 0.15 200 / 0.12);
-  --cyan-border:  oklch(0.82 0.15 200 / 0.30);
+  --cyan:         oklch(0.70 0.18 262);
+  --cyan-glow:    oklch(0.77 0.16 262);
+  --cyan-dim:     oklch(0.70 0.18 262 / 0.14);
+  --cyan-border:  oklch(0.70 0.18 262 / 0.32);
 
   /* Semantic */
   --success:      oklch(0.78 0.17 155);
@@ -28,13 +28,13 @@
   --danger-dim:   oklch(0.68 0.22 25 / 0.12);
 
   /* Text */
-  --fg:           oklch(0.97 0.008 250);
-  --fg-2:         oklch(0.75 0.015 250);
-  --fg-muted:     oklch(0.55 0.012 250);
+  --fg:           oklch(0.97 0.008 265);
+  --fg-2:         oklch(0.75 0.015 265);
+  --fg-muted:     oklch(0.55 0.012 265);
 
   /* Borders */
   --border:       oklch(1 0 0 / 0.08);
-  --border-hover: oklch(0.82 0.15 200 / 0.35);
+  --border-hover: oklch(0.70 0.18 262 / 0.38);
 
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, var(--cyan), var(--cyan-glow));
@@ -56,7 +56,7 @@
 
   /* Shadows */
   --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px -12px oklch(0 0 0 / 0.5);
-  --shadow-glow: 0 8px 32px -8px oklch(0.82 0.15 200 / 0.40);
+  --shadow-glow: 0 8px 32px -8px oklch(0.70 0.18 262 / 0.40);
   --shadow-lg:   0 24px 64px -16px oklch(0 0 0 / 0.6);
 
   /* Radii */
@@ -109,21 +109,21 @@
    ============================================================ */
 [data-theme="light"] {
   color-scheme: light;
-  --background:   oklch(0.97 0.006 250);
+  --background:   oklch(0.97 0.006 262);
   --surface:      oklch(1 0 0);
-  --surface-2:    oklch(0.94 0.008 250);
-  --surface-3:    oklch(0.90 0.010 250);
+  --surface-2:    oklch(0.94 0.008 262);
+  --surface-3:    oklch(0.90 0.010 262);
   --border:       oklch(0 0 0 / 0.08);
-  --border-hover: oklch(0.45 0.20 250 / 0.30);
-  --fg:           oklch(0.15 0.025 250);
-  --fg-2:         oklch(0.35 0.020 250);
-  --fg-muted:     oklch(0.52 0.015 250);
-  --cyan:         oklch(0.45 0.20 250);
-  --cyan-glow:    oklch(0.42 0.22 250);
-  --cyan-dim:     oklch(0.45 0.20 250 / 0.10);
-  --cyan-border:  oklch(0.45 0.20 250 / 0.25);
+  --border-hover: oklch(0.45 0.20 262 / 0.30);
+  --fg:           oklch(0.15 0.025 262);
+  --fg-2:         oklch(0.35 0.020 262);
+  --fg-muted:     oklch(0.52 0.015 262);
+  --cyan:         oklch(0.45 0.20 262);
+  --cyan-glow:    oklch(0.42 0.22 262);
+  --cyan-dim:     oklch(0.45 0.20 262 / 0.10);
+  --cyan-border:  oklch(0.45 0.20 262 / 0.25);
   --shadow-card:  0 1px 3px oklch(0 0 0 / 0.06), 0 4px 16px oklch(0 0 0 / 0.04);
-  --shadow-glow:  0 8px 32px -8px oklch(0.45 0.20 250 / 0.20);
+  --shadow-glow:  0 8px 32px -8px oklch(0.45 0.20 262 / 0.20);
 
   /* Legacy overrides */
   --color-bg-primary:        var(--background);
@@ -656,7 +656,7 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 600; }
 .btn-primary:hover {
   filter: brightness(1.08);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-glow), 0 12px 40px -8px oklch(0.82 0.15 200 / 0.5);
+  box-shadow: var(--shadow-glow), 0 12px 40px -8px oklch(0.70 0.18 262 / 0.5);
 }
 
 .btn-primary:active { transform: translateY(0); }
@@ -1108,7 +1108,7 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
 .ypw-day.is-past {
   background: var(--cyan-dim);
   border-color: var(--cyan-border);
-  box-shadow: 0 0 4px oklch(0.82 0.15 200 / 0.25);
+  box-shadow: 0 0 4px oklch(0.70 0.18 262 / 0.25);
 }
 
 .ypw-day.is-today {
@@ -1171,7 +1171,7 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
 
 .ai-featured-card:hover {
   border-color: var(--cyan);
-  box-shadow: var(--shadow-glow), 0 0 48px oklch(0.82 0.15 200 / 0.15);
+  box-shadow: var(--shadow-glow), 0 0 48px oklch(0.70 0.18 262 / 0.15);
   transform: translateY(-2px);
 }
 
@@ -1605,6 +1605,7 @@ tbody td.tabular { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; 
   overflow: hidden;
 }
 .sidebar-logo-icon {
+  overflow: hidden;
   width: 32px;
   height: 32px;
   border-radius: 8px;

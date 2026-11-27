@@ -12,9 +12,9 @@ const CARD: CSSProperties = {
   background: 'oklch(0.14 0.03 250 / 88%)',
   backdropFilter: 'blur(24px)',
   WebkitBackdropFilter: 'blur(24px)',
-  border: '1px solid oklch(0.78 0.16 200 / 22%)',
+  border: '1px solid oklch(0.72 0.18 262 / 22%)',
   borderRadius: 20,
-  boxShadow: '0 0 60px oklch(0.78 0.16 200 / 10%), 0 24px 64px oklch(0 0 0 / 40%)',
+  boxShadow: '0 0 60px oklch(0.72 0.18 262 / 10%), 0 24px 64px oklch(0 0 0 / 40%)',
 };
 
 type FocusState = { email: boolean; password: boolean };
@@ -28,7 +28,7 @@ function floatingLabel(value: string, focused: boolean): CSSProperties {
     transform: up ? 'none' : 'translateY(-50%)',
     transition: 'top 0.18s ease, transform 0.18s ease, font-size 0.18s ease, color 0.18s ease',
     fontSize: up ? '0.6rem' : '0.88rem',
-    color: focused ? 'oklch(0.78 0.16 200)' : 'oklch(1 0 0 / 38%)',
+    color: focused ? 'oklch(0.72 0.18 262)' : 'oklch(1 0 0 / 38%)',
     pointerEvents: 'none',
     letterSpacing: up ? '0.08em' : 'normal',
     fontFamily: up ? 'JetBrains Mono, monospace' : 'inherit',
@@ -42,9 +42,9 @@ function inputWrap(focused: boolean): CSSProperties {
     display: 'flex',
     alignItems: 'center',
     background: 'oklch(1 0 0 / 4%)',
-    border: `1px solid ${focused ? 'oklch(0.78 0.16 200 / 55%)' : 'oklch(1 0 0 / 10%)'}`,
+    border: `1px solid ${focused ? 'oklch(0.72 0.18 262 / 55%)' : 'oklch(1 0 0 / 10%)'}`,
     borderRadius: 10,
-    boxShadow: focused ? '0 0 0 3px oklch(0.78 0.16 200 / 10%)' : 'none',
+    boxShadow: focused ? '0 0 0 3px oklch(0.72 0.18 262 / 10%)' : 'none',
     transition: 'border-color 0.15s, box-shadow 0.15s',
     height: 54,
     overflow: 'hidden',
@@ -86,7 +86,7 @@ export function LoginPage() {
   const iconColor = (f: boolean) => ({
     position: 'absolute' as const,
     left: 16,
-    color: f ? 'oklch(0.78 0.16 200)' : 'oklch(1 0 0 / 30%)',
+    color: f ? 'oklch(0.72 0.18 262)' : 'oklch(1 0 0 / 30%)',
     transition: 'color 0.15s',
     pointerEvents: 'none' as const,
     flexShrink: 0,
@@ -133,12 +133,12 @@ export function LoginPage() {
               letterSpacing: '-0.01em',
             }}
           >
-            Growth Strategy<span style={{ color: 'oklch(0.78 0.16 200)' }}>.</span>
+            Growth Strategy<span style={{ color: 'oklch(0.72 0.18 262)' }}>.</span>
           </div>
           <div
             style={{
               fontSize: '0.62rem',
-              color: 'oklch(0.78 0.16 200 / 60%)',
+              color: 'oklch(0.72 0.18 262 / 60%)',
               letterSpacing: '0.2em',
               marginTop: 6,
               fontFamily: 'JetBrains Mono, monospace',
@@ -217,7 +217,7 @@ export function LoginPage() {
               marginTop: 8,
               width: '100%',
               height: 48,
-              background: loading ? 'oklch(0.78 0.16 200 / 50%)' : 'oklch(0.78 0.16 200)',
+              background: loading ? 'oklch(0.72 0.18 262 / 50%)' : 'oklch(0.72 0.18 262)',
               border: 'none',
               borderRadius: 10,
               color: 'oklch(0.12 0.03 250)',
@@ -230,7 +230,7 @@ export function LoginPage() {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              boxShadow: loading ? 'none' : '0 0 24px oklch(0.78 0.16 200 / 40%)',
+              boxShadow: loading ? 'none' : '0 0 24px oklch(0.72 0.18 262 / 40%)',
               transition: 'background 0.2s, box-shadow 0.2s, filter 0.15s',
             }}
             onMouseEnter={(e) => {

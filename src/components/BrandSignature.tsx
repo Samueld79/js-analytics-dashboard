@@ -22,7 +22,7 @@ export function BrandSignature({
       />
       <div className="brand-copy">
         <span className="brand-wordmark">
-          Growth Strategy<span style={{ color: 'hsl(180,100%,50%)' }}>.</span>
+          Growth Strategy<span style={{ color: 'var(--cyan)' }}>.</span>
         </span>
         {showSubtitle && <span className="brand-subline">{subtitle}</span>}
       </div>

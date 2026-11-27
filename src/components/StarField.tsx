@@ -48,7 +48,7 @@ export function StarField() {
         top: '50%', left: '50%',
         width: 600, height: 600,
         transform: 'translate(-50%, -50%)',
-        background: 'radial-gradient(circle, oklch(0.82 0.15 200 / 0.08) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, oklch(0.70 0.18 262 / 0.08) 0%, transparent 70%)',
         filter: 'blur(40px)',
         borderRadius: '50%',
         pointerEvents: 'none',

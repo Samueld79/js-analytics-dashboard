@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BrandSignature } from './BrandSignature';
+import brandLogo from '../assets/brand-logo.png';
 import {
   LayoutDashboard,
   Users,
@@ -206,7 +207,7 @@ export function Sidebar() {
         <div className="sidebar-brand">
           <div className="sidebar-logo-wrap">
             <div className="sidebar-logo-icon">
-              <TrendingUp size={18} color="oklch(0.12 0.03 250)" />
+              <img src={brandLogo} alt="" style={{ width: "100%", height: "100%", borderRadius: 8, display: "block" }} />
             </div>
             <span className="sidebar-logo-text">
               Growth <span style={{ color: 'var(--cyan)' }}>Strategy</span>
